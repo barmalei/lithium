@@ -1,0 +1,9 @@
+(INF)  Z  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+(INF)  Z  :: Lithium - project management tool v2.2-beta, Sep 2012  ::
+(INF)  Z  :: http://www.gravitysoft.org                             ::
+(INF)  Z  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+(WAR)  !  Override 'compilejava' command
+(INF)  Z  TARGET: 'compile:WEB-INF/src/nl/jnc/pubsub/onetrail/view/Companies.java'
+(INF)  Z  'WEB-INF/src/nl/jnc/pubsub/onetrail/view/Companies.java', SunJavaCompiler is not expired
+(INF)  Z  There is nothing to be done!
+(INF)  Z  TARGET 'compile:WEB-INF/src/nl/jnc/pubsub/onetrail/view/Companies.java' sucessfully DONE

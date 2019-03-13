@@ -1,0 +1,19 @@
+Usage:
+ "lithium [alias:]*artifact [arg]*"
+
+Predefined aliases:
+  require: - show an artifact dependencies 
+  tree:    - show artifact dependencies tree
+  cleanup: - cleanup artifact
+  info:    - show info about the given artifact
+  init:    - initialize lithium project
+ 
+  run:file             - generic code runner 
+  compile:file|mask    - generic code compiler
+  checkstyle:file|mask - checkstyle 
+  mvn:path             - run maven 
+  ant:                 - start ant script
+            
+Samples:
+    lithium compile:src/**/*.java  
+    lithium run:lib/test.py 
