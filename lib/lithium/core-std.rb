@@ -162,8 +162,8 @@ class Std
                 if File.exists?(path)
                     yield path.clone(File.expand_path(path.to_s))
                 elsif !Pathname.new(path.to_s).absolute?
-                    if !Artifact.context.nil? && !Artifact.context.owner.nil?
-                        home  = Artifact.context.owner.homedir
+                    if !Artifact.last_caller.nil? && !Artifact.last_caller.owner.nil?
+                        home  = Artifact.last_caller.owner.homedir
                         npath = File.join(home, path.to_s)
                         if File.exists?(npath)
                             yield path.clone(npath)

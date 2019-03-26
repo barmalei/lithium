@@ -59,7 +59,11 @@ STD_RECOGNIZERS({
 
 def BUILD_ARTIFACT(name)
     $current_artifact = nil
-    tree = ArtifactTree.new(name)
+
+    tree = Project.target.new_artifact {
+        ArtifactTree.new(name)
+    }
+
     tree.build()
     tree.norm_tree()
     BUILD_ARTIFACT_TREE(tree.root_node)

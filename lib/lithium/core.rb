@@ -28,6 +28,12 @@ require 'lithium/utils'
 class ArtifactName < String
     attr_reader :prefix, :suffix, :path, :path_mask, :mask_type
 
+    # return artname as is if it is passed as an instance of artifact name
+    def self.new(name)
+        return name if name.kind_of?(ArtifactName)
+        super(name)
+    end
+
     def initialize(name)
         name = name.to_s if name.kind_of?(Symbol) || name.kind_of?(Class)
         ArtifactName.nil_name(name)
@@ -57,7 +63,7 @@ class ArtifactName < String
     end
 
     def match(name)
-        artname = name.kind_of?(ArtifactName) ? name : ArtifactName.new(name)
+        artname = ArtifactName.new(name)
 
         # prefix doesn't match each other
         return false if @prefix != artname.prefix
@@ -104,7 +110,7 @@ class ArtifactMeta < Hash
 
     def initialize(*args, &block)
         clazz    = nil
-        @artname = args[0].kind_of?(ArtifactName) ? args[0] : ArtifactName.new(args[0])
+        @artname = ArtifactName.new(args[0])
         clazz    = args[0] if args[0].kind_of?(Class)
 
         # if there is only one argument then consider as a class or class name
@@ -149,27 +155,8 @@ class ArtifactMeta < Hash
         return mt
     end
 
-    def instantiate(name = nil, &block)
-        clazz = self[:clazz]
-        raise "Invalid artifact class" if clazz.nil?
-        begin
-            clazz = Module.const_get(clazz) if clazz.kind_of?(String)
-        rescue NameError
-            raise "Class '#{clazz}' not found"
-        end
-
-        if name.nil?
-            name = @artname
-        else
-            name = ArtifactName.new(name) if name.kind_of?(String)
-        end
-
-        return clazz.new(name.suffix.nil? ? self[:def_name] : name.suffix,
-            &(block.nil? ? self[:block] : Proc.new {
-                self.instance_eval &self[:block]
-                self.instance_eval &block
-            })
-        )
+    def ==(meta)
+        !meta.nil? && meta.class == self.class && meta[:clazz] == self[:clazz] && meta[:block] == self[:block] && meta[:def_name] == self[:def_name]
     end
 end
 
@@ -216,14 +203,14 @@ end
 #  "@ver"
 #
 class Artifact
-    attr_reader :name, :shortname, :ver, :owner
+    attr_reader :name, :shortname, :ver, :owner, :createdByMeta
 
     # context class is special wrapper object that redirect
     # its methods call to a wrapped (artifact object) target
     # object. Additionally it tracks a current target object
     # from which a method has been called.
     # c
-    class Context
+    class Proxy
         instance_methods.each() { |m|
             if not m.to_s =~ /__[a-z]+__/
                 undef_method m if not m.to_s =~ /object_id/
@@ -231,27 +218,49 @@ class Artifact
         }
 
         # keeps artifact call stack
-        @@context = []
+        @@calls_stack = []
 
-        def initialize(target)
-            raise 'Target has to be defined' if target.nil?
-            @target = target
+        def initialize(original)
+            raise 'Target has to be defined' if original.nil?
+            @original_instance = original
+        end
+
+        def top()
+            ow = self
+            while !ow.owner.nil? do
+                ow = ow.owner
+            end
+            return ow
+        end
+
+        def original_instance
+            @original_instance
+        end
+
+        def ==(prx)
+            prx && original_instance == prx.original_instance
         end
 
         def method_missing(meth, *args, &block)
             switched = false
-            if @@context.last != @target
-                @@context.push(@target)
+
+            #puts "method_missing():  stack size = #{@@calls_stack.length}  is last proxy ? =  #{defined? @@calls_stack.last.original_instance.expired?}"
+
+            if  @@calls_stack.length == 0 || @@calls_stack.last.original_instance != @original_instance
+                @@calls_stack.push(self)
                 switched = true
             end
+
             begin
-                return @target.send(meth, *args, &block)
+                return @original_instance.send(meth, *args, &block)
             ensure
-                @@context.pop() if switched
+                @@calls_stack.pop() if switched
             end
         end
 
-        def self.context() @@context.last end
+        def self.last_caller() @@calls_stack.last end
+
+        def self._calls_stack_() @@calls_stack end
     end
 
     def Artifact.required(clazz, &block)
@@ -280,28 +289,32 @@ class Artifact
     # !!! to keep track for the current context (instance
     # !!! where a method has been executed)
     def Artifact.new(*args,  &block)
-        instance = allocate()
-        ctx = Artifact.context
-        if instance.owner.nil? && !ctx.nil?
-            if ctx.kind_of?(Project)
-                instance.owner  = ctx
-            elsif !ctx.owner.nil?
-                instance.owner = ctx.owner
+        instance       = allocate()
+        instance_proxy = Proxy.new(instance)
+        last_caller    = Artifact.last_caller
+
+        unless last_caller.nil?
+            if last_caller.kind_of?(ArtifactContainer)
+                instance_proxy.owner = last_caller
+            elsif !last_caller.owner.nil?
+                instance_proxy.owner = last_caller.owner
             end
         end
         instance.send(:initialize, *args, &block)
-        Context.new(instance)
+        return instance_proxy
     end
 
     # return artifact instance whose method is currently called
-    def Artifact.context() Context.context() end
+    def Artifact.last_caller() Proxy.last_caller end
+
+    def Artifact._calls_stack_() Proxy._calls_stack_ end
 
     def initialize(name, &block)
         # test if the name of the artifact is not nil or empty string
         ArtifactName.nil_name(name)
 
         @name, @shortname = name, File.basename(name)
-        @owner ||= nil  # owner has to be set basing on calling context before initialize method in new
+        #@owner ||= nil  # owner has to be set basing on calling context before initialize method in new
 
         # block can be passed to artifact
         # it is expected the block setup class instance
@@ -309,11 +322,15 @@ class Artifact
         self.instance_eval(&block) if block
     end
 
+    def createdByMeta=(m)
+        @createdByMeta = m
+    end
+
     def owner=(value)
         if value.nil?
             @owner = value
         else
-            raise "Invalid project artifact type '#{value.class}'" unless value.kind_of?(Project)
+            raise "Invalid project artifact type '#{value.class}'" unless value.kind_of?(ArtifactContainer)
             @owner = value
         end
     end
@@ -358,7 +375,9 @@ class Artifact
     end
 
     # Overload "eq" operation of two artifact instances.
-    def ==(art) art && self.class == art.class && @name == art.name && @ver == art.ver && @owner == art.owner end
+    def ==(art)
+        art && self.class == art.class && @name == art.name && @ver == art.ver && owner == art.owner
+    end
 
     # return last time the artifact has been modified
     def mtime() -1 end
@@ -375,7 +394,23 @@ class ArtifactTree < Artifact
 
         def initialize(art, parent=nil)
             raise 'Artifact cannot be nil' if art.nil?
-            art = Project.artifact(art) if art.kind_of?(String)
+
+            # TODO: make sure this is more proper way of artifact building than commented below
+            if art.kind_of?(String)
+                if !parent.nil?
+                    puts "Node.initialize(): art = #{art}, parent = #{parent.art} parent owner = #{parent.art.owner}"
+                end
+
+                if parent.nil?
+                    art = Project.artifact(art)
+                else
+                    art = parent.art.owner.artifact(art)
+
+                    puts "Node.initialize(): Create #{art}, #{art.owner} dependencies by owner #{parent.art.owner}"
+                end
+            end
+            #art = Project.artifact(art) if art.kind_of?(String)
+            #
             @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
         end
 
@@ -413,7 +448,7 @@ class ArtifactTree < Artifact
     end
 
     def build_tree(root)
-        root.art.requires.each { |a|
+        root.art.requires.each { | a |
             kid_node, p = Node.new(a, root), root
             while p && p.art != kid_node.art
                 p = p.parent
@@ -670,153 +705,123 @@ class FileMask < FileArtifact
     def expired?() true end
 end
 
-#  Instantiate an artifact depending on condition the artifact name
-#  matches. Constructor should get name and block that defines mapping
-#  rules:
-#  {
-#     'regexp_string' | <reg_exp>  => artifact_class | artifact_alias (command name)
-#  }
-class ArtifactSelector < Artifact
-    def initialize(*args)
-        super
-
-        # Fetch mapping block
-        raise 'Artifact conditional map has not been defined' if @map.nil? || @map.length == 0
-
-        counter = 0
-        @map.each_pair { | k, v |
-            r = Regexp.new(k) if k.kind_of?(String)
-
-            if r.match(@name)
-                raise "Ambiguous artifact selector match for #{@name}" if counter > 0
-                counter += 1
-                if v.kind_of?(String)
-                    raise "Owner for '#{self.class}' class is not defined" if owner.nil?
-                    REQUIRE owner.artifact("#{v}:#{@name}")
-                elsif v.kind_of?(Class)
-                    REQUIRE v.new(@name)
-                else
-                    raise "Artifact '#{@name}' mapping has wrong type #{v.class}"
-                end
-            end
-        }
-
-        raise "No mapping is available for '#{@name}' artifact" if counter == 0
-    end
-
-    def build() end
-end
-
-# project artifact
-class Project < Directory
-    attr_reader :desc
-
-    @@target_project = nil
-
-    def self.target=(prj)
-        @@target_project = prj
-    end
-
-    def self.target()
-        @@target_project
-    end
-
-    def self.artifact(name, &block)
-        @@target_project.artifact(name, &block)
-    end
-
-    def self.create(home, owner = nil)
-        @@target_project = Project.new(home, owner) {
-            conf = File.join(home, '.lithium', 'project.rb')
-            self.instance_eval(File.read(conf)).call if File.exists? conf
-        }
-        return @@target_project
-    end
-
-    def initialize(*args, &block)
-        # means artifact meta are not shared with its children project
-        @contexts  = {}
-        self.owner = args[1] if args.length > 1
-        super(args[0], &block)
-        @desc ||= File.basename(args[0])
-    end
-
-    def top()
-        ow = self
-        while !ow.owner.nil? do
-            ow = ow.owner
-        end
-        return ow
-    end
-
-    #  artifact name can be
-    #    -- ArtifactMeta then artifact is created immediately,
-    #    -- String or ArtifactName first look in cache, then try to find in a context then try to build by local meta ...
-    #    -- Class
-    #
+module ArtifactContainer
     def artifact(name, &block)
-        artname = name.kind_of?(ArtifactName) ? name : ArtifactName.new(name)
-        return _artifacts[artname] if artname.path_mask.nil? && !_artifacts[artname].nil?  # try to fetch the artifact from cache
+        raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
 
-        unless artname.path.nil?
-            ctx = @contexts[artname.path]
-            ctx = @contexts.detect { | p | p[0].match(artname.path) } if ctx.nil?
-            return ctx[1].artifact(name, &block) unless ctx.nil?
-        end
+        artname = ArtifactName.new(name)
 
         # fund local info about the given artifact
-        key, meta = find_meta(artname)
-
+        meta = find_meta(artname)
         if meta.nil?
-            if artname.path.nil? || !match(artname.path)
-                # path nil or doesn't match project then delegate finding an artifact in an owner project context
-                return owner.artifact(name, &block) unless owner.nil?
+            # meta cannot be locally found try to delegate search to owner
+            # path nil or doesn't match project then delegate finding an artifact in an owner project context
+            return owner.artifact(name, &block) if !owner.nil? && (artname.path.nil? || !match(artname.path))
+            meta = _meta_from_owner(artname)
+
+            unless meta.nil?
+                raise "Seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
-                # path matches the project find meta in owner hierarchy and resolve it in the context of the project
-                ow = owner
-                while !ow.nil? && meta.nil? do
-                    key, meta = ow.find_meta(artname)
-                    ow = ow.owner
-                end
+                meta = _meta_by_name(artname)
             end
+            raise NameError.new("No artifact is associated with '#{name}'") if meta.nil?
         end
 
-        # TODO: analyze if this should be done in context owner or the child
-        if meta.nil?
-            # try to treat artifact prefix as a class name
-            unless artname.prefix.nil?
-                clazz = nil
-                begin
-                    clazz = Module.const_get(artname.prefix[0..-2])
-                rescue NameError
-                    raise "Artifact class cannot be detected by '#{artname}'"
-                end
-
-                # this type of artifacts cannot be cached, so return it
-                return clazz.new(artname.suffix, &block) unless clazz.nil?
-            end
-            raise NameError.new("No artifact is associated with '#{name}'")
+        # manage cache
+        if block.nil?
+            art = _artifact_from_cache(artname, meta)
+        else
+            _remove_from_cache(artname, meta)
+            art = nil
         end
 
-        art = meta.instantiate(artname, &block)
+        art = _artifact_by_meta(artname, meta, &block) if art.nil?
+        if art.kind_of?(ArtifactContainer)
+            art = _cache_artifact(artname, meta, art)
+            art = art.artifact(artname.suffix)
+        end
 
-        # key implicitly identifies artifact then store the artifact in cache
-        _artifacts[artname] = art if artname == key
+        return _cache_artifact(artname, meta, art)
+    end
+
+    def _cache_artifact(artname, meta, art)
+        if art.kind_of?(ArtifactContainer)
+            _artifacts_cache[meta.artname] = art
+        elsif artname == meta.artname
+            _artifacts_cache[artname] = art
+        end
+        return art
+    end
+
+    def _artifact_from_cache(name, meta)
+        artname = ArtifactName.new(name)
+        if !meta.nil? && meta[:clazz].included_modules.include?(ArtifactContainer)
+            return _artifacts_cache[meta.artname]
+        elsif !_artifacts_cache[artname].nil? && artname.path_mask.nil?
+            return _artifacts_cache[artname]
+        else
+            return nil
+        end
+    end
+
+    # { <art_name> => <art_class_instance>, ...}
+    def _artifacts_cache()
+        @artifacts = {} unless defined? @artifacts
+        @artifacts
+    end
+
+    def _remove_from_cache(artname, meta)
+        artname = ArtifactName.new(name)
+        if meta[:clazz].included_modules.include?(ArtifactContainer)
+            _artifacts_cache.delete(meta.artname) if _artifacts_cache[meta.artname]
+        elsif artname.path_mask.nil?
+            _artifacts_cache.delete(artname) if _artifacts_cache[artname]
+        end
+    end
+
+    def _artifact_by_meta(name, meta, &block)
+        artname = ArtifactName.new(name)
+
+        clazz = meta[:clazz]
+        raise 'Invalid nil artifact class' if clazz.nil?
+        begin
+            clazz = Module.const_get(clazz) if clazz.kind_of?(String)
+        rescue NameError
+            raise "Class '#{clazz}' not found"
+        end
+
+        art = clazz.new(artname.suffix.nil? ? meta[:def_name] : artname.suffix,
+            &(block.nil? ? meta[:block] : Proc.new {
+                self.instance_eval &meta[:block] unless meta[:block].nil?
+                self.instance_eval &block
+            })
+        )
+
+        art.createdByMeta = meta
 
         # TODO: the key :clean is never set, since ARTIFACT doesn't support the parameter
         art.cleanup() if meta[:clean] == true
         return art
     end
 
-    def homedir()
-        return @name if @is_absolute
-        return super
+    def _meta_by_name(name)
+        artname = ArtifactName.new(name)
+        begin
+            return ArtifactMeta.new(artname) unless artname.prefix.nil?
+        rescue NameError => e
+        end
+        return nil
     end
 
-    # { <art_name> => <art_class_instance>, ...}
-    def _artifacts()
-        @artifacts = {} unless defined? @artifacts
-        @artifacts
+    def _meta_from_owner(name)
+        artname = ArtifactName.new(name)
+        ow   = owner
+        meta = nil
+        while !ow.nil? && meta.nil? do
+            meta = ow.find_meta(artname)
+            ow = ow.owner
+        end
+        return meta;
     end
 
     # ArtifacName => {
@@ -830,27 +835,16 @@ class Project < Directory
     end
 
     def find_meta(name)
-        artname = name.kind_of?(ArtifactName) ? name : ArtifactName.new(name)
+        artname = ArtifactName.new(name)
         meta    = _meta[artname]
-        return _meta.detect { | p | p[0].match(artname) } if meta.nil?
-        return [ artname, meta ]
+        return meta unless meta.nil?
+        meta = _meta.detect { | p | p[0].match(artname) }
+        return meta[1] unless meta.nil?
+        return nil
     end
 
-    def expired?() true end
-
-    def build() end
-
-    def what_it_does()
-        nil
-    end
-
-    def CONTEXT(name, path)
-        path = fullpath(File.join('.lithium', path)) unless Pathname.new(path).absolute?
-        raise "Context configuration path '#{path}' is invalid" if !File.exists?(path) || File.directory?(path)
-        @contexts[ArtifactName.new(name)] = Project.new(homedir, self) {
-            self.instance_eval(File.read(path)).call
-        }
-        @contexts = @contexts.sort.to_h
+    def ==(prj)
+        super(prj) && _meta == prj._meta
     end
 
     #
@@ -860,10 +854,7 @@ class Project < Directory
         m = ArtifactMeta.new(*args, &block)
 
         # try to find previously stored meta
-        if _meta[m.artname]
-            puts "Override previously defined '#{m.artname}' artifact"
-            _artifacts.delete(m.artname) if m.artname.path_mask.nil? && _artifacts[m.artname]
-        end
+        puts "Override previously defined '#{m.artname}' artifact" if _meta[m.artname]
 
         # store meta
         _meta[m.artname] = m
@@ -890,4 +881,64 @@ class Project < Directory
 
     def REMOVE(name)
     end
+end
+
+
+# project artifact
+class Project < Directory
+    attr_reader :desc
+
+    include ArtifactContainer
+
+    @@target_project = nil
+
+    def self.target=(prj)
+        @@target_project = prj
+    end
+
+    def self.target()
+        @@target_project
+    end
+
+    def self.artifact(name, &block)
+        @@target_project.artifact(name, &block)
+    end
+
+    def self.create(home, owner = nil)
+        @@target_project = Project.new(home, owner) {
+            conf = File.join(home, '.lithium', 'project.rb')
+            self.instance_eval(File.read(conf)).call if File.exists? conf
+        }
+        return @@target_project
+    end
+
+    def initialize(*args, &block)
+        # means artifact meta are not shared with its children project
+        self.owner = args[1] if args.length > 1
+        super(args[0], &block)
+        @desc ||= File.basename(args[0])
+    end
+
+    def new_artifact(&block)
+        art = block.call
+        return art
+    end
+
+    def homedir()
+        return @name if @is_absolute
+        return super
+    end
+
+    def expired?() true end
+
+    def build() end
+
+    def what_it_does()
+        nil
+    end
+end
+
+
+class FileMaskContainer < FileMask
+    include ArtifactContainer
 end

@@ -58,7 +58,8 @@ end
 class RunJavaCode < JavaFileRunner
     def initialize(*args)
         super
-        REQUIRE "compilejava:#{name}"
+        # TODO: hardcoded artifact prefix
+        REQUIRE "compile:#{name}"
     end
 
     def build_target()

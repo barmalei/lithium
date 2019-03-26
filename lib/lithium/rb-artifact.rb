@@ -14,20 +14,24 @@ class RUBY < Artifact
     def initialize(name)
         super
 
-        # TODO: File.dirname($lithium_code) is ugly
-        @libs ||=  (owner.nil? || owner.name != File.dirname($lithium_code) ? [ 'lib' ] : [ '.lithium/lib' ])
-        @ruby_path = ''
+        @libs      ||= [ 'lib' ]
+        @ruby_path ||= ''
         @libs.each { | path |
-            path = "#{homedir()}/#{path}" if !Pathname.new(path).absolute?()
-            raise "Invalid Ruby lib path - '#{path}'" if !File.directory?(path)
-            @ruby_path = "#{@ruby_path} -I#{path}"
+            path = File.join(homedir, path) if !Pathname.new(path).absolute?
+            if File.directory?(path)
+                @ruby_path = "#{@ruby_path} -I#{path}"
+            else
+                puts "Ruby library path '#{path}' cannot be found"
+            end
         }
 
+        path = File.join(homedir, '.lithium', 'lib')
+        @ruby_path = "#{@ruby_path} -I#{path}" if File.directory?(path)
     end
 
     def ruby() "ruby #{@ruby_path}" end
     def build() end
-    def what_it_does() "Initialize Ruby environment '#{@name}'" end
+    def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{@ruby_path}'" end
 end
 
 # Run ruby script

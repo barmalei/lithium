@@ -237,15 +237,14 @@ class TestCore < Test::Unit::TestCase
         prj.ARTIFACT("a/b/c", FileArtifact)
         mm = prj.find_meta("a/b/c")
         assert_not_nil(mm);
-        assert_equal(mm.length, 2);
-        assert_equal(mm[0], "a/b/c")
-        assert_equal(mm[1][:clazz], FileArtifact)
-        assert_nil(mm[1][:block])
-        assert_nil(mm[1][:def_value])
+        assert_equal(mm.artname, "a/b/c")
+        assert_equal(mm[:clazz], FileArtifact)
+        assert_nil(mm[:block])
+        assert_nil(mm[:def_value])
 
         aa = prj.artifact("a/b/c")
         assert_not_nil(aa)
-        assert_equal(prj._artifacts[ArtifactName.new(aa.name)], aa)
+        assert_equal(prj._artifact_from_cache(aa.name, prj.find_meta(aa.name)), aa)
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "a/b/c")
         assert_equal(aa.owner, prj)
@@ -253,7 +252,9 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.homedir, prj.homedir)
 
         aa = prj.artifact("FileArtifact:a/b/k")
-        assert_nil(prj._artifacts[ArtifactName.new("FileArtifact:" + aa.name)])
+        assert_equal(aa.name, "a/b/k")
+        key = "FileArtifact:" + aa.name
+        assert_equal(prj._artifact_from_cache(key, prj.find_meta(key)), aa)
         assert_nil(prj.find_meta("a/b/k"))
         assert_nil(prj.find_meta("FileArtifact:a/b/k"))
         assert_not_nil(aa)
@@ -263,11 +264,13 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.homedir, prj.homedir)
 
         aa = prj.artifact("FileArtifact:a/b/k") {
+            puts "!!!!!!!!!!!!!!!!!!!!!! #{self}"
             @test = 100
         }
         assert_nil(prj.find_meta("a/b/k"))
         assert_nil(prj.find_meta("FileArtifact:a/b/k"))
-        assert_nil(prj._artifacts[ArtifactName.new("FileArtifact:" + aa.name)])
+        key = "FileArtifact:" + aa.name
+        assert_equal(prj._artifact_from_cache(key, nil), aa)
         assert_not_nil(aa)
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "a/b/k")
@@ -385,6 +388,33 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.fullpath, File.join(pw, "test/*.java"))
         assert_equal(aa.homedir, prj.homedir)
         assert_equal(aa.instance_variable_get("@test"), 4000)
+
+        art  = Artifact.new("aaa")
+        fart = FileArtifact.new(pw)
+        prj1 = Project.new(pw)
+        prj2 = Project.new(pw)
+        assert_true(prj1 == prj2)
+        assert_false(prj1 == fart)
+        assert_false(prj2 == fart)
+        assert_false(prj1 == art)
+        assert_false(prj2 == art)
+        assert_false(fart == art)
+
+        prj1.ARTIFACT(FileArtifact)
+        assert_false(prj1 == prj2)
+
+        prj2.ARTIFACT(FileArtifact)
+        assert_true(prj1 == prj2)
+
+        prj1.ARTIFACT("test:*", Project) {
+            ARTIFACT("s", FileArtifact)
+        }
+
+        assert_false(prj1 == prj2)
+        prj11 = prj1.artifact("test:s")
+
+    #assert_false(prj1 == )
+
     end
 
     def test_filecommand_artifact()
@@ -394,20 +424,6 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.fullpath, File.join(Dir.pwd, "test/test"))
         assert_true(aa.expired?)
     end
-
-    def test_selector_artifact()
-        aa = ArtifactSelector.new("*") {
-            @map = {
-                '\.java$'   => 'runjava'
-
-            }
-        }
-        assert_equal(aa.name, "test/test")
-        assert_equal(aa.fullpath, File.join(Dir.pwd, "test/test"))
-        assert_true(aa.expired?)
-    end
-
-    ArtifactSelector
 
     def test_artname_match()
         aa = ArtifactName.new("compile:test/test/a")
@@ -498,7 +514,22 @@ class TestCore < Test::Unit::TestCase
         assert_nil(aa[:def_value])
         assert_not_nil(aa[:block])
         assert_nil(aa[:clean])
+
+        mm1 = ArtifactMeta.new(nn) {}
+        mm2 = ArtifactMeta.new(nn)
+        assert_false(mm1 == mm2)
+
+        mm1 = ArtifactMeta.new(nn)
+        mm2 = ArtifactMeta.new(nn)
+        assert_true(mm1 == mm2)
+
+        mm1 = ArtifactMeta.new(FileArtifact)
+        mm2 = ArtifactMeta.new(Directory)
+        assert_false(mm1 == mm2)
     end
 end
+
+
+
 
 

@@ -11,6 +11,9 @@ class Touch < FileCommand
         super
         go_to_homedir()
         path = fullpath()
+
+        puts "<<<< #{path}"
+
         File.utime(File.atime(path), Time.now(), path) if File.exists?(path)
     end
 end

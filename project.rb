@@ -1,21 +1,9 @@
 -> {
     ARTIFACT('touch:*', Touch)
 
-    ARTIFACT('runjava:**/*.java',  RunJavaCode) { }
-
-    ARTIFACT('runjar:**/*.java',      RunJAR)
-    ARTIFACT('rungroovy:**/*.groovy', RunGroovyScript)
-    ARTIFACT('runkotlin:**/*.kt',     RunKotlinCode)
-    ARTIFACT('runscala:**/*.scala',   RunScalaCode)
-    ARTIFACT('runclass:**/*.class',   RunJavaClass)
-    ARTIFACT('runrb:**/*.rb',         RunRubyScript)
-
     ARTIFACT('minjs:**/*.js',     CompressJavaScript)
-    ARTIFACT('runjs:**/*.js',     RunNodejs)
-    ARTIFACT('runpy:**/*.py',     RunPythonScript)
-    ARTIFACT('runphp:**/*.php',    RunPhpScript)
     ARTIFACT('openhtml:**/*.html',  OpenHTML)
-    ARTIFACT('runsh:**/*.sh',     RunShell)
+
     ARTIFACT('mvn:*',  RunMaven)
     ARTIFACT('buildsass:**/*.sass', BuildVaadinSass)
 
@@ -27,57 +15,36 @@
         @script = $arguments.length > 0 ? $arguments.join(' ') : $stdin.read.strip
     }
 
+    ARTIFACT("run:*", FileMaskContainer) {
+        ARTIFACT('**/*.java',   RunJavaCode)
+        ARTIFACT('run:**/*.js',     RunNodejs)
+        ARTIFACT('run:**/*.py',     RunPythonScript)
+        ARTIFACT('run:**/*.php',    RunPhpScript)
+        ARTIFACT('run:**/*.sh',     RunShell)
+        ARTIFACT('run:**/*.jar',    RunJAR)
+        ARTIFACT('run:**/*.groovy', RunGroovyScript)
+        ARTIFACT('run:**/*.kt',     RunKotlinCode)
+        ARTIFACT('run:**/*.scala',  RunScalaCode)
+        ARTIFACT('run:**/*.class',  RunJavaClass)
+        ARTIFACT('**/*.rb',  RunRubyScript)
+    }
 
-    ARTIFACT('compilejava:**/*.java',     JavaCompiler) { @options = "-Xlint:deprecation" }
-    ARTIFACT('compilegroovy:**/*.groovy', GroovyCompiler)
-    ARTIFACT('compilekotlin:**/*.kt',    CompileKotlin)
-    ARTIFACT('compilescala:**/*.scala',  CompileScala)
-    ARTIFACT('compilerb:**/*.rb',     ValidateRubyScript)
-    ARTIFACT('compilephp:**/*.php', ValidatePhpScript)
+    ARTIFACT("compile:*", FileMaskContainer) {
+        ARTIFACT('**/*.java',   JavaCompiler) { @options = "-Xlint:deprecation" }
+        ARTIFACT('**/*.groovy', GroovyCompiler)
+        ARTIFACT('**/*.kt',     CompileKotlin)
+        ARTIFACT('**/*.scala',  CompileScala)
+        ARTIFACT('**/*.rb',     ValidateRubyScript)
+        ARTIFACT('**/*.php',    ValidatePhpScript)
 
-    ARTIFACT('compilepy:**/*.py', ValidatePythonScript)
-    ARTIFACT('compilexml:**/*.xml', ValidateXML)
-    ARTIFACT('compilett:**/*.tt', CompileTTGrammar)
-    ARTIFACT('compilesass:**/*.sass', CompileSass)
+        ARTIFACT('**/*.py',   ValidatePythonScript)
+        ARTIFACT('**/*.xml',  ValidateXML)
+        ARTIFACT('**/*.tt',   CompileTTGrammar)
+        ARTIFACT('**/*.sass', CompileSass)
+    }
 
     ARTIFACT('checkstyle:**/*.java', CheckStyle)
     ARTIFACT('pmd:**/*.java',        PMD)
-
-    ARTIFACT('run:**/*', ArtifactSelector) {
-        @map = {
-          '\.java$'   => 'runjava',
-          '\.class$'  => 'runclass',
-          '\.kt$'     => 'runkotlin',
-          '\.scala$'  => 'runscala',
-          '\.jar$'    => 'runjar',
-          '\.rb$'     => 'runrb',
-          '\.py$'     => 'runpy',
-          '\.js$'     => 'runjs',
-          '\.sh$'     => 'runsh',
-          '\.html$'   => 'openhtml',
-          '\.php$'    => 'runphp',
-          '\.groovy$' => 'rungroovy'
-        }
-    }
-
-    ARTIFACT('compile:**/*', ArtifactSelector) {
-        @map =  {
-          '\.java$'    => 'compilejava',
-          '\.rb$'      => 'compilerb',
-          '\.py$'      => 'compilepy',
-          '\.xml$'     => 'compilexml',
-          '\.kt$'      => 'compilekotlin',
-          '\.scala$'   => 'compilescala',
-          '\.groovy$'  => 'compilegroovy',
-          '\.c$'       => 'make',
-          '\.cpp$'     => 'make',
-          'pom\.xml$'  => 'mvn',
-          '\.php$'     => 'compilephp',
-          '\.tt$'      => 'compilett',
-          '\.treetop$' => 'compilett',
-       #   '\.scss$'   => 'compilesass',
-          '\.scss$'    => 'buildsass'  }
-    }
 
     ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
 

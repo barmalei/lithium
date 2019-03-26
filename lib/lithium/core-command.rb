@@ -134,33 +134,21 @@ class INIT < FileCommand
 end
 
 # list all configured artifacts
-class LIST < Artifact
+class LIST < Directory
     def build()
         ls_artifacts()
-
-        #TODO: analyze and remove
-        # if @name == 'artifacts'
-        #     ls_artifacts()
-        # elsif @name == 'all'
-        #     puts "Artifacts list"
-        #     puts "#{'='*60}"
-        #     puts
-        # else
-        #     raise "'#{@name}' is unknown artifacts list type"
-        # end
     end
 
     def ls_artifacts()
-
-
-        Project.target._artifacts.each_value { |e|
-            if e.kind_of?(Artifact)
-                n, clazz = e.name, e.class.to_s
-            else
-                n, clazz = e[0][0], e[0][-1].to_s
-            end
+        puts "Project owner '#{Project.target.owner.nil? ? 'nil' : Project.target.owner.homedir}'"
+        Project.target._meta.each_value { |e|
+            n, clazz = e.artname, e[:clazz]
             puts sprintf "  %-20s('%s')\n", clazz, n
         }
+    end
+
+    def expired?
+        true
     end
 
     def what_it_does() "List project '#{@name}' artifacts" end
