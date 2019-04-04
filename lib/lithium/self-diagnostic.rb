@@ -136,9 +136,6 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.requires, [ "test1", "test2" ])
     end
 
-    def test_
-    end
-
     def test_artname_sort()
         for i in 1..10 do
             arts = [
@@ -188,39 +185,39 @@ class TestCore < Test::Unit::TestCase
         end
     end
 
-    def test_fileartifact()
-        pw = Dir.pwd
+    # def test_fileartifact()
+    #     pw = Dir.pwd
 
-        fa = FileArtifact.new("test/a")
-        assert_equal(fa.name, "test/a")
-        assert_equal(fa.homedir, pw)
-        assert_equal(fa.fullpath, File.join(pw, fa.name))
-        assert_equal(fa.fullpath("b"), File.join(pw, "b"))
-        assert_false(fa.is_absolute)
-        assert_false(fa.is_permanent)
-        assert_equal(fa.mtime, -1)
-        assert_false(fa.match("a"))
-        assert_false(fa.match("test/a"))
+    #     fa = FileArtifact.new("test/a")
+    #     assert_equal(fa.name, "test/a")
+    #     assert_equal(fa.homedir, pw)
+    #     assert_equal(fa.fullpath, File.join(pw, fa.name))
+    #     assert_equal(fa.fullpath("b"), File.join(pw, "b"))
+    #     assert_false(fa.is_absolute)
+    #     assert_false(fa.is_permanent)
+    #     assert_equal(fa.mtime, -1)
+    #     assert_false(fa.match("a"))
+    #     assert_false(fa.match("test/a"))
 
-        fa = FileArtifact.new("/test/a")
-        assert_equal(fa.name, "/test/a")
-        assert_equal(fa.homedir, "/test")
-        assert_equal(fa.fullpath, fa.name)
-        assert_equal(fa.fullpath("b"), "/test/b")
-        assert_true(fa.is_absolute)
-        assert_false(fa.is_permanent)
-        assert_equal(fa.mtime, -1)
-        assert_false(fa.match("a"))
-        assert_false(fa.match("test/a"))
-        assert_true(fa.match("/test"))
-        assert_false(fa.match("/test2"))
-        assert_false(fa.match("/test22222"))
-        assert_true(fa.match("/test/**/*"))
-        assert_true(fa.match("/test/*"))
-        assert_true(fa.match("/test/a"))
-        assert_true(fa.match("/test/a/*"))
-        assert_false(fa.match("/test2/a/*"))
-    end
+    #     fa = FileArtifact.new("/test/a")
+    #     assert_equal(fa.name, "/test/a")
+    #     assert_equal(fa.homedir, "/test")
+    #     assert_equal(fa.fullpath, fa.name)
+    #     assert_equal(fa.fullpath("b"), "/test/b")
+    #     assert_true(fa.is_absolute)
+    #     assert_false(fa.is_permanent)
+    #     assert_equal(fa.mtime, -1)
+    #     assert_false(fa.match("a"))
+    #     assert_false(fa.match("test/a"))
+    #     assert_true(fa.match("/test"))
+    #     assert_false(fa.match("/test2"))
+    #     assert_false(fa.match("/test22222"))
+    #     assert_true(fa.match("/test/**/*"))
+    #     assert_true(fa.match("/test/*"))
+    #     assert_true(fa.match("/test/a"))
+    #     assert_true(fa.match("/test/a/*"))
+    #     assert_false(fa.match("/test2/a/*"))
+    # end
 
     def test_project()
         pw  = Dir.pwd
@@ -264,7 +261,6 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.homedir, prj.homedir)
 
         aa = prj.artifact("FileArtifact:a/b/k") {
-            puts "!!!!!!!!!!!!!!!!!!!!!! #{self}"
             @test = 100
         }
         assert_nil(prj.find_meta("a/b/k"))
@@ -283,9 +279,10 @@ class TestCore < Test::Unit::TestCase
         prj.ARTIFACT("*", FileArtifact) { @test = 300 }
         prj.ARTIFACT("a/b/*", FileArtifact) { @test = 400 }
 
+
         aa = prj.artifact("a/b/y")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new(aa.name)])
+        assert_nil(prj._artifact_from_cache(aa.name, nil))
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "a/b/y")
         assert_equal(aa.owner, prj)
@@ -295,7 +292,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("a/y/y")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new(aa.name)])
+        assert_nil(prj._artifact_from_cache(aa.name, nil))
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "a/y/y")
         assert_equal(aa.owner, prj)
@@ -305,7 +302,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("a/yy/y")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new(aa.name)])
+        assert_nil(prj._artifact_from_cache(aa.name, nil))
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "a/yy/y")
         assert_equal(aa.owner, prj)
@@ -315,7 +312,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("b")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new(aa.name)])
+        assert_nil(prj._artifact_from_cache(aa.name, nil))
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "b")
         assert_equal(aa.owner, prj)
@@ -329,7 +326,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("b")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new(aa.name)])
+        assert_nil(prj._artifact_from_cache(aa.name, nil))
         assert_true(aa.kind_of?(FileArtifact))
         assert_equal(aa.name, "b")
         assert_equal(aa.owner, prj)
@@ -351,7 +348,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("action:")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new("action:" + aa.name)])
+        assert_nil(prj._artifact_from_cache("action:" + aa.name, nil))
         assert_true(aa.class == FileMask)
         assert_equal(aa.name, ".")
         assert_equal(aa.owner, prj)
@@ -361,7 +358,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("action:test")
         assert_not_nil(aa)
-        assert_not_nil(prj._artifacts[ArtifactName.new("action:" + aa.name)])
+        assert_not_nil(prj._artifact_from_cache("action:" + aa.name, nil))
         assert_true(aa.class == FileArtifact)
         assert_equal(aa.name, "test")
         assert_equal(aa.owner, prj)
@@ -371,7 +368,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("action:test/aa")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new("action:" + aa.name)])
+        assert_nil(prj._artifact_from_cache("action:" + aa.name, nil))
         assert_true(aa.class == FileCommand)
         assert_equal(aa.name, "test/aa")
         assert_equal(aa.owner, prj)
@@ -381,7 +378,7 @@ class TestCore < Test::Unit::TestCase
 
         aa = prj.artifact("action:test/*.java")
         assert_not_nil(aa)
-        assert_nil(prj._artifacts[ArtifactName.new("action:" + aa.name)])
+        assert_nil(prj._artifact_from_cache("action:" + aa.name, nil))
         assert_true(aa.class == FileCommand)
         assert_equal(aa.name, "test/*.java")
         assert_equal(aa.owner, prj)
@@ -409,12 +406,7 @@ class TestCore < Test::Unit::TestCase
         prj1.ARTIFACT("test:*", Project) {
             ARTIFACT("s", FileArtifact)
         }
-
         assert_false(prj1 == prj2)
-        prj11 = prj1.artifact("test:s")
-
-    #assert_false(prj1 == )
-
     end
 
     def test_filecommand_artifact()
@@ -526,6 +518,42 @@ class TestCore < Test::Unit::TestCase
         mm1 = ArtifactMeta.new(FileArtifact)
         mm2 = ArtifactMeta.new(Directory)
         assert_false(mm1 == mm2)
+
+        nn = 'FileArtifact:test/com'
+        am1 = ArtifactMeta.new(nn)
+        am2 = ArtifactMeta.new(am1)
+        assert_equal(am1, am2)
+        assert_not_equal(am1.object_id, am2.object_id)
+        assert_equal(nn,  am1.artname)
+        assert_equal(nn,  am2.artname)
+        assert_nil(am1[:def_value])
+        assert_nil(am1[:block])
+        assert_nil(am1[:clean])
+        assert_nil(am2[:def_value])
+        assert_nil(am2[:block])
+        assert_nil(am2[:clean])
+
+        am1 = ArtifactMeta.new(nn)  { @test = 11; @test2 = 212 }
+        am2 = ArtifactMeta.new(am1) { @test = 12 }
+        aa  = am2[:clazz].new(am2.artname, &am2[:block])
+        assert_equal(aa.class, FileArtifact)
+        assert_equal(aa.name, nn)
+        assert_equal(aa.instance_variable_get("@test"), 12)
+        assert_equal(aa.instance_variable_get("@test2"), 212)
+
+        am1 = ArtifactMeta.new(nn)
+        am2 = ArtifactMeta.new(am1) { @test = 12 }
+        aa  = am2[:clazz].new(am2.artname, &am2[:block])
+        assert_equal(aa.class, FileArtifact)
+        assert_equal(aa.name, nn)
+        assert_equal(aa.instance_variable_get("@test"), 12)
+
+        am1 = ArtifactMeta.new(nn) { @test = 1222 }
+        am2 = ArtifactMeta.new(am1)
+        aa  = am2[:clazz].new(am2.artname, &am2[:block])
+        assert_equal(aa.class, FileArtifact)
+        assert_equal(aa.name, nn)
+        assert_equal(aa.instance_variable_get("@test"), 1222)
     end
 end
 

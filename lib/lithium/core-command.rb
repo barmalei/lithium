@@ -10,6 +10,28 @@ class CLEANUP < Artifact
     def what_it_does() "Cleanup '#{@name}', #{Project.artifact(@name).class}" end
 end
 
+# Display registered artifact
+class META < Artifact
+    def build()
+        # art = nil;
+        # begin
+        #     art = Project.current().artifact(name)
+        # rescue
+        # end
+        # puts "------- #{art.createdByMeta}"
+
+        show(Project.current(), Projet.current())
+    end
+
+    def show(cnt, art, shift = '    ')
+        cnt._meta.each { | artname, meta |
+            puts "!!!!!!!!!!!!!!!!!!!!!!!" if art.createdByMeta == meta
+            puts "#{shift}#{art && art.createdByMeta == meta ? '***' : ''}['#{artname}' => #{meta[:clazz]}]"
+            show(meta[:clazz].new(artname, &meta[:block]), art, shift + '    ') if meta[:clazz] == FileMaskContainer
+        }
+    end
+end
+
 class REQUIRE < Artifact
     def build()
         cc = 0
@@ -140,8 +162,8 @@ class LIST < Directory
     end
 
     def ls_artifacts()
-        puts "Project owner '#{Project.target.owner.nil? ? 'nil' : Project.target.owner.homedir}'"
-        Project.target._meta.each_value { |e|
+        puts "Project owner '#{Project.current.owner.nil? ? 'nil' : Project.current.owner.homedir}'"
+        Project.current._meta.each_value { |e|
             n, clazz = e.artname, e[:clazz]
             puts sprintf "  %-20s('%s')\n", clazz, n
         }

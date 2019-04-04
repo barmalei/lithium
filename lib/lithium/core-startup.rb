@@ -38,6 +38,7 @@ STD_RECOGNIZERS({
     [ ValidatePythonScript, RunPythonScript ] => [
         Std::FileLocRecognizer.new('\s*File\s+\"(?<file>${file_pattern}\.py)\"\,\s*line\s+(?<line>[0-9]+)')
     ],
+
     [ ValidateRubyScript, RunRubyScript ] => [
         Std::FileLocRecognizer.new(ext: 'rb')
     ],
@@ -60,7 +61,7 @@ STD_RECOGNIZERS({
 def BUILD_ARTIFACT(name)
     $current_artifact = nil
 
-    tree = Project.target.new_artifact {
+    tree = Project.current.new_artifact {
         ArtifactTree.new(name)
     }
 
@@ -161,10 +162,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, options, ba
     }
 
     # build target artifact including its dependencies
-    target_artifact = ''
-    target_artifact  = artifact_prefix unless artifact_prefix.nil?
-    target_artifact += artifact_path   unless artifact_path.nil?
-    target_artifact = File.join(target_artifact, artifact_mask) unless artifact_mask.nil?
+    target_artifact = ArtifactName.nameFrom(artifact_prefix, artifact_path, artifact_mask)
     puts "TARGET artifact: '#{target_artifact}'"
     BUILD_ARTIFACT(target_artifact)
     puts "#{DateTime.now.strftime('%H:%M:%S.%L')} '#{artifact}' has been built successfully"

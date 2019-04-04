@@ -29,7 +29,7 @@ module CLASSPATH
     end
 
     def expand_class_path(path)
-        root = homedir()
+        root = homedir
         path = File.join(root, path) if !(Pathname.new path).absolute?
         list = [ path ]
         Dir["#{path}/*.jar"].each { |i|  list << i } if File.directory?(path)

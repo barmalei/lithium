@@ -1,0 +1,20 @@
+[
+    {
+        "id": "tools",
+        "children":
+        [
+            {
+                "caption": "Lithium",
+                "children":
+                [
+                             { "caption": "Compile", "command": "li", "args": {"command":"compile:"}  }
+                            ,{ "caption": "Run", "command": "li", "args": {"command":"run:"} }
+                            ,{ "caption": "-" }
+                            ,{ "caption": "Build", "command": "li" }
+                            ,{ "caption": "-" }
+                            ,{ "caption": "Show errors", "command": "li_show_paths" }
+                ]
+            }
+        ]
+    }
+]

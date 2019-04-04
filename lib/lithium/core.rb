@@ -36,6 +36,8 @@ class ArtifactName < String
 
     def initialize(name)
         name = name.to_s if name.kind_of?(Symbol) || name.kind_of?(Class)
+        #name = "class.#{name.to_s}" if name.kind_of?(Class)  # TODO: think about better prefix
+
         ArtifactName.nil_name(name)
 
         @mask_type = File::FNM_DOTMATCH
@@ -62,6 +64,14 @@ class ArtifactName < String
         raise "#{msg} cannot be nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
     end
 
+    def self.nameFrom(prefix, path, path_mask)
+        name  = ''
+        name  = prefix                     unless prefix.nil?
+        name += path                       unless path.nil?
+        name  = File.join(name, path_mask) unless path_mask.nil?
+        return name
+    end
+
     def match(name)
         artname = ArtifactName.new(name)
 
@@ -74,6 +84,11 @@ class ArtifactName < String
         else
             return @suffix == artname.suffix
         end
+    end
+
+    # TODO: correct the method to take in account mask and file mask
+    def path=(path)
+        @path = path
     end
 
     def <=>(p)
@@ -109,42 +124,64 @@ class ArtifactMeta < Hash
     attr_reader :artname
 
     def initialize(*args, &block)
-        clazz    = nil
-        @artname = ArtifactName.new(args[0])
-        clazz    = args[0] if args[0].kind_of?(Class)
+        if args[-1].kind_of?(ArtifactMeta)
+            cm              = args[-1]
+            @artname        = args.length > 1 ? args[0] : cm.artname
+            self[:clazz]    = cm[:clazz]
+            self[:def_name] = cm[:def_name]
 
-        # if there is only one argument then consider as a class or class name
-        # In this case name of artifact is fetched as to_s of class
-        if args.length == 1
-            raise "Class cannot be detected for '#{@artname}'" if clazz.nil? && @artname.prefix.nil?
-            clazz = Module.const_get(@artname.prefix[0..-2])   if clazz.nil?
-        elsif args.length > 1   # first argument should contain artifact name and the last one should point to class
-            if args[-1].kind_of?(String)
-                clazz = Module.const_get(args[-1])
-            elsif args[-1].kind_of?(Class)
-                clazz = args[-1]
+            if block.nil?
+                self[:block] = cm[:block]
+            elsif cm[:block].nil?
+                self[:block] = block
             else
-                raise "Unknown artifact '#{args[0]}' class"
+                sb = cm[:block]
+                self[:block] = Proc.new {
+                    self.instance_eval &sb
+                    self.instance_eval &block
+                }
             end
         else
-            raise "No artifact information has been passed"
+            clazz    = nil
+            @artname = ArtifactName.new(args[0])
+            clazz    = args[0] if args[0].kind_of?(Class)
+
+            # if there is only one argument then consider as a class or class name
+            # In this case name of artifact is fetched as to_s of class
+            if args.length == 1
+                puts "ArtifactMeta.initialize(): #{args[0]} pref = #{@artname}"
+
+                raise "Class cannot be detected for '#{@artname}'" if clazz.nil? && @artname.prefix.nil?
+                clazz = Module.const_get(@artname.prefix[0..-2])   if clazz.nil?
+            elsif args.length > 1   # first argument should contain artifact name and the last one should point to class
+                if args[-1].kind_of?(String)
+                    clazz = Module.const_get(args[-1])
+                elsif args[-1].kind_of?(Class)
+                    clazz = args[-1]
+                else
+                    raise "Unknown artifact '#{args[0]}' class"
+                end
+            else
+                raise "No artifact information has been passed"
+            end
+
+            raise "Default name can be specified only if an artifact name has not been defined" if args.length > 2 && !@artname.suffix.nil?
+
+            self[:clazz]    = clazz
+            self[:block]    = block
+            self[:def_name] = args.length > 2 ? args[1] : nil
         end
-
-        raise "Default name can be specified only if an artifact name has not been defined" if args.length > 2 && !@artname.suffix.nil?
-
-        self[:clazz]    = clazz
-        self[:block]    = block
-        self[:def_name] = args.length > 2 ? args[1] : nil
     end
 
     def reuse(&block)
         bk = block
         unless self[:block].nil?
+            sb = self[:block]
             if block.nil?
-                bk = self[:block]
+                bk = sb
             else
                 bk = Proc.new {
-                    self.instance_eval &self[:block]
+                    self.instance_eval &sb
                     self.instance_eval &block
                 }
             end
@@ -157,6 +194,10 @@ class ArtifactMeta < Hash
 
     def ==(meta)
         !meta.nil? && meta.class == self.class && meta[:clazz] == self[:clazz] && meta[:block] == self[:block] && meta[:def_name] == self[:def_name]
+    end
+
+    def to_s
+        "#{self.class} : { " + super + " artname = '#{artname}' }"
     end
 end
 
@@ -195,13 +236,10 @@ module AutoRegisteredArtifact
     end
 end
 
-
-#
 # Core artifact abstraction.
 #  "@name" - name of artifact
 #  "@shortname"
 #  "@ver"
-#
 class Artifact
     attr_reader :name, :shortname, :ver, :owner, :createdByMeta
 
@@ -336,7 +374,7 @@ class Artifact
     end
 
     def homedir()
-        return owner.fullpath unless owner.nil?
+        return owner.homedir unless owner.nil? # if has a container the artifact belongs
         return File.expand_path(Dir.pwd)
     end
 
@@ -563,6 +601,20 @@ class FileArtifact < Artifact
         Dir.chdir(homedir)
     end
 
+    def relative(path = @name)
+        mi = path.index(/[\[\]\?\*\{\}]/)
+        unless mi.nil?
+            path = path[0, mi]
+            return nil if path.length == 0
+        end
+
+        path  = Pathname.new(path).cleanpath
+        home  = Pathname.new(homedir)
+        return nil if (path.absolute? && !home.absolute?) || (!path.absolute? && home.absolute?) || !_contains_path?(home.to_s, path.to_s)
+
+        return path.relative_path_from(home).to_s
+    end
+
     def fullpath(path = @name)
         if path == @name
             return path if @is_absolute
@@ -710,9 +762,11 @@ module ArtifactContainer
         raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
 
         artname = ArtifactName.new(name)
-
         # fund local info about the given artifact
         meta = find_meta(artname)
+
+        #puts "#{self.class}.artifact(): own = '#{owner}' current = '#{self.name}' name = #{name} meta = #{meta} hm = #{homedir}"
+
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
             # path nil or doesn't match project then delegate finding an artifact in an owner project context
@@ -720,7 +774,7 @@ module ArtifactContainer
             meta = _meta_from_owner(artname)
 
             unless meta.nil?
-                raise "Seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
+                raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
                 meta = _meta_by_name(artname)
             end
@@ -736,6 +790,8 @@ module ArtifactContainer
         end
 
         art = _artifact_by_meta(artname, meta, &block) if art.nil?
+
+
         if art.kind_of?(ArtifactContainer)
             art = _cache_artifact(artname, meta, art)
             art = art.artifact(artname.suffix)
@@ -838,6 +894,12 @@ module ArtifactContainer
         artname = ArtifactName.new(name)
         meta    = _meta[artname]
         return meta unless meta.nil?
+
+        if !artname.path.nil?
+            path = relative(artname.path)
+            artname = ArtifactName.new(ArtifactName.nameFrom(artname.prefix, path, artname.path_mask)) if !path.nil?
+        end
+
         meta = _meta.detect { | p | p[0].match(artname) }
         return meta[1] unless meta.nil?
         return nil
@@ -847,9 +909,11 @@ module ArtifactContainer
         super(prj) && _meta == prj._meta
     end
 
-    #
+    def SUB(name, &block)
+        ARTIFACT(name, FileMaskContainer, &block)
+    end
+
     # ([name, []] clazz, [&block])
-    #
     def ARTIFACT(*args, &block)
         m = ArtifactMeta.new(*args, &block)
 
@@ -863,11 +927,29 @@ module ArtifactContainer
         @meta = _meta.sort.to_h
     end
 
+    def REF(name)
+        artname = ArtifactName.new(name)
+        meta = find_meta(artname)
+        if meta.nil?
+            meta = _meta_from_owner(artname)
+
+            unless meta.nil?
+                raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
+            else
+                meta = _meta_by_name(artname)
+            end
+            raise NameError.new("No artifact is associated with '#{name}'") if meta.nil?
+        end
+        return meta
+    end
+
     def REUSE(*args, &block)
         raise "Project '#{self}' doesn't have parent project to re-use its artifacts" if owner.nil?
         artname = ArtifactName.new(args[0])
         meta    = _meta[artname]
-        raise "Artifact '#{artname}' is already defined with '#{self}' project" unless meta.nil?
+
+        # TODO: throws exception for containers
+        #raise "Artifact '#{artname}' is already defined with '#{self}' project" unless meta.nil?
 
         ow = owner
         while meta.nil? && !ow.nil?
@@ -880,7 +962,19 @@ module ArtifactContainer
     end
 
     def REMOVE(name)
+        # TODO: implement it
     end
+end
+
+
+class FileMaskContainer < FileMask
+    include ArtifactContainer
+
+    # def homedir()
+    #     puts "FileMaskContainer.homedir(): #{owner}"
+
+    #     return owner.homedir()
+    # end
 end
 
 
@@ -890,26 +984,26 @@ class Project < Directory
 
     include ArtifactContainer
 
-    @@target_project = nil
+    @@curent_project = nil
 
-    def self.target=(prj)
-        @@target_project = prj
+    def self.current=(prj)
+        @@curent_project = prj
     end
 
-    def self.target()
-        @@target_project
+    def self.current()
+        @@curent_project
     end
 
     def self.artifact(name, &block)
-        @@target_project.artifact(name, &block)
+        @@curent_project.artifact(name, &block)
     end
 
     def self.create(home, owner = nil)
-        @@target_project = Project.new(home, owner) {
+        @@curent_project = Project.new(home, owner) {
             conf = File.join(home, '.lithium', 'project.rb')
             self.instance_eval(File.read(conf)).call if File.exists? conf
         }
-        return @@target_project
+        return @@curent_project
     end
 
     def initialize(*args, &block)
@@ -919,6 +1013,7 @@ class Project < Directory
         @desc ||= File.basename(args[0])
     end
 
+    # TODO: comment it
     def new_artifact(&block)
         art = block.call
         return art
@@ -936,9 +1031,4 @@ class Project < Directory
     def what_it_does()
         nil
     end
-end
-
-
-class FileMaskContainer < FileMask
-    include ArtifactContainer
 end

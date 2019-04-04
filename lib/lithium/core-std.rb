@@ -1,4 +1,4 @@
-
+require 'pathname'
 
 # !!! debug field
 # Can be useful to debug lithium stdout. Using original
@@ -161,20 +161,19 @@ class Std
 
                 if File.exists?(path)
                     yield path.clone(File.expand_path(path.to_s))
-                elsif !Pathname.new(path.to_s).absolute?
-                    if !Artifact.last_caller.nil? && !Artifact.last_caller.owner.nil?
-                        home  = Artifact.last_caller.owner.homedir
-                        npath = File.join(home, path.to_s)
+                elsif !Pathname.new(path.to_s).absolute? && !Artifact.last_caller.nil? && !Artifact.last_caller.owner.nil?
+                    home  = Artifact.last_caller.owner.homedir
+                    npath = File.join(home, path.to_s)
+                    if File.exists?(npath)
+                        yield path.clone(npath)
+                    else
+                        npath = File.join(home, 'src', path.to_s)
                         if File.exists?(npath)
                             yield path.clone(npath)
                         else
-                            npath = File.join(home, 'src', path.to_s)
-                            if File.exists?(npath)
-                                yield path.clone(npath)
-                            else
-                                found = Dir.glob(File.join(home, "src", "**", path.to_s))
-                                yield path.clone(found[0]) if found && found.length > 0
-                            end
+                            # TODO: can consume time if src exits and conatins tons of sources
+                            found = Dir.glob(File.join(home, "src", "**", path.to_s))
+                            yield path.clone(found[0]) if found && found.length > 0
                         end
                     end
                 end
@@ -348,3 +347,10 @@ module StdFormater
         msg
     end
 end
+
+
+# rr = Std::FileLocRecognizer.new(ext: 'rb')
+# rr.recognize("ArtifactMeta : { {:clazz=>FileArtifact, :block=>#<Proc:0x007ff22c92d008@/Users/brigadir/projects/.lithium/lib/lithium/self-diagnostic.rb:280>, :def_name=>nil} artname = 'a/b/*' }") {
+
+# }
+

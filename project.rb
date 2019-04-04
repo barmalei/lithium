@@ -1,13 +1,13 @@
 -> {
     ARTIFACT('touch:*', Touch)
 
-    ARTIFACT('minjs:**/*.js',     CompressJavaScript)
-    ARTIFACT('openhtml:**/*.html',  OpenHTML)
+    ARTIFACT('minjs:**/*.js',      CompressJavaScript)
+    ARTIFACT('openhtml:**/*.html', OpenHTML)
 
-    ARTIFACT('mvn:*',  RunMaven)
+    ARTIFACT('mvn:*', RunMaven)
     ARTIFACT('buildsass:**/*.sass', BuildVaadinSass)
 
-    ARTIFACT('runpystr:', RunPythonString) {
+    ARTIFACT('runpystr:', RunPythonString)  {
         @script = $arguments.length > 0 ? $arguments.join(' ') : $stdin.read.strip
     }
 
@@ -15,7 +15,7 @@
         @script = $arguments.length > 0 ? $arguments.join(' ') : $stdin.read.strip
     }
 
-    ARTIFACT("run:*", FileMaskContainer) {
+    SUB("run:*") {
         ARTIFACT('**/*.java',   RunJavaCode)
         ARTIFACT('run:**/*.js',     RunNodejs)
         ARTIFACT('run:**/*.py',     RunPythonScript)
@@ -29,8 +29,8 @@
         ARTIFACT('**/*.rb',  RunRubyScript)
     }
 
-    ARTIFACT("compile:*", FileMaskContainer) {
-        ARTIFACT('**/*.java',   JavaCompiler) { @options = "-Xlint:deprecation" }
+    SUB("compile:*") {
+        ARTIFACT('**/*.java',   JavaCompiler)  { @options = "-Xlint:deprecation" }
         ARTIFACT('**/*.groovy', GroovyCompiler)
         ARTIFACT('**/*.kt',     CompileKotlin)
         ARTIFACT('**/*.scala',  CompileScala)
@@ -51,6 +51,8 @@
     ARTIFACT('grep:', GREP) {
         @grep = $arguments[0] if $arguments.length > 0
     }
+
+    ARTIFACT("primus/**/*", FileArtifact)
 
     ARTIFACT('info:*',  INSPECT)
     ARTIFACT('tree:*',  TREE)
