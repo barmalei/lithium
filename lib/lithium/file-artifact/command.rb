@@ -12,9 +12,11 @@ class Touch < FileCommand
         go_to_homedir()
         path = fullpath()
 
-        puts "<<<< #{path}"
-
-        File.utime(File.atime(path), Time.now(), path) if File.exists?(path)
+        if File.exists?(path)
+            File.utime(File.atime(path), Time.now(), path)
+        else
+            puts_warning "File '#{path}' cannot be found to be touched"
+        end
     end
 end
 
@@ -24,15 +26,19 @@ end
 class CopyFile < FileCommand
     attr_reader :destination
 
-    def initialize(*args)
-        super
+    def initialize(name, dest = nil, &block)
+        super(name, &block)
         @ignore_hidden_files ||= true
 
-        if !@destination
-            self.destination = $arguments[0] if $arguments.length > 0 && $arguments[0]
-        else
-            self.destination = @destination
+        unless @destination
+            if dest
+                @destination = dest
+            elsif $lithium_args.length > 0
+                self.destination = $lithium_args[0]
+            end
         end
+
+        self.destination = @destination
     end
 
     def destination=(v)
@@ -62,8 +68,8 @@ class CopyFile < FileCommand
 
         source = fullpath()
 
-        raise 'Destination path is not defined' if !@destination
-        raise "Source file '#{source}' cannot be found" if !File.exists?(source)
+        raise 'Destination path is not defined' unless @destination
+        raise "Source file '#{source}' cannot be found" unless File.exists?(source)
 
         if File.directory?(source)
             filter = @ignore_hidden_files ? /^[\.].*/ : nil

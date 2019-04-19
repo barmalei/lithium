@@ -7,7 +7,7 @@ require 'lithium/file-artifact/acquired'
 require 'lithium/utils'
 
 
-class JS < Artifact
+class JS < EnvArtifact
     include AutoRegisteredArtifact
 
     attr :compressorClassName
@@ -29,7 +29,7 @@ end
 # Run JS with nodejs
 class RunNodejs < FileCommand
     def build()
-        raise 'Run failed' if exec4("node", "'#{fullpath()}'", $arguments.join(' ')) != 0
+        raise 'Run failed' if exec4("node", "'#{fullpath()}'", $lithium_args.join(' ')) != 0
     end
 
     def what_it_does()

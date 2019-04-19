@@ -10,38 +10,102 @@ class CLEANUP < Artifact
     def what_it_does() "Cleanup '#{@name}', #{Project.artifact(@name).class}" end
 end
 
-# Display registered artifact
+# Display registered meats
+#   -- Show the full list of meta registered for the whole projects hierarchy
+#   -- Mark meta references to the same parent metas
+#   -- Mark meta that matches target artifact name
+#
+# Options:
+#    meta.opts
+#      -- owner   - show only owner metas
+#      -- current - show only current project metas
+#      -- path    - show only metas (from the whole hierarchy) that matches target
+#
+# Example:
+# -------
+#      META:*                    # target artifact doesn't matter
+#      META:compile:**/*.java    # mark 'compile:**/*.java' as target artifact in meta tree
+#
 class META < Artifact
-    def build()
-        # art = nil;
-        # begin
-        #     art = Project.current().artifact(name)
-        # rescue
-        # end
-        # puts "------- #{art.createdByMeta}"
-
-        show(Project.current(), Projet.current())
+    def initialize(*args, &block)
+        super
+        @options ||= $lithium_options['meta.opt']
+        @options = [] if @options.nil?
+        @options = @options.split(',') if @options.kind_of?(String)
     end
 
-    def show(cnt, art, shift = '    ')
-        cnt._meta.each { | artname, meta |
-            puts "!!!!!!!!!!!!!!!!!!!!!!!" if art.createdByMeta == meta
-            puts "#{shift}#{art && art.createdByMeta == meta ? '***' : ''}['#{artname}' => #{meta[:clazz]}]"
-            show(meta[:clazz].new(artname, &meta[:block]), art, shift + '    ') if meta[:clazz] == FileMaskContainer
+    def build()
+        p  = Project.current
+        unless p.nil?
+            if @options.include?('current')
+                stack = [ p ]
+                traverse(stack, stack.length - 1)
+            elsif @options.include?('owner')
+                if p.owner.nil?
+                    raise "Project '#{p}' doesn't have an owner project"
+                else
+                    stack = [ p.owner ]
+                    traverse(stack, stack.length - 1)
+                end
+            else
+                stack = []
+                while !p.nil? do
+                    stack << p
+                    p = p.owner
+                end
+                traverse(stack, stack.length - 1)
+            end
+        else
+            raise "Current actual project cannot be detected"
+        end
+    end
+
+    def traverse(stack, index, shift = '')
+        if index >= 0
+            prj = stack[index]
+            artname = prj.relative_art(@name)
+            puts "#{shift}[+] Meta data for '#{prj}' project {\n"
+            puts_prj_metas(prj, artname, shift)
+            traverse(stack, index - 1, shift + '    ')
+            puts "#{shift}}"
+        end
+    end
+
+    def puts_prj_metas(prj, artname, shift)
+        count = 0
+        prj._meta.each { | m |
+            ps = ''
+            unless prj.owner.nil?
+                pmeta = prj.owner.find_meta(m[1].artname)
+                ps = " (#{prj.owner}:#{pmeta.artname})" unless pmeta.nil?
+            end
+            pp = m[0].match(artname) ? " ~= '#{artname}'" : ''
+            if !@options.include?('path') || pp.length > 0
+                printf("#{shift}    %-20s => '%s'#{ps}#{pp}\n", m[1][:clazz], m[1].artname)
+                puts_prj_metas(prj._artifact_by_meta(m[1].artname, m[1]), artname, shift + '    ') if m[1][:clazz] <= FileMaskContainer
+                count += 1
+            end
         }
+
+        puts "#{shift}    <no meta is available>" if count == 0
+    end
+
+    def what_it_does()
+        "List meta tree"
     end
 end
 
 class REQUIRE < Artifact
     def build()
-        cc = 0
-        puts "Artifact '#{@name}' dependencies list:"
-        Project.artifact(@name).requires().collect {| e |
-            puts "   [class = #{e.class}]: '#{e}'"
-            cc += 1
+        res = Project.artifact(@name).requires()
+
+        puts "Artifact '#{@shortname}' dependencies list {"
+        res.each { | e |
+            printf("    %-20s => '%s'\n", e.class, e)
         }
-        puts "Dependencies list is empty" if cc == 0
-        puts ""
+
+        puts '    < dependencies list is empty! >' if res.length == 0
+        puts '}'
     end
 
     def what_it_does() "List '#{@name}' artifact dependencies" end
@@ -154,28 +218,6 @@ class INIT < FileCommand
 
     def what_it_does() "Generate lithium stuff for '#{@name}'" end
 end
-
-# list all configured artifacts
-class LIST < Directory
-    def build()
-        ls_artifacts()
-    end
-
-    def ls_artifacts()
-        puts "Project owner '#{Project.current.owner.nil? ? 'nil' : Project.current.owner.homedir}'"
-        Project.current._meta.each_value { |e|
-            n, clazz = e.artname, e[:clazz]
-            puts sprintf "  %-20s('%s')\n", clazz, n
-        }
-    end
-
-    def expired?
-        true
-    end
-
-    def what_it_does() "List project '#{@name}' artifacts" end
-end
-
 
 class INSTALL < Artifact
     def initialize(name = 'INSTALL')

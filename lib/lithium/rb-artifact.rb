@@ -5,7 +5,7 @@ require 'lithium/misc-artifact'
 require 'pathname'
 
 # Ruby environment
-class RUBY < Artifact
+class RUBY < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
@@ -39,7 +39,7 @@ class RunRubyScript < FileCommand
     required RUBY
 
     def build()
-        raise 'Run RUBY failed' if exec4(ruby().ruby, "'#{fullpath()}'", $arguments.join(' ')) != 0
+        raise 'Run RUBY failed' if exec4(ruby().ruby, "'#{fullpath()}'", $lithium_args.join(' ')) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -56,7 +56,7 @@ class ValidateRubyScript < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if exec4("ruby -c", "'#{fullpath(path)}'") {} != 0
+        raise "Validation RUBY script '#{path}' failed" if exec4("ruby -c", "'#{fullpath(path)}'") != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end

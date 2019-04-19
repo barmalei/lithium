@@ -16,7 +16,7 @@ class JavaFileRunner < FileCommand
         if !@args.nil?
             args = @args
         else
-            args = $arguments.join(' ')
+            args = $lithium_args.join(' ')
         end
         raise "Running '#{@name}' failed." if exec4(cmd(), args) != 0
     end

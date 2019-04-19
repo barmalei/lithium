@@ -8,7 +8,7 @@ require 'lithium/misc-artifact'
 #
 # Python home
 #
-class PYTHON < Artifact
+class PYTHON < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
@@ -66,7 +66,7 @@ class RunPythonScript < FileCommand
 
     def build()
         raise "File '#{fullpath()}' cannot be found" if !File.exists?(fullpath())
-        raise "Run #{self.class.name} failed" if exec4("#{python().python} -u", "'#{fullpath()}'", $arguments.join(' '))  != 0
+        raise "Run #{self.class.name} failed" if exec4("#{python().python} -u", "'#{fullpath()}'", $lithium_args.join(' '))  != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end

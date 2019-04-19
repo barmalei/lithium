@@ -83,7 +83,7 @@ def BUILD_ARTIFACT_TREE(root, level = 0)
         begin
             $current_artifact = art
             wid = art.what_it_does()
-            puts wid if wid
+            puts wid unless wid.nil?
             art.pre_build()
             art.build()
         rescue
@@ -103,10 +103,9 @@ end
 # @param  artifact - original artifact target
 # @param  artifact_prefix - artifact prefix including ":". Can be nil
 # @param  artifact_path   - artifact path with mask cut. Can be nil
-# @param  options         - list of passed via command line options
 # @param  basedir         - a related location the lithium has been started
 #
-def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, options, basedir)
+def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # print header
     dt = DateTime.now.strftime("%H:%M:%S.%L")
     puts "+#{'—'*73}+"
@@ -122,13 +121,13 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, options, ba
 
     # initialize stdout/stderr handler
     std_clazz = LithiumStd
-    if options['std']
-        std_s = options['std'].strip()
+    if $lithium_options['std']
+        std_s = $lithium_options['std'].strip()
         std_clazz = std_s == 'null' ? nil : Module.const_get(std_s)
     end
 
     if std_clazz
-        std_f = options['stdformat']
+        std_f = $lithium_options['stdformat']
         std_i = std_f ? std_clazz.new(std_f) : std_clazz.new()
         raise 'Output handler class has to inherit Std class' unless std_i.kind_of?(Std)
         at_exit() { std_i.flush() }
@@ -162,7 +161,8 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, options, ba
     }
 
     # build target artifact including its dependencies
-    target_artifact = ArtifactName.nameFrom(artifact_prefix, artifact_path, artifact_mask)
+    target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
+
     puts "TARGET artifact: '#{target_artifact}'"
     BUILD_ARTIFACT(target_artifact)
     puts "#{DateTime.now.strftime('%H:%M:%S.%L')} '#{artifact}' has been built successfully"

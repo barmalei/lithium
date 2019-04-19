@@ -24,11 +24,11 @@ class JavaCompiler < FileMask
 
         if !@destination
             @destination = fullpath('classes')
-            @destination = fullpath('WEB-INF/classes') if !File.exists?(@destination)
-            @destination = fullpath('lib')             if !File.exists?(@destination)
+            @destination = fullpath('WEB-INF/classes') unless File.exists?(@destination)
+            @destination = fullpath('lib')             unless File.exists?(@destination)
             puts_warning "Class destination is not specified. Stick to '#{@destination}' as default one"
         else
-            @destination = fullpath(@destination)
+            @destination = fullpath(@destination) unless Pathname.new(@destination).absolute?
             if !File.exists?(@destination) && @create_destination
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
@@ -163,9 +163,6 @@ class CompileScala < JavaCompiler
     required SCALA
 
     def initialize(*args)
-
-        puts "CompileScala.initialize() : owner = '#{owner}' class = #{self.class} homedir = #{homedir}"
-
         super
         @description = 'Scala compiler'
     end

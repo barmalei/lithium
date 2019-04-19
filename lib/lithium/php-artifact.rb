@@ -2,7 +2,7 @@ require 'lithium/file-artifact/command'
 
 
 class RunPhpScript < FileCommand
-    def build() raise 'Run PHP failed' if exec4("php", "-f", "'#{fullpath}'", $arguments.join(' ')) != 0 end
+    def build() raise 'Run PHP failed' if exec4("php", "-f", "'#{fullpath}'", $lithium_args.join(' ')) != 0 end
     def what_it_does() "Run PHP '#{@name}' script" end
 end
 

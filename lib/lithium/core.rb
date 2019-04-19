@@ -35,8 +35,11 @@ class ArtifactName < String
     end
 
     def initialize(name)
-        name = name.to_s if name.kind_of?(Symbol) || name.kind_of?(Class)
-        #name = "class.#{name.to_s}" if name.kind_of?(Class)  # TODO: think about better prefix
+        if name.kind_of?(Class)
+            name = name.default_name.nil? ? name.to_s : name.default_name
+        elsif name.kind_of?(Symbol)
+            name = name.to_s
+        end
 
         ArtifactName.nil_name(name)
 
@@ -64,11 +67,12 @@ class ArtifactName < String
         raise "#{msg} cannot be nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
     end
 
-    def self.nameFrom(prefix, path, path_mask)
+    def self.name_from(prefix, path, path_mask)
+        path = nil if path.length == 0
         name  = ''
-        name  = prefix                     unless prefix.nil?
-        name += path                       unless path.nil?
-        name  = File.join(name, path_mask) unless path_mask.nil?
+        name += path                                               unless path.nil?
+        name  = path.nil? ? path_mask : File.join(name, path_mask) unless path_mask.nil?
+        name  = prefix + name                                      unless prefix.nil?
         return name
     end
 
@@ -79,7 +83,7 @@ class ArtifactName < String
         return false if @prefix != artname.prefix
 
         unless @path_mask.nil?
-            return false if artname.suffix.nil?
+            return false if artname.suffix.nil?  # TODO: hard-coded "env/"
             return File.fnmatch(@suffix, artname.suffix, @mask_type)
         else
             return @suffix == artname.suffix
@@ -111,7 +115,7 @@ class ArtifactName < String
     end
 
     def inspect()
-        return "Instance of #{self.class.name} => { prefix = '#{@prefix}', suffix = '#{@suffix}', path = '#{@path}', mask = '#{@path_mask}' mask_type = #{mask_type}}"
+        return "#{self.class.name}: { prefix='#{@prefix}', suffix='#{@suffix}', path='#{@path}', mask='#{@path_mask}' mask_type=#{mask_type} }"
     end
 end
 
@@ -149,10 +153,16 @@ class ArtifactMeta < Hash
             # if there is only one argument then consider as a class or class name
             # In this case name of artifact is fetched as to_s of class
             if args.length == 1
-                puts "ArtifactMeta.initialize(): #{args[0]} pref = #{@artname}"
-
                 raise "Class cannot be detected for '#{@artname}'" if clazz.nil? && @artname.prefix.nil?
-                clazz = Module.const_get(@artname.prefix[0..-2])   if clazz.nil?
+
+                if clazz.nil?
+                    begin
+                        cn = @artname.prefix[0..-2]
+                        clazz = Module.const_get(cn)
+                    rescue
+                        raise "Artifact class cannot be resolved by artifact name '#{cn}'"
+                    end
+                end
             elsif args.length > 1   # first argument should contain artifact name and the last one should point to class
                 if args[-1].kind_of?(String)
                     clazz = Module.const_get(args[-1])
@@ -165,7 +175,9 @@ class ArtifactMeta < Hash
                 raise "No artifact information has been passed"
             end
 
-            raise "Default name can be specified only if an artifact name has not been defined" if args.length > 2 && !@artname.suffix.nil?
+            if args.length > 2 && !@artname.suffix.nil?
+                raise "Default name cannot be specified since artifact '#{@artname}' already defines target name"
+            end
 
             self[:clazz]    = clazz
             self[:block]    = block
@@ -301,11 +313,20 @@ class Artifact
         def self._calls_stack_() @@calls_stack end
     end
 
+    @default_name = nil
+
+    def Artifact.default_name(*args)
+        @default_name = args[0] if args.length > 0
+        @default_name ||= nil
+        return @default_name
+    end
+
     def Artifact.required(clazz, &block)
         self.send(:define_method, clazz.name.downcase) {
-            an = instance_variable_get("@#{clazz.name}")
+            #an = instance_variable_get("@#{clazz.name}")
+            an = nil
             begin
-                a  = owner.artifact(an.nil? ? clazz.name : an) unless owner.nil?
+                a  = owner.artifact(an.nil? ? clazz :  an) unless owner.nil?
                 return a unless a.nil?
             rescue NameError => e
             end
@@ -349,15 +370,20 @@ class Artifact
 
     def initialize(name, &block)
         # test if the name of the artifact is not nil or empty string
-        ArtifactName.nil_name(name)
+        name = validate_artifact_name(name)
 
         @name, @shortname = name, File.basename(name)
-        #@owner ||= nil  # owner has to be set basing on calling context before initialize method in new
+        #@owner ||= nil  # TODO: owner has to be set basing on calling context before initialize method in new ?
 
         # block can be passed to artifact
         # it is expected the block setup class instance
         # variables like '{ @a = 10 ... }'
         self.instance_eval(&block) if block
+    end
+
+    def validate_artifact_name(name)
+        ArtifactName.nil_name(name)
+        name
     end
 
     def createdByMeta=(m)
@@ -435,16 +461,10 @@ class ArtifactTree < Artifact
 
             # TODO: make sure this is more proper way of artifact building than commented below
             if art.kind_of?(String)
-                if !parent.nil?
-                    puts "Node.initialize(): art = #{art}, parent = #{parent.art} parent owner = #{parent.art.owner}"
-                end
-
                 if parent.nil?
                     art = Project.artifact(art)
                 else
                     art = parent.art.owner.artifact(art)
-
-                    puts "Node.initialize(): Create #{art}, #{art.owner} dependencies by owner #{parent.art.owner}"
                 end
             end
             #art = Project.artifact(art) if art.kind_of?(String)
@@ -601,7 +621,16 @@ class FileArtifact < Artifact
         Dir.chdir(homedir)
     end
 
-    def relative(path = @name)
+    def relative_art(name)
+        artname = ArtifactName.new(name)
+        unless artname.path.nil?
+            path    = relative_path(artname.path)
+            artname = ArtifactName.new(ArtifactName.name_from(artname.prefix, path, artname.path_mask)) unless path.nil?
+        end
+        return artname
+    end
+
+    def relative_path(path = @name)
         mi = path.index(/[\[\]\?\*\{\}]/)
         unless mi.nil?
             path = path[0, mi]
@@ -616,6 +645,8 @@ class FileArtifact < Artifact
     end
 
     def fullpath(path = @name)
+        return path if path.start_with?('.lithium/env/')
+
         if path == @name
             return path if @is_absolute
             return Pathname.new(File.join(homedir, path)).cleanpath.to_s
@@ -683,7 +714,7 @@ class PermanentFile < FileArtifact
     end
 end
 
-#  Perform and action on a file artifact
+# Perform and action on a file artifact
 class FileCommand < PermanentFile
     def expired?() true end
 end
@@ -721,18 +752,18 @@ class FileMask < FileArtifact
 
     def build_item(path, m) end
 
-    def paths_to_list(relative = nil)
+    def paths_to_list(rel = nil)
         list = []
-        list_items(relative) { | path, m|
+        list_items(rel) { | path, m|
             list << path
         }
         return list
     end
 
-    def list_items(relative = nil)
+    def list_items(rel = nil)
         go_to_homedir()
 
-        relative = relative[0, relative.length - 1] if !relative.nil? && relative[-1] == '/'
+        rel = rel[0, rel.length - 1] if !rel.nil? && rel[-1] == '/'
 
         Dir[@name].each { | path |
             b = false
@@ -745,9 +776,9 @@ class FileMask < FileArtifact
 
             if b == false
                 mt = File.mtime(path).to_i()
-                unless relative.nil?
-                    "Relative path '#{relative}' cannot be applied to '#{path}'" unless _contains_path?(relative, path)
-                    path = path[relative.length + 1, path.length - relative.length]
+                unless rel.nil?
+                    "Relative path '#{rel}' cannot be applied to '#{path}'" unless _contains_path?(rel, path)
+                    path = path[rel.length + 1, path.length - rel.length]
                 end
                 yield path, mt
             end
@@ -762,6 +793,10 @@ module ArtifactContainer
         raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
 
         artname = ArtifactName.new(name)
+
+        return Project.current if artname.to_s == Project.current.name.to_s
+
+
         # fund local info about the given artifact
         meta = find_meta(artname)
 
@@ -790,7 +825,6 @@ module ArtifactContainer
         end
 
         art = _artifact_by_meta(artname, meta, &block) if art.nil?
-
 
         if art.kind_of?(ArtifactContainer)
             art = _cache_artifact(artname, meta, art)
@@ -891,16 +925,11 @@ module ArtifactContainer
     end
 
     def find_meta(name)
-        artname = ArtifactName.new(name)
+        artname = relative_art(name)
         meta    = _meta[artname]
         return meta unless meta.nil?
 
-        if !artname.path.nil?
-            path = relative(artname.path)
-            artname = ArtifactName.new(ArtifactName.nameFrom(artname.prefix, path, artname.path_mask)) if !path.nil?
-        end
-
-        meta = _meta.detect { | p | p[0].match(artname) }
+        meta  = _meta.detect { | p | p[0].match(artname) }
         return meta[1] unless meta.nil?
         return nil
     end
@@ -909,13 +938,15 @@ module ArtifactContainer
         super(prj) && _meta == prj._meta
     end
 
-    def SUB(name, &block)
-        ARTIFACT(name, FileMaskContainer, &block)
-    end
-
     # ([name, []] clazz, [&block])
     def ARTIFACT(*args, &block)
-        m = ArtifactMeta.new(*args, &block)
+        if args[-1].kind_of?(Class)
+            m = ArtifactMeta.new(*args, &block)
+        else
+            args = args.dup()
+            args.push(FileMaskContainer)
+            m = ArtifactMeta.new(*args, &block)
+        end
 
         # try to find previously stored meta
         puts "Override previously defined '#{m.artname}' artifact" if _meta[m.artname]
@@ -1032,3 +1063,49 @@ class Project < Directory
         nil
     end
 end
+
+
+class EnvArtifact < Artifact
+    def self.default_name(*args)
+        @default_name ||= nil
+        if args.length > 0
+            @default_name = validate_env_name(args[0])
+        elsif @default_name.nil?
+            @default_name = ".lithium/env/#{self.name}"
+        end
+
+        return @default_name
+    end
+
+    def self.validate_env_name(name)
+        raise "Environment artifact cannot be assigned with '#{name}' name. Use '$/<artifact_name>' name pattern" if name[0] != '$' || name[1] != '/'
+        name
+    end
+
+    # def validate_artifact_name(name)
+    #     EnvArtifact.validate_env_name(name)
+    # end
+end
+
+
+class TestFileMask < FileMask
+    def initialize(*args, &block)
+        super
+    end
+
+    def build()
+        exts = []
+
+        list_items { |f, m|
+            ext = File.extname(f)
+            exts.push(ext) if !ext.nil? && ext != "" && !exts.include?(ext)
+        }
+
+        exts.each { | ext |
+            name = "#{@name}#{ext}"
+            puts "Detect '#{ext}' to be compiled as '#{name}'"
+            BUILD_ARTIFACT("compile:#{name}")
+        }
+    end
+end
+

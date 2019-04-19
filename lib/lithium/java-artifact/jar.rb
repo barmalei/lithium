@@ -51,10 +51,10 @@ class CreateJAR < FileMask
 
     def initialize(*args)
         super
-        @destination ||= $arguments.length > 0 ? $arguments[0] : "result.jar"
+        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : "result.jar"
         @manifest    ||= nil
         @ignore_dirs = true
-        @base        ||= $arguments.length > 1 ? $arguments[1] : nil
+        @base        ||= $lithium_args.length > 1 ? $lithium_args[1] : nil
 
         @base = fullpath("lib") if !@base
         raise "Invalid base directory '#{@base}'" if !File.exists?(@base) || !File.directory?(@base)
@@ -95,12 +95,10 @@ class JarFile < FileArtifact
     def initialize(*args)
         super
 
-
-
-        @destination ||= $arguments.length > 0 ? $arguments[0] : "result.jar"
+        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : "result.jar"
         @manifest    ||= nil
         @ignore_dirs = true
-        @base        ||= $arguments.length > 1 ? $arguments[1] : nil
+        @base        ||= $lithium_args.length > 1 ? $lithium_args[1] : nil
 
         @base = fullpath("lib") if !@base
         raise "Invalid base directory '#{@base}'" if !File.exists?(@base) || !File.directory?(@base)

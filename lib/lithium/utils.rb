@@ -142,7 +142,7 @@ module LogArtifactState
 
     # expire log to make the target artifact expired
     def expire_logs()
-        return if !can_artifact_be_tracked?
+        return unless can_artifact_be_tracked?
 
         p1 = items_log_path()
         File.delete(p1) if is_items_log_enabled? && File.exists?(p1)
@@ -152,7 +152,7 @@ module LogArtifactState
     end
 
     def logs_mtime()
-        return -1 if !can_artifact_be_tracked?()
+        return -1 unless can_artifact_be_tracked?
 
         p1 = items_log_path()
         p2 = attrs_log_path()
@@ -162,7 +162,7 @@ module LogArtifactState
     end
 
     def logs_expired?()
-        return false if !can_artifact_be_tracked?()
+        return false unless can_artifact_be_tracked?
 
         if is_items_log_enabled?
             # check items expiration
@@ -203,7 +203,7 @@ module LogArtifactState
 
     # return map where key is an item path and value is integer modified time
     def load_items_log()
-        return if !self.class.method_defined?(:list_items)
+        return unless self.class.method_defined?(:list_items)
 
         p, e = items_log_path(), {}
         if File.exists?(p)
@@ -221,16 +221,15 @@ module LogArtifactState
 
     # list target artifact items that are expired
     def list_expired_items(&block)
-        return if !self.class.method_defined?(:list_items)
-
+        return unless self.class.method_defined?(:list_items)
         e = load_items_log()
-        list_items() { |n, t|
+        list_items { |n, t|
             block.call(n, e[n] ? e[n] : -1) if t == -1 || e[n].nil? || e[n].to_i == -1 || e[n].to_i < t
         }
     end
 
     def update_items_log()
-        return if !self.class.method_defined?(:list_items)
+        return unless self.class.method_defined?(:list_items)
 
         d, e, r = false, load_items_log(), {}
         list_items() { |n, t|

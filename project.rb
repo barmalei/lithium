@@ -8,40 +8,67 @@
     ARTIFACT('buildsass:**/*.sass', BuildVaadinSass)
 
     ARTIFACT('runpystr:', RunPythonString)  {
-        @script = $arguments.length > 0 ? $arguments.join(' ') : $stdin.read.strip
+        @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
     ARTIFACT('runrbstr:', RunRubyString) {
-        @script = $arguments.length > 0 ? $arguments.join(' ') : $stdin.read.strip
+        @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
-    SUB("run:*") {
+    ARTIFACT("a/a.txt", FileArtifact)
+    ARTIFACT("a/a.ru", FileArtifact)
+    ARTIFACT("a/*", FileArtifact)
+
+
+    ARTIFACT("run:*") {
         ARTIFACT('**/*.java',   RunJavaCode)
-        ARTIFACT('run:**/*.js',     RunNodejs)
-        ARTIFACT('run:**/*.py',     RunPythonScript)
-        ARTIFACT('run:**/*.php',    RunPhpScript)
-        ARTIFACT('run:**/*.sh',     RunShell)
-        ARTIFACT('run:**/*.jar',    RunJAR)
-        ARTIFACT('run:**/*.groovy', RunGroovyScript)
-        ARTIFACT('run:**/*.kt',     RunKotlinCode)
-        ARTIFACT('run:**/*.scala',  RunScalaCode)
-        ARTIFACT('run:**/*.class',  RunJavaClass)
+        ARTIFACT('**/*.js',     RunNodejs)
+        ARTIFACT('**/*.py',     RunPythonScript)
+        ARTIFACT('**/*.php',    RunPhpScript)
+        ARTIFACT('**/*.sh',     RunShell)
+        ARTIFACT('**/*.jar',    RunJAR)
+        ARTIFACT('**/*.groovy', RunGroovyScript)
+        ARTIFACT('**/*.kt',     RunKotlinCode)
+        ARTIFACT('**/*.scala',  RunScalaCode)
+        ARTIFACT('**/*.class',  RunJavaClass)
         ARTIFACT('**/*.rb',  RunRubyScript)
+
+        ARTIFACT("*") {
+            ARTIFACT('**/*.rb',  RunRubyScript)
+            ARTIFACT('**/*.java',  RunRubyScript)
+        }
     }
 
-    SUB("compile:*") {
+    ARTIFACT("compile:*") {
         ARTIFACT('**/*.java',   JavaCompiler)  { @options = "-Xlint:deprecation" }
-        ARTIFACT('**/*.groovy', GroovyCompiler)
+        ARTIFACT('**/*.groovy', GroovyCompiler) {
+            puts "GROOVY COMPILER for #{@name}"
+        }
         ARTIFACT('**/*.kt',     CompileKotlin)
         ARTIFACT('**/*.scala',  CompileScala)
         ARTIFACT('**/*.rb',     ValidateRubyScript)
         ARTIFACT('**/*.php',    ValidatePhpScript)
 
-        ARTIFACT('**/*.py',   ValidatePythonScript)
-        ARTIFACT('**/*.xml',  ValidateXML)
-        ARTIFACT('**/*.tt',   CompileTTGrammar)
-        ARTIFACT('**/*.sass', CompileSass)
+        ARTIFACT('**/*.py',    ValidatePythonScript)
+        ARTIFACT('**/*.xml',   ValidateXML)
+        ARTIFACT('**/pom.xml', MavenCompile)
+        ARTIFACT('**/*.tt',    CompileTTGrammar)
+        ARTIFACT('**/*.sass',  CompileSass)
+
+        #ARTIFACT('**/*', TestFileMask) {
+         #   puts ">>>>>>>>>>> #{name}"
+
+            # ['*.java', '*.kt']
+
+            # REQUIRE "compile:**/*.java"
+            # REQUIRE "compile:**/*.groovy"
+            # REQUIRE "compile:**/*.kt"
+        #}
     }
+
+    # ARTIFACT("build:*", '.') {
+    #     ARTIFACT('**/*.java',  MavenCompile)
+    # }
 
     ARTIFACT('checkstyle:**/*.java', CheckStyle)
     ARTIFACT('pmd:**/*.java',        PMD)
@@ -49,16 +76,14 @@
     ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
 
     ARTIFACT('grep:', GREP) {
-        @grep = $arguments[0] if $arguments.length > 0
+        @grep = $lithium_args[0] if $lithium_args.length > 0
     }
 
-    ARTIFACT("primus/**/*", FileArtifact)
-
-    ARTIFACT('info:*',  INSPECT)
+    ARTIFACT('inspect:*',  INSPECT)
     ARTIFACT('tree:*',  TREE)
     ARTIFACT('require:*', REQUIRE)
     ARTIFACT('cleanup:*', CLEANUP)
-    ARTIFACT('list:.',    LIST)
+    ARTIFACT('meta:*',  META)
 
     ARTIFACT('INSTALL:', INSTALL)
 

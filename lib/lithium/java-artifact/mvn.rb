@@ -9,10 +9,10 @@ require 'lithium/core-std'
 
 def LOC_MAVEN(group, id, ver)
     p = File.expand_path("~/.m2/repository")
-    return nil if !File.exists?(p)
+    return nil unless File.exists?(p)
     group = group.gsub(".", "/") if group.index('.') != nil
 
-    puts "p = #{p} group = #{group} #{id} #{ver}"
+    puts "p = #{p} group = #{group} id = #{id} ver = #{ver}"
 
     p = File.join(p, group, id, ver, "#{id}-#{ver}.jar")
  #   raise "Maven artifact '#{p}' cannot be found" if !File.exists?(p)
@@ -28,22 +28,39 @@ end
 #     end
 # end
 
-class POM < PermanentFile
-    include LogArtifactState
 
-    def initialize(name)
-        super
+class POMFile < PermanentFile
+    include LogArtifactState
+    include StdFormater
+
+    def initialize(name, &block)
+        super(FileUtil.look_file_up(fullpath(name), "pom.xml", homedir), &block)
+    end
+
+    def list_items()
+        f = fullpath
+        yield f, File.mtime(f).to_i
+    end
+end
+
+
+class DownloadPOMDeps < POMFile
+    def initialize(name, &block)
+        super(name, &block)
+
         @properties      ||= {}
         @ignore_optional ||= true
         @destination     ||= "lib"
         @files, @rfiles = [], []
 
-        raise "Destination directory '#{@destination}' doesn't exists" if !File.directory?(fullpath(@destination))
+
+
+        raise "Destination directory '#{@destination}' doesn't exists" unless File.directory?(fullpath(@destination))
 
         artifacats = {}
         load_dep_from(@name, artifacats, false)
 
-        artifacats.each_pair() { |k, v|
+        artifacats.each_pair { |k, v|
             next if v["manager"]
 
             fid, fgr, fvr = v["id"], v["group"], v["ver"]
@@ -59,35 +76,36 @@ class POM < PermanentFile
             end
 
             n = "#{fid}-#{fvr}.jar"
-            @files << File.join(@destination, n)
-
+            @files  << File.join(@destination, n)
             @rfiles << LOC_MAVEN(fgr, fid, fvr)
         }
-    end
-
-    def list_items()
-        yield fullpath(), mtime()
-        # @files.each() { |f|
-        #     yield f, File.exists?(f) ? File.mtime(f).to_i() : -1
-        # }
     end
 
     def load_dep_from(xml, artifacts, isparent)
         xml = (Pathname.new(xml)).absolute? ? xml : fullpath(xml)
         raise "File '#{xml}' doesn't exist" if !File.exist?(xml)
 
+        File.open(xml, 'r') { |f|
+            xpath = '/project/properties/*'
+            REXML::Document.new(f).get_elements(xpath).each { |n|
+                @properties[n.name] = n.text
+            }
+        }
+
         bb = true
         File.open(xml, 'r') { |f|
             REXML::Document.new(f).get_elements('/project/parent').each { |n|
                 bb = false;
                 p = n.get_text("relativePath")
-                if !p
+                if p.nil?
                     p = File.join(File.dirname(xml), "../pom.xml")
                     p = File.expand_path(p)
-                    if !File.exists?(p)
+                    unless File.exists?(p)
                         puts_warning "Parent POM '#{p}'' cannot be found"
                         next
                     end
+                else
+                    p = File.expand_path(File.join(File.dirname(xml), p.to_s))
                 end
 
                 puts "Load parent '#{p.to_s}' artifacts"
@@ -124,7 +142,7 @@ class POM < PermanentFile
     end
 
     def resolve_variables(p)
-        if p[0..0] == "$"
+        if p[0..0] == '$'
             v = p[2..p.length-2]
             if @properties[v]
                 p = @properties[v]
@@ -137,15 +155,18 @@ class POM < PermanentFile
     end
 
     def expired?()
-        @files.each() { |f|
+
+        puts ">>>> #{@files}"
+
+        @files.each { |f|
             p = fullpath(f)
-            return true if !File.exists?(p)
+            return true unless File.exists?(p)
         }
         return false
     end
 
     def cleanup()
-        @files.each() { |f|
+        @files.each { |f|
             f = fullpath(f)
             next if !File.exists?(f)
             File.delete(f)
@@ -155,7 +176,7 @@ class POM < PermanentFile
     def build()
         cleanup()
         dest = fullpath(@destination)
-        @rfiles.each_index() { |i|
+        @rfiles.each_index { |i|
             src = @rfiles[i]
             FileUtils.cp(src, dest) if !src.nil?
         }
@@ -233,8 +254,6 @@ class MavenJarFile < HTTPRemoteFile
     def remote_pom_path() "#{remote_dir()}#{@id}-#{@ver}.pom" end
 
     def fetch_pom()
-
-
         pn  = "#{@id}-#{@ver}.pom"
         pom = fullpath(File.join(File.dirname(@name), pn))
         begin
@@ -247,33 +266,51 @@ class MavenJarFile < HTTPRemoteFile
     end
 end
 
-class RunMaven < FileCommand
-    include StdFormater
-
-    def initialize(*args)
+class RunMaven < POMFile
+    def initialize(name, &block)
         super
+
         @maven_path ||= FileUtil.which('mvn')
         @targets    ||= [ "clean", "install" ]
         @options    ||= ""
-        raise "maven path cannot be detected" if !@maven_path
-        raise "maven path cannot be detected" if !File.exists?(@maven_path)
+        raise "maven path cannot be detected" unless @maven_path
+        raise "maven path cannot be detected" unless File.exists?(@maven_path)
+    end
+
+    def expired?
+        true
     end
 
     def build
         path = fullpath()
-        raise "Target mvn artifact cannot be found '#{path}'" if !File.exists?(path)
-
-        if !File.directory?(path)
-            raise "Invalid maven file '#{path}'" if File.basename(path) != 'pom.xml'
-        else
-            path = FileUtil.look_file_up(path, "pom.xml", homedir())
-            raise "Cannot found POM file in '#{fullpath}'" if path.nil?
-        end
+        raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
 
         Dir.chdir(File.dirname(path));
         raise "Maven running failed" if exec4("#{@maven_path} #{@options} #{@targets.join(' ')}") != 0
     end
 
     def what_it_does() "Run maven: '#{@target}'" end
+end
+
+class MavenCompile < RunMaven
+    def initialize(*args)
+        super
+        @targets = [ "compile" ]
+    end
+
+    def expired?
+        false
+    end
+
+    def list_items()
+        dir = File.join(File.dirname(fullpath()), 'src', "**", "*")
+        FileMask.new(dir).list_items { |f, t|
+            yield f, t
+        }
+
+        super { |f, t|
+            yield f, t
+        }
+    end
 end
 

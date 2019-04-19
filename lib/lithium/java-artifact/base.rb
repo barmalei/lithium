@@ -56,9 +56,12 @@ module CLASSPATH
     end
 end
 
-class JAVA < Artifact
+class JVM < EnvArtifact
     include CLASSPATH
     include LogArtifactState
+end
+
+class JAVA < JVM
     include AutoRegisteredArtifact
 
     attr_reader :classpath
@@ -129,9 +132,7 @@ class JAVA < Artifact
     end
 end
 
-class GROOVY < Artifact
-    include CLASSPATH
-    include LogArtifactState
+class GROOVY < JVM
     include AutoRegisteredArtifact
 
     log_attr :groovy_home, :runtime, :libs
@@ -142,7 +143,7 @@ class GROOVY < Artifact
         super
 
         if !@groovy_home
-            groovy_path = FileUtil.which("groovy")
+            groovy_path = FileUtil.which('groovy')
             @groovy_home = File.dirname(File.dirname(groovy_path)) if groovy_path
         end
         raise "Cannot find groovy home '#{@groovy_home}'" if !File.exists?(@groovy_home)
@@ -167,9 +168,7 @@ end
 #
 # Kotlin environment
 #
-class KOTLIN < Artifact
-    include CLASSPATH
-    include LogArtifactState
+class KOTLIN < JVM
     include AutoRegisteredArtifact
 
     log_attr :kotlin_home, :runtime, :libs
@@ -206,9 +205,7 @@ end
 
 
 # Scala environment
-class SCALA < Artifact
-    include CLASSPATH
-    include LogArtifactState
+class SCALA < JVM
     include AutoRegisteredArtifact
 
     log_attr :scala_home
