@@ -86,7 +86,7 @@ class ValidatePythonCode < FileMask
 end
 
 class ValidatePythonScript < FileCommand
-    def build() raise "Validation failed" if !ValidatePythonScript.validate(fullpath()) end
+    def build() raise "Validation failed" unless ValidatePythonScript.validate(fullpath()) end
     def what_it_does() "Validate '#{@name}' script" end
 
     def self.validate(path)

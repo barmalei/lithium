@@ -121,7 +121,7 @@ module LogArtifactState
     #############################################################
     def logs_home_dir()
         raise 'Cannot detect log directory since project home is unknown' if !homedir()
-        h = File.join(homedir(), ".lithium", ".logs")
+        h = File.join(homedir, ".lithium", ".logs")
         if !File.exists?(h)
             puts_warning "LOG directory '#{h}' cannot be found. Try to create it ..."
             Dir.mkdir(h)
@@ -131,7 +131,7 @@ module LogArtifactState
 
     # check if log can be done
     def can_artifact_be_tracked?()
-        lith = File.join(homedir(), ".lithium")
+        lith = File.join(homedir, ".lithium")
         if (!File.exists?(lith))
             puts_warning "Artifact state cannot be tracked since since '#{lith}' log directory doesn't exist"
             return false

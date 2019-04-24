@@ -16,7 +16,7 @@ class CompileTTGrammar < FileCommand
         @output_dir = fullpath(@output_dir)
 
         path = FileUtil.which("tt")
-        raise "Cannot detect tree top grammar compiler" if !path || File.is_directory?(path)
+        raise 'Cannot detect tree top grammar compiler' if !path || File.is_directory?(path)
         @tt = path
         raise "Undefined output directory '#{@output_dir}'." if !File.directory?(@output_dir)
     end

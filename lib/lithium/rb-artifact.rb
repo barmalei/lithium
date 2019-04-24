@@ -39,7 +39,7 @@ class RunRubyScript < FileCommand
     required RUBY
 
     def build()
-        raise 'Run RUBY failed' if exec4(ruby().ruby, "'#{fullpath()}'", $lithium_args.join(' ')) != 0
+        raise "Run RUBY '#{@name}' script failed" if exec4(ruby().ruby, "'#{fullpath()}'", $lithium_args.join(' ')) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end

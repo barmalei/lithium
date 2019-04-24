@@ -24,7 +24,7 @@ unless artifact_path.nil?
     artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil   # store mask
     artifact_path = artifact_path[0, i] if !i.nil? && i >= 0               # cut mask from path
 
-    if (artifact_path.length > 0 || artifact_mask != '*') && artifact_path.start_with?('.lithium/') == false
+    if (artifact_path.length > 0 || artifact_mask != '*') && artifact_path.start_with?('.env/') == false
         artifact_path = File.expand_path(artifact_path)  # expand path to artifact to absolute path if
 
         basedir = artifact_path

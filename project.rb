@@ -41,9 +41,7 @@
 
     ARTIFACT("compile:*") {
         ARTIFACT('**/*.java',   JavaCompiler)  { @options = "-Xlint:deprecation" }
-        ARTIFACT('**/*.groovy', GroovyCompiler) {
-            puts "GROOVY COMPILER for #{@name}"
-        }
+        ARTIFACT('**/*.groovy', GroovyCompiler)
         ARTIFACT('**/*.kt',     CompileKotlin)
         ARTIFACT('**/*.scala',  CompileScala)
         ARTIFACT('**/*.rb',     ValidateRubyScript)
@@ -55,24 +53,16 @@
         ARTIFACT('**/*.tt',    CompileTTGrammar)
         ARTIFACT('**/*.sass',  CompileSass)
 
-        #ARTIFACT('**/*', TestFileMask) {
-         #   puts ">>>>>>>>>>> #{name}"
-
-            # ['*.java', '*.kt']
-
-            # REQUIRE "compile:**/*.java"
-            # REQUIRE "compile:**/*.groovy"
-            # REQUIRE "compile:**/*.kt"
-        #}
+        ARTIFACT('**/*', GroupByExtension) {
+            DO { | ext |
+                BUILD_ARTIFACT("compile:#{@name}#{ext}")
+            }
+        }
     }
 
-    # ARTIFACT("build:*", '.') {
-    #     ARTIFACT('**/*.java',  MavenCompile)
-    # }
 
     ARTIFACT('checkstyle:**/*.java', CheckStyle)
     ARTIFACT('pmd:**/*.java',        PMD)
-
     ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
 
     ARTIFACT('grep:', GREP) {

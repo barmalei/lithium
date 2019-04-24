@@ -79,7 +79,7 @@ class META < Artifact
                 pmeta = prj.owner.find_meta(m[1].artname)
                 ps = " (#{prj.owner}:#{pmeta.artname})" unless pmeta.nil?
             end
-            pp = m[0].match(artname) ? " ~= '#{artname}'" : ''
+            pp = m[0].match(artname) ? " : [ '#{artname}' ]" : ''
             if !@options.include?('path') || pp.length > 0
                 printf("#{shift}    %-20s => '%s'#{ps}#{pp}\n", m[1][:clazz], m[1].artname)
                 puts_prj_metas(prj._artifact_by_meta(m[1].artname, m[1]), artname, shift + '    ') if m[1][:clazz] <= FileMaskContainer
@@ -128,16 +128,14 @@ class EXPIRED < Artifact
         a = Project.artifact(@name)
         raise "Artifact '#{@name}' doesn't track its state" unless a.kind_of?(LogArtifactState)
 
-        if !a.expired?
-            puts "Artifact '#{@name}' is not expired"
-        else
+        unless a.expired?
             ei = 0
             puts "Detected expired items for '#{@name}':"
             a.list_expired_items { | path, tm |
                 puts "   '#{path}': #{tm}"
                 ei += 1
             }
-            puts "    <No expired items have been detected !" if ei == 0
+            puts '    <No expired items have been detected !' if ei == 0
 
             ei = 0
             puts "\nDetected expired properties for '#{@name}':"
@@ -145,8 +143,10 @@ class EXPIRED < Artifact
                 puts "    '#{n}' = #{ov}"
                 ei += 1
             }
-            puts "    <No an expired property has been detected !" if ei == 0
-            puts ""
+            puts '    <No an expired property has been detected !' if ei == 0
+            puts ''
+        else
+            puts "Artifact '#{@name}' is not expired"
         end
     end
 

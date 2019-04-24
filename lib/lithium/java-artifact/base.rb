@@ -45,12 +45,22 @@ module CLASSPATH
     end
 
     def self.norm_classpath(cp)
-        res = []
+        res   = []
+        names = {}
         cp.split(File::PATH_SEPARATOR).each { | part |
-            if res.include?(part)
-            else
-                res << part
+            ext = File.extname(part)
+            if ext == '.jar' || ext == '.zip'
+                name = File.basename(part)
+                if names[name].nil?
+                    names[name] = part
+                else
+                    puts_error "Duplicated '#{name}' library has been detected in class path:"
+                    puts_error "   ? '#{names[name]}'"
+                    puts_error "   ? '#{part}'"
+                end
             end
+
+            res << part unless res.include?(part)
         }
         return res.join(File::PATH_SEPARATOR)
     end

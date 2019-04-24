@@ -68,12 +68,16 @@ class ArtifactName < String
     end
 
     def self.name_from(prefix, path, path_mask)
-        path = nil if path.length == 0
+        path = nil if !path.nil? && path.length == 0
         name  = ''
         name += path                                               unless path.nil?
         name  = path.nil? ? path_mask : File.join(name, path_mask) unless path_mask.nil?
         name  = prefix + name                                      unless prefix.nil?
         return name
+    end
+
+    def env_path?()
+        return !path.nil? && path.start_with?(".env/")
     end
 
     def match(name)
@@ -83,7 +87,7 @@ class ArtifactName < String
         return false if @prefix != artname.prefix
 
         unless @path_mask.nil?
-            return false if artname.suffix.nil?  # TODO: hard-coded "env/"
+            return false if artname.suffix.nil? || (artname.env_path? ^ env_path?)
             return File.fnmatch(@suffix, artname.suffix, @mask_type)
         else
             return @suffix == artname.suffix
@@ -146,9 +150,8 @@ class ArtifactMeta < Hash
                 }
             end
         else
-            clazz    = nil
             @artname = ArtifactName.new(args[0])
-            clazz    = args[0] if args[0].kind_of?(Class)
+            clazz    = args[0].kind_of?(Class) ? args[0]  : nil
 
             # if there is only one argument then consider as a class or class name
             # In this case name of artifact is fetched as to_s of class
@@ -157,7 +160,7 @@ class ArtifactMeta < Hash
 
                 if clazz.nil?
                     begin
-                        cn = @artname.prefix[0..-2]
+                        cn    = @artname.prefix[0..-2]
                         clazz = Module.const_get(cn)
                     rescue
                         raise "Artifact class cannot be resolved by artifact name '#{cn}'"
@@ -172,7 +175,7 @@ class ArtifactMeta < Hash
                     raise "Unknown artifact '#{args[0]}' class"
                 end
             else
-                raise "No artifact information has been passed"
+                raise 'No artifact information has been passed'
             end
 
             if args.length > 2 && !@artname.suffix.nil?
@@ -210,6 +213,10 @@ class ArtifactMeta < Hash
 
     def to_s
         "#{self.class} : { " + super + " artname = '#{artname}' }"
+    end
+
+    def inspect()
+        return "#{self.class.name}: { class='#{self[:clazz]}', def_val='#{self[:def_value]}', artname='#{@artname}' }"
     end
 end
 
@@ -645,7 +652,7 @@ class FileArtifact < Artifact
     end
 
     def fullpath(path = @name)
-        return path if path.start_with?('.lithium/env/')
+        return path if path.start_with?('.env/')
 
         if path == @name
             return path if @is_absolute
@@ -789,13 +796,13 @@ class FileMask < FileArtifact
 end
 
 module ArtifactContainer
-    def artifact(name, &block)
+    def artifact(name, shift ='',  &block)
         raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
 
         artname = ArtifactName.new(name)
 
+        # check if artifact name points to current project
         return Project.current if artname.to_s == Project.current.name.to_s
-
 
         # fund local info about the given artifact
         meta = find_meta(artname)
@@ -817,21 +824,17 @@ module ArtifactContainer
         end
 
         # manage cache
-        if block.nil?
-            art = _artifact_from_cache(artname, meta)
-        else
-            _remove_from_cache(artname, meta)
-            art = nil
-        end
-
+        _remove_from_cache(artname, meta) unless block.nil?
+        art = _artifact_from_cache(artname, meta)
         art = _artifact_by_meta(artname, meta, &block) if art.nil?
 
+        # always cache container
         if art.kind_of?(ArtifactContainer)
             art = _cache_artifact(artname, meta, art)
-            art = art.artifact(artname.suffix)
+            return art.artifact(artname.suffix)
+        else
+            return _cache_artifact(artname, meta, art)
         end
-
-        return _cache_artifact(artname, meta, art)
     end
 
     def _cache_artifact(artname, meta, art)
@@ -867,6 +870,7 @@ module ArtifactContainer
         elsif artname.path_mask.nil?
             _artifacts_cache.delete(artname) if _artifacts_cache[artname]
         end
+        nil
     end
 
     def _artifact_by_meta(name, meta, &block)
@@ -949,7 +953,7 @@ module ArtifactContainer
         end
 
         # try to find previously stored meta
-        puts "Override previously defined '#{m.artname}' artifact" if _meta[m.artname]
+        #puts "Override previously defined '#{m.artname}' artifact" if _meta[m.artname]
 
         # store meta
         _meta[m.artname] = m
@@ -1064,14 +1068,13 @@ class Project < Directory
     end
 end
 
-
 class EnvArtifact < Artifact
     def self.default_name(*args)
         @default_name ||= nil
         if args.length > 0
             @default_name = validate_env_name(args[0])
         elsif @default_name.nil?
-            @default_name = ".lithium/env/#{self.name}"
+            @default_name = ".env/#{self.name}"
         end
 
         return @default_name
@@ -1087,15 +1090,18 @@ class EnvArtifact < Artifact
     # end
 end
 
-
-class TestFileMask < FileMask
+class GroupByExtension < FileMask
     def initialize(*args, &block)
+        @callback = nil
         super
+    end
+
+    def DO(&block)
+        @callback = block
     end
 
     def build()
         exts = []
-
         list_items { |f, m|
             ext = File.extname(f)
             exts.push(ext) if !ext.nil? && ext != "" && !exts.include?(ext)
@@ -1104,7 +1110,7 @@ class TestFileMask < FileMask
         exts.each { | ext |
             name = "#{@name}#{ext}"
             puts "Detect '#{ext}' to be compiled as '#{name}'"
-            BUILD_ARTIFACT("compile:#{name}")
+            @callback.call(ext)
         }
     end
 end

@@ -28,8 +28,13 @@ class ValidateXML < FileMask
 end
 
 class StringRunner < Artifact
+    def initialize(*args, &block)
+        @script = nil
+        super
+    end
+
     def build()
-        raise 'Script string has not been defined' if !@script
+        raise 'Script string has not been defined' unless @script
         r = Open4.popen4(cmd()) { | pid, stdin, stdout, stderr |
             stdin << @script
             stdin.close

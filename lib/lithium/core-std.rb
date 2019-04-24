@@ -347,10 +347,3 @@ module StdFormater
         msg
     end
 end
-
-
-# rr = Std::FileLocRecognizer.new(ext: 'rb')
-# rr.recognize("ArtifactMeta : { {:clazz=>FileArtifact, :block=>#<Proc:0x007ff22c92d008@/Users/brigadir/projects/.lithium/lib/lithium/self-diagnostic.rb:280>, :def_name=>nil} artname = 'a/b/*' }") {
-
-# }
-
