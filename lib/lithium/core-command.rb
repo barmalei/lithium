@@ -248,7 +248,6 @@ eval \"$vc\"
         elsif Platform::OS == :win32
             win = ENV['WINDIR'].dup
             win["\\"] = '/'
-            win = FileUtil.correct_win_path(win)
             @script_path = "#{win}/#{@script_name}.bat"
             @script = @win_script
         else

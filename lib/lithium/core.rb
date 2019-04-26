@@ -600,6 +600,10 @@ class FileArtifact < Artifact
     end
 
     def _contains_path?(base, path)
+
+        puts "FileArtifact._contains_path?(): base = '#{base}' path = '#{path}'"
+
+
         base = base[0..-2] if base[-1] == '/'
         path = path[0..-2] if path[-1] == '/'
         return true  if base == path
@@ -610,14 +614,19 @@ class FileArtifact < Artifact
     end
 
     def homedir()
+        puts "FileArtifact.homedir(): is_absolute = #{@is_absolute}, owner = '#{owner}' name = #{@name} clazz = #{self.class}"
+
         if @is_absolute
             unless owner.nil?
                 home = owner.homedir
                 if Pathname.new(home).absolute?
                     home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
+
+                    puts "FileArtifact.homedir(): HOME = #{home} owner.homedir = #{owner.homedir}:#{owner.class} name = #{@name} clazz = #{self.class}" if _contains_path?(home, @name)
                     return home if _contains_path?(home, @name)
                 end
             end
+
             return File.dirname(@name)
         else
             return super
@@ -660,6 +669,9 @@ class FileArtifact < Artifact
         else
             path = Pathname.new(path).cleanpath
             home = homedir
+
+            puts "FileArtifact.fullpath(): home = #{home}, path = #{path}"
+
             if path.absolute?
                 path = path.to_s
                 home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
@@ -1114,4 +1126,6 @@ class GroupByExtension < FileMask
         }
     end
 end
+
+puts "HELLo WIN_10"
 

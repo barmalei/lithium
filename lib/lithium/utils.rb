@@ -1,6 +1,5 @@
 require 'fileutils'
 require 'tempfile'
-require 'open4'
 require 'open3'
 
 #  Log takes care about logged expiration state.
@@ -121,7 +120,7 @@ module LogArtifactState
     #############################################################
     def logs_home_dir()
         raise 'Cannot detect log directory since project home is unknown' if !homedir()
-        h = File.join(homedir, ".lithium", ".logs")
+        h = File.join(homedir, '.lithium', '.logs')
         if !File.exists?(h)
             puts_warning "LOG directory '#{h}' cannot be found. Try to create it ..."
             Dir.mkdir(h)
@@ -131,7 +130,7 @@ module LogArtifactState
 
     # check if log can be done
     def can_artifact_be_tracked?()
-        lith = File.join(homedir, ".lithium")
+        lith = File.join(homedir, '.lithium')
         if (!File.exists?(lith))
             puts_warning "Artifact state cannot be tracked since since '#{lith}' log directory doesn't exist"
             return false
@@ -315,45 +314,37 @@ module LogArtifactState
     def attrs_log_path() items_log_path() + ".ser" end
 end
 
-def exec4(*args, &block)
-    def read_std(std, out, &block)
-        while  (rr = IO.select([std], nil, nil, 2)) != nil
+def exec4(*args)
+    def read_std(std, out)
+        while (rr = IO.select([std], nil, nil, 2)) != nil
             next if rr.empty?
             begin
-                l = std.readline()
-                if l
-                    if block
-                        block.call(l)
-                    else
-                        out.puts l
-                    end
-                end
-            rescue IOError=>e
+                l = std.readline().strip
+                out.puts l if l
+            rescue IOError => e
                 break
             end
         end
     end
 
-    def read_all(pid, stdout, stderr, sout, serr, &block)
+    Open3.popen3(args.join(' ')) { | stdin, stdout, stderr, thread |
         while true
             begin
-                Process.getpgid(pid)
-            rescue Errno::ESRCH
+                return thread.value if Process.waitpid(thread.value.pid)
+            #rescue Errno::ESRCH #Errno::ECHILD
+            #rescue Exception => e
+            rescue Errno::ECHILD
                 begin
-                    read_std(stdout, sout, &block)
-                    read_std(stderr, serr)
+                    read_std(stdout, $stdout)
+                    read_std(stderr, $stderr)
                 rescue
                 end
-                break
+                return thread.value
             end
-            read_std(stdout, sout, &block)
-            read_std(stderr, serr)
+            read_std(stdout, $stdout)
+            read_std(stderr, $stderr)
         end
-    end
 
-    cmd = args.join(' ')
-    r = Open3.popen3(cmd) { | stdin, stdout, stderr, thread |
-        read_all(thread.pid, stdout, stderr, $stdout, $stderr, &block)
         return thread.value
     }
 end
@@ -423,13 +414,5 @@ class FileUtil
             return Regexp.last_match if l =~ pattern
         }
         nil
-    end
-
-    #  Windows absolute path contains letter and the letter case can differ
-    def self.correct_win_path(path)
-        return path if File::PATH_SEPARATOR != ';'
-        path["\\"] = '/' if path.index("\\")
-        i  = path.index(/^[A-Za-z][:]\//)
-        return path[0,1].downcase() + path[1, path.length()] if i == 0
     end
 end

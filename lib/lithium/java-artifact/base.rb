@@ -1,6 +1,5 @@
 require 'tmpdir'
 require "pathname"
-require "pty"
 
 require 'lithium/core'
 require 'lithium/utils'
@@ -99,7 +98,8 @@ class JAVA < JVM
         @java_version_version = '?'
         @java_version_low     = '?'
         @java_version_high    = '?'
-        PTY.spawn("#{java()} -version") do |stdout, stdin, pid|
+
+        IO.popen([java(),  '-version',  :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
                     m = /java\s+version\s+\"([0-9]+)\.([0-9]+)\.([^\"]*)\"/.match(line.chomp)
@@ -107,15 +107,16 @@ class JAVA < JVM
                         @java_version_high = m[1]
                         @java_version_low  = m[2]
                         @java_version      = "#{@java_version_high}.#{@java_version_low}.#{m[3]}"
+                        stdout.close
                         break
                     end
                 }
             rescue Errno::EIO
                 puts_warning "Java version cannot be detected"
             end
-        end
+        }
 
-        raise "Java version cannot be identified for #{@java_home}" if !@java_version
+        raise "Java version cannot be identified for #{@java_home}" if @java_version.nil?
         puts "Java version #{@java_version}, home '#{@java_home}'"
 
         @classpath = build_classpath(*@libs)

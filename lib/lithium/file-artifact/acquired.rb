@@ -1,6 +1,5 @@
 require 'lithium/core'
 require 'lithium/utils'
-require 'open4'
 
 # acquired file artifact
 class GeneratedFile < FileArtifact
