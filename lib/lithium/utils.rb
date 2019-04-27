@@ -313,10 +313,10 @@ end
 
 def exec4(*args)
     def read_std(std, out)
-        while (rr = IO.select([std], nil, nil, 2)) != nil
+        while (rr = IO.select([ std ], nil, nil, 2)) != nil
             next if rr.empty?
             begin
-                l = std.readline().strip
+                l = std.readline.strip
                 out.puts l if l
             rescue IOError => e
                 break

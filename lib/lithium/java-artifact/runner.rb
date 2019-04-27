@@ -11,9 +11,6 @@ class JavaFileRunner < FileCommand
     end
 
     def build()
-
-        puts "JavaFileRunner.build(): owner = '#{owner}', homedir = '#{homedir}'"
-
         go_to_homedir()
         raise "Running '#{@name}' failed" if exec4(*cmd()) != 0
     end
@@ -56,7 +53,7 @@ class RunJavaCode < JavaFileRunner
     def initialize(*args)
         super
         # TODO: hardcoded artifact prefix
-        #REQUIRE "compile:#{name}"
+        REQUIRE "compile:#{name}"
     end
 
     def build_target()
@@ -64,8 +61,6 @@ class RunJavaCode < JavaFileRunner
         pkgname = FileUtil.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*;/)
         clname  = File.basename(file)
         clname[/\.java$/] = ''
-
-        #clname  = FileUtil.grep(file, /\s*public\s+(static\s+)?(abstract\s+)?class\s+([a-zA-Z][a-zA-Z0-9_]*)/)
 
         raise 'Class name cannot be identified' if clname.nil?
         puts_warning 'Package name is empty' if pkgname.nil?

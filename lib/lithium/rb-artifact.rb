@@ -28,7 +28,7 @@ class RUBY < EnvArtifact
         }
         path = File.join(homedir, '.lithium', 'lib')
         rpath = "#{rpath} -I#{path}" if File.directory?(path)
-        return path
+        return rpath
     end
 
     def ruby() 'ruby' end
