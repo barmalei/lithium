@@ -29,7 +29,7 @@ def STD_RECOGNIZERS(args)
             if key.kind_of?(Class)
                 key = key.name
             elsif !key.kind_of?(String)
-                raise "Invalid object type '{key.class.name}'"
+                raise "Invalid object type '#{key.class.name}'"
             end
 
             $RECOGNIZERS[key] = [] unless $RECOGNIZERS.has_key?(key)
@@ -149,7 +149,7 @@ class Std
                 regexp = regexp.gsub("${file_pattern}", $FILENAME_PATTERN)
                 regexp = regexp.gsub("${file_extension}", ext) unless ext.nil?
             elsif ext
-                raise "File extension cannot be specified for none-string regexp"
+                raise 'File extension cannot be specified for none-string regexp'
             end
 
             super regexp
@@ -238,7 +238,7 @@ class Std
 
     def _fatal_(e)
         # fatal error has happened in Std implementation
-        $M.puts "Fatal error has occurred:"
+        $M.puts 'Fatal error has occurred:'
         $M.puts " #{$!.message}:"
         e.backtrace().each() { |line| $M.puts "     #{line}" }
     end

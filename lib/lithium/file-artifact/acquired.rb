@@ -100,22 +100,19 @@ class ZipFile < MetaGeneratedFile
             list.each_index { |i| list[i] = list[i].gsub("#{bb}/", '') }
             Dir.chdir(bb)
 
-            list.each() { |f| raise "'#{f}' file cannot be found" unless File.exists?(f) }
+            list.each { |f| raise "'#{f}' file cannot be found" unless File.exists?(f) }
             list = list.collect { |f| "'#{f}'" }
-            raise 'Archive building failed.' if exec4(command(list)) != 0
+
+            zip_path = FileUtils.which('zip')
+            raise 'command line zip tool cannot be found' unless zip_path.nil?
+            raise 'Archive building failed' if exec4(zip_path, @options, fullpath, list.join(' ')) != 0
         else
-            puts_warning 'No file to be packed.'
+            puts_warning 'No file to be packed'
         end
     end
 
     def build_failed() cleanup() end
     def what_it_does() "Create ZIP file by '#{@meta.name}'" end
-
-    def command(list)
-        zip_path = FileUtils.which('zip')
-        raise "command line zip tool cannot be found" unless zip_path.nil?
-        "#{zip_path} #{@options} #{fullpath} #{list.join(' ')}"
-    end
 end
 
 # Copy file format:

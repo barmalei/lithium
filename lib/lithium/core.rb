@@ -49,7 +49,7 @@ class ArtifactName < String
         @suffix = @prefix.nil? ? name : name[@prefix.length .. name.length]
         @suffix = nil if !@suffix.nil? && @suffix.length == 0
 
-        @path = @suffix[/((?<![a-z])[a-z]:)?[^:]+$/] unless @suffix.nil?
+        @path = @suffix[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/] unless @suffix.nil?
         unless @path.nil?
             mask_index = @path.index(/[\[\]\?\*\{\}]/)
             unless mask_index.nil?
@@ -300,9 +300,6 @@ class Artifact
 
         def method_missing(meth, *args, &block)
             switched = false
-
-            #puts "method_missing():  stack size = #{@@calls_stack.length}  is last proxy ? =  #{defined? @@calls_stack.last.original_instance.expired?}"
-
             if  @@calls_stack.length == 0 || @@calls_stack.last.original_instance != @original_instance
                 @@calls_stack.push(self)
                 switched = true
@@ -346,7 +343,9 @@ class Artifact
 
         self.send(:define_method, 'requires') {
             r = self.send(rname.intern)
-            r << self.send(clazz.name.downcase)
+            a = self.send(clazz.name.downcase)
+            raise "Dependency '#{clazz.name.downcase}' cannot be resolved in #{self.class}:'#{@name}'" if a.nil?
+            r.push(a)
             return r
         }
     end
@@ -442,7 +441,10 @@ class Artifact
     # add required for the artifact building dependencies (other artifact)
     def REQUIRE(*args)
         @requires ||= []
-        args.each { | aa | @requires << aa }
+        args.each { | aa |
+            raise "Null dependency has been detected in #{self.class}:'#{@name}' artifact" if aa.nil?
+            @requires.push(aa)
+        }
     end
 
     # Overload "eq" operation of two artifact instances.
@@ -600,10 +602,6 @@ class FileArtifact < Artifact
     end
 
     def _contains_path?(base, path)
-
-        puts "FileArtifact._contains_path?(): base = '#{base}' path = '#{path}'"
-
-
         base = base[0..-2] if base[-1] == '/'
         path = path[0..-2] if path[-1] == '/'
         return true  if base == path
@@ -614,15 +612,11 @@ class FileArtifact < Artifact
     end
 
     def homedir()
-        puts "FileArtifact.homedir(): is_absolute = #{@is_absolute}, owner = '#{owner}' name = #{@name} clazz = #{self.class}"
-
         if @is_absolute
             unless owner.nil?
                 home = owner.homedir
                 if Pathname.new(home).absolute?
                     home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
-
-                    puts "FileArtifact.homedir(): HOME = #{home} owner.homedir = #{owner.homedir}:#{owner.class} name = #{@name} clazz = #{self.class}" if _contains_path?(home, @name)
                     return home if _contains_path?(home, @name)
                 end
             end
@@ -669,8 +663,6 @@ class FileArtifact < Artifact
         else
             path = Pathname.new(path).cleanpath
             home = homedir
-
-            puts "FileArtifact.fullpath(): home = #{home}, path = #{path}"
 
             if path.absolute?
                 path = path.to_s
@@ -818,8 +810,6 @@ module ArtifactContainer
 
         # fund local info about the given artifact
         meta = find_meta(artname)
-
-        #puts "#{self.class}.artifact(): own = '#{owner}' current = '#{self.name}' name = #{name} meta = #{meta} hm = #{homedir}"
 
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
@@ -1126,6 +1116,4 @@ class GroupByExtension < FileMask
         }
     end
 end
-
-puts "HELLo WIN_10"
 

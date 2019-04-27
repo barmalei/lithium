@@ -15,7 +15,7 @@ class ExtractJAR < FileCommand
     end
 
     def build()
-        FileUtils.mkdir_p(@destination) if !File.exists?(@destination)
+        FileUtils.mkdir_p(@destination) unless File.exists?(@destination)
         Dir.chdir(@destination)
         `jar -xfv '#{fullpath()}'`.each { |i|
             puts " :: #{i.chomp}"
@@ -51,12 +51,12 @@ class CreateJAR < FileMask
 
     def initialize(*args)
         super
-        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : "result.jar"
+        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : 'result.jar'
         @manifest    ||= nil
         @ignore_dirs = true
         @base        ||= $lithium_args.length > 1 ? $lithium_args[1] : nil
 
-        @base = fullpath("lib") if !@base
+        @base = fullpath('lib') if !@base
         raise "Invalid base directory '#{@base}'" if !File.exists?(@base) || !File.directory?(@base)
 
         if @manifest
@@ -72,9 +72,9 @@ class CreateJAR < FileMask
 
         Dir.chdir(@base)
         if @manifest
-            r = exec4(java().jar, "cfm", "'#{dest}'", "'#{@manifest}'", "-C '#{@base}'", list)
+            r = exec4(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
         else
-            r = exec4(java().jar, "cf", "'#{dest}'",  list)
+            r = exec4(java().jar, "cf", "\"#{dest}\"",  list)
         end
         raise "JAR #{dest} creation error" if r != 0
     end
@@ -95,18 +95,18 @@ class JarFile < FileArtifact
     def initialize(*args)
         super
 
-        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : "result.jar"
+        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : 'result.jar'
         @manifest    ||= nil
         @ignore_dirs = true
         @base        ||= $lithium_args.length > 1 ? $lithium_args[1] : nil
 
-        @base = fullpath("lib") if !@base
+        @base = fullpath('lib') unless @base
         raise "Invalid base directory '#{@base}'" if !File.exists?(@base) || !File.directory?(@base)
 
         if @manifest
             @manifest = fullpath(@manifest)
-            raise "Manifest file '#{@manifest}' cannot be found" if !File.exists?(@manifest)
-            raise "Manifest file '#{@manifest}'' is a directory" if  File.directory?(@manifest)
+            raise "Manifest file '#{@manifest}' cannot be found" unless File.exists?(@manifest)
+            raise "Manifest file '#{@manifest}' is a directory"  if     File.directory?(@manifest)
         end
     end
 
@@ -116,9 +116,9 @@ class JarFile < FileArtifact
 
         Dir.chdir(@base)
         if @manifest
-            r = exec4(java().jar, "cfm", "'#{dest}'", "'#{@manifest}'", "-C '#{@base}'", list)
+            r = exec4(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
         else
-            r = exec4(java().jar, "cf", "'#{dest}'",  list)
+            r = exec4(java().jar, 'cf', "\"#{dest}\"",  list)
         end
         raise "JAR #{dest} creation error" if r != 0
     end

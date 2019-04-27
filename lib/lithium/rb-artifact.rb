@@ -13,25 +13,27 @@ class RUBY < EnvArtifact
 
     def initialize(name)
         super
-
-        @libs      ||= [ 'lib' ]
-        @ruby_path ||= ''
-        @libs.each { | path |
-            path = File.join(homedir, path) if !Pathname.new(path).absolute?
-            if File.directory?(path)
-                @ruby_path = "#{@ruby_path} -I#{path}"
-            else
-                puts "Ruby library path '#{path}' cannot be found"
-            end
-        }
-
-        path = File.join(homedir, '.lithium', 'lib')
-        @ruby_path = "#{@ruby_path} -I#{path}" if File.directory?(path)
+        @libs ||= [ 'lib' ]
     end
 
-    def ruby() "ruby #{@ruby_path}" end
+    def rpath()
+        rpath = ''
+        @libs.each { |  path |
+            path = File.join(homedir, path) unless Pathname.new(path).absolute?
+            if File.directory?(path)
+                rpath = "#{rpath} -I#{path}"
+            else
+                puts_warning "Ruby library path '#{path}' cannot be found"
+            end
+        }
+        path = File.join(homedir, '.lithium', 'lib')
+        rpath = "#{rpath} -I#{path}" if File.directory?(path)
+        return path
+    end
+
+    def ruby() 'ruby' end
     def build() end
-    def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{@ruby_path}'" end
+    def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{rpath}'" end
 end
 
 # Run ruby script
@@ -39,7 +41,7 @@ class RunRubyScript < FileCommand
     required RUBY
 
     def build()
-        raise "Run RUBY '#{@name}' script failed" if exec4(ruby().ruby, "'#{fullpath()}'", $lithium_args.join(' ')) != 0
+        raise "Run RUBY '#{@name}' script failed" if exec4(ruby().ruby, ruby().rpath, "\"#{fullpath()}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -56,7 +58,7 @@ class ValidateRubyScript < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if exec4("ruby -c", "'#{fullpath(path)}'") != 0
+        raise "Validation RUBY script '#{path}' failed" if exec4('ruby', '-c', "\"#{fullpath(path)}\"") != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end

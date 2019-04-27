@@ -29,7 +29,7 @@ end
 # Run JS with nodejs
 class RunNodejs < FileCommand
     def build()
-        raise "Run '#{@name}' JS failed" if exec4("node", "'#{fullpath()}'", $lithium_args.join(' ')) != 0
+        raise "Run '#{@name}' JS failed" if exec4('node', "\"#{fullpath}\"") != 0
     end
 
     def what_it_does()
@@ -87,12 +87,12 @@ class UglifyJavaScript < CompressJavaScript
     end
 
     def compress(infile, outfile)
-        opt = [ "#{@lib}/bin/uglifyjs" ]
+        opt = [ File.join(@lib, 'bin', 'uglifyjs') ]
         opt << @options
         opt << infile
-        opt << ">"
+        opt << '>'
         opt << outfile
-        raise "JS Uglify failed" if exec4(opt.join(' ')) != 0
+        raise 'JS Uglify failed' if exec4(opt.join(' ')) != 0
     end
 
     def what_it_does() "Uglify (nodejs) #{@name}' JS script" end
@@ -106,10 +106,10 @@ class CompressedJavaScriptFile < FileArtifact
         super
 
         unless @source
-            s = ".min.js"
+            s = '.min.js'
             i = @name.rindex(s)
             raise "JS compressed file name '#{@name}' cannot be used to identify input file name automatically" if i.nil? || i != (@name.length - s.length)
-            @source = @name[0, i + 1] + "js"
+            @source = @name[0, i + 1] + 'js'
         end
     end
 
@@ -136,7 +136,7 @@ end
 
 class CombinedJavaScript < MetaGeneratedFile
     def build()
-        f = File.new(fullpath(), "w")
+        f = File.new(fullpath(), 'w')
         f.write("(function() {\n\n")
         @meta.list_items(true) { |n,t|
             puts " add #{n}"
@@ -159,7 +159,7 @@ class GenerateJavaScriptDoc < FileArtifact
         super
         @config   ||= nil
         @template ||= nil
-        @input    ||= "."
+        @input    ||= '.'
         raise "Name has to be directory" if File.exists?(fullpath()) && !File.directory?(fullpath())
     end
 
@@ -175,24 +175,24 @@ class GenerateJavaScriptDoc < FileArtifact
         p = fullpath()
         raise "Invalid artifact path '#{p}'" if File.exists?(p) && !File.directory?(p)
 
-        args = [ "-o ", p, "-n", "-C" ]
+        args = [ 'yuidoc', '-o ', p, '-n', '-C' ]
 
-        if !@template.nil?
+        unless @template.nil?
             t = fullpath(@template)
             raise "Invalid template path '#{t}'" if !File.exists?(t) || !File.directory?(t)
             args << "-t " << t
         end
 
-        if !@config.nil?
+        unless @config.nil?
             c = fullpath(@config)
             raise "Invalid template path '#{c}'" if !File.exists?(c) || File.directory?(c)
-            args << "-c " << c
+            args << '-c ' << c
         end
 
         istmp = false
         i = fullpath(@input)
         raise "Invalid input path '#{i}'" if !File.exists?(i)
-        if !File.directory?(i)
+        unless File.directory?(i)
             tmp = Dir.mktmpdir()
             FileUtils.cp(i, tmp.to_s)
             i = tmp
@@ -201,7 +201,7 @@ class GenerateJavaScriptDoc < FileArtifact
 
         args << i
 
-        exec4("yuidoc", args.join(' '))
+        exec4(*args)
 
         FileUtils.rmtree(i) if istmp
     end

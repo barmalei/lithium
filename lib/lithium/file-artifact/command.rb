@@ -187,7 +187,7 @@ class BackupFile < PermanentFile
         template_path = File.join($project_def, "#{template_name}.backup")
 
         if @backup_descriptor && !File.exists?(template_path)
-            template_path= $project_def/@backup_descriptor
+            template_path= File.join($project_def, @backup_descriptor)
             raise "Backup descriptor cannot be found '#{template_path}'" if !File.exists?(template_path)
         end
 
@@ -217,9 +217,9 @@ class BackupFile < PermanentFile
                 FileUtils.mkdir_p(f) if !File.exists?(f)
             else
                 cf = f.gsub('../', '')
-                dir = File.expand_path(dest_dir/File.dirname(cf))
-                FileUtils.mkdir_p(dir) if !File.exists?(dir)
-                dest_file = dest_dir/cf
+                dir = File.expand_path(File.join(dest_dir, File.dirname(cf)))
+                FileUtils.mkdir_p(dir) unless File.exists?(dir)
+                dest_file = File.join(dest_dir, cf)
                 raise "File '#{dest_file}' already exists" if File.exists?(dest_file)
                 File.cp(f, dest_file)
             end

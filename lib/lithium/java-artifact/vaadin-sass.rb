@@ -14,8 +14,8 @@ class BuildVaadinSass < FileCommand
         fp = fullpath()
         on = "#{File.basename(fp, 'scss')}css"
 
-        r = exec4(java().java(), '-cp ', "'#{fullpath('/WEB-INF/lib/*')}'",
-                  "com.vaadin.sass.SassCompiler",
+        r = exec4(java().java, '-cp ', "\"#{fullpath(File.join('WEB-INF', 'lib', '*'))}\"",
+                  'com.vaadin.sass.SassCompiler',
                   fp,
                   File.join(File.dirname(fp), on))
 

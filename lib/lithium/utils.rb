@@ -61,12 +61,9 @@ module LogArtifactState
             update_logs()
         elsif meth == :mtime
             t = logs_mtime()
-            if t < 0
-                return original_mtime()
-            else
-                tt = original_mtime()
-                return t > tt ? t : tt
-            end
+            return original_mtime() if t < 0
+            tt = original_mtime()
+            return t > tt ? t : tt
         elsif meth == :expired?
             return logs_expired? || original_expired?
         else
@@ -252,7 +249,7 @@ module LogArtifactState
     end
 
     def items_log_path()
-        @items_log_path ||= "#{logs_home_dir()}/#{self.class.to_s}_#{self.name.tr("/\\<>:.*{}[]", '_')}"
+        @items_log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{self.name.tr("/\\<>:.*{}[]", '_')}")
         @items_log_path
     end
 
@@ -327,6 +324,15 @@ def exec4(*args)
         end
     end
 
+    # clone arguments
+    args = args.dup
+
+    # use quotas to surround process if necessary
+    args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
+
+    # append arguments passed via command line
+    args << $lithium_args if $lithium_args.length > 0
+
     Open3.popen3(args.join(' ')) { | stdin, stdout, stderr, thread |
         while true
             begin
@@ -390,7 +396,7 @@ class FileUtil
 
     def self.look_path_up(path, fname, top_path = nil, &block)
         path      = File.expand_path(path)
-        top_path  = File.expand_path(top_path) if !top_path.nil?
+        top_path  = File.expand_path(top_path) unless top_path.nil?
         prev_path = nil
 
         #raise "Path '#{path}' doesn't exist" unless File.exists?(path)

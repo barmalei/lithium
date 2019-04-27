@@ -10,7 +10,7 @@ require 'lithium/core-std'
 def LOC_MAVEN(group, id, ver)
     p = File.expand_path("~/.m2/repository")
     return nil unless File.exists?(p)
-    group = group.gsub(".", "/") if group.index('.') != nil
+    group = group.gsub('.', '/') if group.index('.') != nil
 
     puts "p = #{p} group = #{group} id = #{id} ver = #{ver}"
 
@@ -34,7 +34,7 @@ class POMFile < PermanentFile
     include StdFormater
 
     def initialize(name, &block)
-        super(FileUtil.look_file_up(fullpath(name), "pom.xml", homedir), &block)
+        super(FileUtil.look_file_up(fullpath(name), 'pom.xml', homedir), &block)
     end
 
     def list_items()
@@ -53,24 +53,22 @@ class DownloadPOMDeps < POMFile
         @destination     ||= "lib"
         @files, @rfiles = [], []
 
-
-
         raise "Destination directory '#{@destination}' doesn't exists" unless File.directory?(fullpath(@destination))
 
         artifacats = {}
         load_dep_from(@name, artifacats, false)
 
         artifacats.each_pair { |k, v|
-            next if v["manager"]
+            next if v['manager']
 
-            fid, fgr, fvr = v["id"], v["group"], v["ver"]
+            fid, fgr, fvr = v['id'], v['group'], v['ver']
 
-            if @scopes && v.has_key?("scope") && @scopes.index(v["scope"])
+            if @scopes && v.has_key?("scope") && @scopes.index(v['scope'])
                 puts_warning "Ignore '#{@name}'->'#{fid}-#{fvr}' because of scope '#{fsc}'"
                 next
             end
 
-            if @ignore_optional && v.has_key?("optional") && v["optional"] == 'true'
+            if @ignore_optional && v.has_key?('optional') && v['optional'] == 'true'
                 puts_warning "Ignore optional '#{@name}'->'#{fid}-#{fvr}' dependency"
                 next
             end
@@ -130,12 +128,12 @@ class DownloadPOMDeps < POMFile
 
                 key  = "#{fgr}:#{fid}"
                 desc = artifacts[key] if artifacts.has_key?(key)
-                desc = { "id"=>fid, "group"=>fgr, "manager"=>isparent } if !desc
+                desc = { 'id' => fid, 'group' => fgr, 'manager' => isparent } if !desc
 
-                desc["ver"]      = resolve_variables(fvr.to_s) if fvr
-                desc["scope"]    = resolve_variables(fsc.to_s) if fsc
-                desc["optional"] = resolve_variables(fop.to_s) if fop
-                desc["manager"]  = isparent
+                desc['ver']      = resolve_variables(fvr.to_s) if fvr
+                desc['scope']    = resolve_variables(fsc.to_s) if fsc
+                desc['optional'] = resolve_variables(fop.to_s) if fop
+                desc['manager']  = isparent
                 artifacts[key] = desc
             }
         }
@@ -238,7 +236,7 @@ class MavenJarFile < HTTPRemoteFile
                     next
                 end
 
-                n = "#{File.dirname(@name)}/#{fid}-#{fvr}.jar"
+                n = File.join(File.dirname(@name), "#{fid}-#{fvr}.jar")
                 @requires << MavenJarFile.new(n) {
                     @group, @ver, @id = fgr, fvr, fid
                 }
@@ -249,9 +247,9 @@ class MavenJarFile < HTTPRemoteFile
 
     protected
 
-    def remote_dir() "#{@group}/#{@id}/#{@ver}/" end
-    def remote_path() "#{remote_dir()}#{@id}-#{@ver}.jar" end
-    def remote_pom_path() "#{remote_dir()}#{@id}-#{@ver}.pom" end
+    def remote_dir()       File.join(@group, @id, @ver)                  end
+    def remote_path()      File.join(remote_dir(), "#{@id}-#{@ver}.jar") end
+    def remote_pom_path()  File.join(remote_dir(), "#{@id}-#{@ver}.pom") end
 
     def fetch_pom()
         pn  = "#{@id}-#{@ver}.pom"
@@ -271,10 +269,10 @@ class RunMaven < POMFile
         super
 
         @maven_path ||= FileUtil.which('mvn')
-        @targets    ||= [ "clean", "install" ]
+        @targets    ||= [ 'clean', 'install' ]
         @options    ||= ""
-        raise "maven path cannot be detected" unless @maven_path
-        raise "maven path cannot be detected" unless File.exists?(@maven_path)
+        raise 'maven path cannot be detected' unless @maven_path
+        raise "maven path '#{@maven_path}' doesn't exist be detected" unless File.exists?(@maven_path)
     end
 
     def expired?
@@ -286,7 +284,7 @@ class RunMaven < POMFile
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
 
         Dir.chdir(File.dirname(path));
-        raise "Maven running failed" if exec4("#{@maven_path} #{@options} #{@targets.join(' ')}") != 0
+        raise 'Maven running failed' if exec4(@maven_path, @options,  @targets.join(' ')) != 0
     end
 
     def what_it_does() "Run maven: '#{@target}'" end
@@ -295,7 +293,7 @@ end
 class MavenCompile < RunMaven
     def initialize(*args)
         super
-        @targets = [ "compile" ]
+        @targets = [ 'compile' ]
     end
 
     def expired?
@@ -303,7 +301,7 @@ class MavenCompile < RunMaven
     end
 
     def list_items()
-        dir = File.join(File.dirname(fullpath()), 'src', "**", "*")
+        dir = File.join(File.dirname(fullpath()), 'src', '**', '*')
         FileMask.new(dir).list_items { |f, t|
             yield f, t
         }

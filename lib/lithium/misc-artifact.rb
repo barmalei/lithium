@@ -7,7 +7,7 @@ require 'rexml/parsers/pullparser'
 
 class RunShell < FileCommand
     def build()
-        raise "Script '#{@name}' running failed" if exec4("sh", fullpath()) != 0
+        raise "Script '#{@name}' running failed" if exec4('sh', fullpath) != 0
     end
 end
 
@@ -24,7 +24,7 @@ class ValidateXML < FileMask
         end
     end
 
-    def what_it_does() "Validate #{@name} XML file(s)" end
+    def what_it_does() "Validate '#{@name}' XML file(s)" end
 end
 
 class StringRunner < Artifact

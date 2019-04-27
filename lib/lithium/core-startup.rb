@@ -71,7 +71,7 @@ def BUILD_ARTIFACT(name)
 end
 
 def BUILD_ARTIFACT_TREE(root, level = 0)
-    raise "Nil artifact cannot be built" if root.nil?
+    raise 'Nil artifact cannot be built' if root.nil?
     unless root.expired
         puts "'#{root.art.name}' : #{root.art.class} is not expired", 'There is nothing to be done!' if level == 0
         return false

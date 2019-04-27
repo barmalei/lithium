@@ -23,17 +23,17 @@ class PYTHON < EnvArtifact
             if @pyname
                 python_path = FileUtil.which(@pyname)
             else
-                python_path = FileUtil.which("python")
+                python_path = FileUtil.which('python')
                 if python_path
-                    @pyname = "python"
+                    @pyname = 'python'
                 else
-                    python_path = FileUtil.which("python3")
-                    @pyname= "python3" if python_path
+                    python_path = FileUtil.which('python3')
+                    @pyname= 'python3' if python_path
                 end
             end
             @python_home = File.dirname(File.dirname(python_path)) if python_path
         else
-            @pyname ||= "python"
+            @pyname ||= 'python'
         end
 
         raise "Python home ('#{@python_home}') cannot be detected" if !@python_home || !File.exists?(@python_home) || !File.directory?(@python_home)
@@ -43,8 +43,8 @@ class PYTHON < EnvArtifact
 
         # setup pypath
         @libs.each { | lib |
-            lib = "#{homedir()}/#{lib}" if !Pathname.new(lib).absolute?()
-            raise "Invalid lib path - '#{lib}'" if !File.directory?(lib)
+            lib = File.join(homedir, lib)       unless Pathname.new(lib).absolute?()
+            raise "Invalid lib path - '#{lib}'" unless File.directory?(lib)
             @pypath = @pypath ? lib + File::PATH_SEPARATOR + @pypath : lib
         }
         ENV['PYTHONPATH'] = @pypath
@@ -65,8 +65,8 @@ class RunPythonScript < FileCommand
     required PYTHON
 
     def build()
-        raise "File '#{fullpath()}' cannot be found" if !File.exists?(fullpath())
-        raise "Run #{self.class.name} failed" if exec4("#{python().python} -u", "'#{fullpath()}'", $lithium_args.join(' '))  != 0
+        raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
+        raise "Run #{self.class.name} failed" if exec4(python().python, '-u', "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -81,12 +81,12 @@ end
 
 class ValidatePythonCode < FileMask
     def build_item(path, mt)
-        raise 'Pyflake python code validation failed' if exec4("pyflake", "'#{fullpath(path)}'") != 0
+        raise 'Pyflake python code validation failed' if exec4('pyflake', "\"#{fullpath(path)}\"") != 0
     end
 end
 
 class ValidatePythonScript < FileCommand
-    def build() raise "Validation failed" unless ValidatePythonScript.validate(fullpath()) end
+    def build() raise 'Validation failed' unless ValidatePythonScript.validate(fullpath) end
     def what_it_does() "Validate '#{@name}' script" end
 
     def self.validate(path)

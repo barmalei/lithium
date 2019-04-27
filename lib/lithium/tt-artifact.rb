@@ -18,7 +18,7 @@ class CompileTTGrammar < FileCommand
         path = FileUtil.which("tt")
         raise 'Cannot detect tree top grammar compiler' if !path || File.is_directory?(path)
         @tt = path
-        raise "Undefined output directory '#{@output_dir}'." if !File.directory?(@output_dir)
+        raise "Undefined output directory '#{@output_dir}'" if !File.directory?(@output_dir)
     end
 
     def build_item(path, mt)
@@ -30,7 +30,7 @@ class CompileTTGrammar < FileCommand
         opath = File.join(@output_dir, oname)
         File.delete(opath) if File.exists?(opath)
 
-        raise "Grammar '#{path}' compilation failed" if exec4(ruby().ruby, @tt, "'#{fullpath(path)}'", "-o", "'#{opath}'") != 0
+        raise "Grammar '#{path}' compilation failed" if exec4(ruby().ruby, ruby().rpath, @tt, "\"#{fullpath(path)}\"", '-o', "\"#{opath}\"") != 0
     end
 
     def what_it_does() "Compile '#{@name}' tree top grammar to '#{@output_dir}'" end

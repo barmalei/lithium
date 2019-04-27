@@ -1,7 +1,6 @@
 require 'fileutils'
 
 require 'lithium/core'
-require 'lithium/platform'
 require 'lithium/utils'
 
 
@@ -56,7 +55,7 @@ class META < Artifact
                 traverse(stack, stack.length - 1)
             end
         else
-            raise "Current actual project cannot be detected"
+            raise 'Current actual project cannot be detected'
         end
     end
 
@@ -160,10 +159,10 @@ class INSPECT < Artifact
         art       = Project.artifact(@name)
         variables = art.instance_variables
 
-        is_tracked_art_sign = "untracked"
+        is_tracked_art_sign = 'untracked'
         tracked_attrs       = []
         if art.kind_of?(LogArtifactState)
-            is_tracked_art_sign =  "tracked"
+            is_tracked_art_sign =  'tracked'
             art.class.each_log_attrs { | attr_name |
                 attr_name = attr_name[1, attr_name.length - 1]
                 tracked_attrs << attr_name
@@ -205,9 +204,9 @@ class INIT < FileCommand
             raise "'.lithium' as a file already exits in '#{lp}'" unless File.directory?(lp)
             puts_warning "Project '#{lp}' already has lithium stuff initialized"
         else
-            lh = File.join($lithium_code, "templates",  @template, ".lithium")
+            lh = File.join($lithium_code, 'templates',  @template, '.lithium')
             begin
-                l = File.join(lp, "project.rb")
+                l = File.join(lp, 'project.rb')
                 FileUtils.cp_r(lh, path)
             rescue
                 FileUtils.rm_r lp if File.exists?(lp)
@@ -223,6 +222,14 @@ class INSTALL < Artifact
     def initialize(name = 'INSTALL')
         super
         @script_name ||= 'lithium'
+
+        if RUBY_PLATFORM =~ /darwin/i || RUBY_PLATFORM =~ /linux/i || RUBY_PLATFORM =~ /freebsd/i || RUBY_PLATFORM =~ /freebsd/i || RUBY_PLATFORM =~ /netbsd/i || RUBY_PLATFORM =~ /cygwin/i
+            os = :unix
+        elsif RUBY_PLATFORM =~ /mswin/i || RUBY_PLATFORM =~ /mingw/i || RUBY_PLATFORM =~ /bccwin/i
+            os = :win
+        else
+            os = nil;
+        end
 
 @nix_script = "#!/bin/bash
 
@@ -242,16 +249,16 @@ eval \"$vc\"
 @set LITHIUM_HOME=#{$lithium_code}
 @ruby %LITHIUM_HOME%/lib/lithium.rb %*
 "
-        if Platform::OS == :unix
+        if os == :unix
             @script_path = "/usr/local/bin/#{@script_name}"
             @script = @nix_script
-        elsif Platform::OS == :win32
+        elsif os == :win
             win = ENV['WINDIR'].dup
             win["\\"] = '/'
             @script_path = "#{win}/#{@script_name}.bat"
             @script = @win_script
         else
-            raise "Unsupported platform #{Platform::OS}"
+            raise 'Unsupported platform, nix or windows are expected'
         end
     end
 
@@ -270,7 +277,7 @@ eval \"$vc\"
 
         File.open(@script_path, 'w') { |f|
             f.print @script
-            f.chmod(0777) if Platform::OS != :win32
+            f.chmod(0777) if os != :win
         }
     end
 

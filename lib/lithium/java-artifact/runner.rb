@@ -7,18 +7,15 @@ class JavaFileRunner < FileCommand
 
     def initialize(*args)
         super
-        @args    ||= nil
-        @options ||= ""
+        @options ||= ''
     end
 
     def build()
+
+        puts "JavaFileRunner.build(): owner = '#{owner}', homedir = '#{homedir}'"
+
         go_to_homedir()
-        if !@args.nil?
-            args = @args
-        else
-            args = $lithium_args.join(' ')
-        end
-        raise "Running '#{@name}' failed." if exec4(cmd(), args) != 0
+        raise "Running '#{@name}' failed" if exec4(*cmd()) != 0
     end
 
     def cmd()
@@ -26,9 +23,9 @@ class JavaFileRunner < FileCommand
         target = build_target()
         runner = build_runner()
         if clpath
-            return "#{runner} -classpath #{clpath} #{@options} #{target}"
+            return [runner, '-classpath', "\"#{clpath}\"", @options, target]
         else
-            return "#{runner} #{@options} #{target}"
+            return [runner, @options, target]
         end
     end
 
@@ -59,7 +56,7 @@ class RunJavaCode < JavaFileRunner
     def initialize(*args)
         super
         # TODO: hardcoded artifact prefix
-        REQUIRE "compile:#{name}"
+        #REQUIRE "compile:#{name}"
     end
 
     def build_target()
@@ -70,14 +67,14 @@ class RunJavaCode < JavaFileRunner
 
         #clname  = FileUtil.grep(file, /\s*public\s+(static\s+)?(abstract\s+)?class\s+([a-zA-Z][a-zA-Z0-9_]*)/)
 
-        raise 'Class name cannot be identified.' if clname.nil?
-        puts_warning 'Package name is empty.' if pkgname.nil?
+        raise 'Class name cannot be identified' if clname.nil?
+        puts_warning 'Package name is empty' if pkgname.nil?
 
         pkgname = pkgname[1] if pkgname
         return (pkgname ? "#{pkgname}.#{clname}": clname)
     end
 
-    def what_it_does() "Run JAVA code '#{@name}'" end
+    def what_it_does() "Run JAVA '#{@name}' code" end
 end
 
 class RunJAR < JavaFileRunner
@@ -110,7 +107,7 @@ class RunGroovyScript < JavaFileRunner
     end
 
     def what_it_does()
-        "Run groovy script '#{@name}'"
+        "Run groovy '#{@name}' script"
     end
 end
 
@@ -139,7 +136,7 @@ class RunKotlinCode < JavaFileRunner
 
     def initialize(*args)
         super
-        REQUIRE "compilekotlin:#{name}"
+        REQUIRE "compile:#{name}"
     end
 
     def build_classpath()
@@ -161,7 +158,7 @@ class RunKotlinCode < JavaFileRunner
     end
 
     def what_it_does()
-        "Run Kotlin code '#{@name}' code"
+        "Run Kotlin '#{@name}' code"
     end
 end
 
@@ -170,7 +167,7 @@ class RunScalaCode < JavaFileRunner
 
     def initialize(*args)
         super
-        REQUIRE "compilescala:#{name}"
+        REQUIRE "compile:#{name}"
     end
 
     def build_classpath()
@@ -192,6 +189,6 @@ class RunScalaCode < JavaFileRunner
     end
 
     def what_it_does()
-        "Run Scala code '#{@name}' code"
+        "Run Scala '#{@name}' code"
     end
 end

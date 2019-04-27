@@ -20,10 +20,10 @@ module CLASSPATH
     def detect_libs()
         base = homedir()
         libs = []
-        libs << 'classes'         if File.exists?(File.join(base, 'classes'))
-        libs << 'lib'             if File.exists?(File.join(base, 'lib'))
-        libs << 'WEB-INF/classes' if File.exists?(File.join(base, 'WEB-INF', 'classes'))
-        libs << 'WEB-INF/lib'     if File.exists?(File.join(base, 'WEB-INF', 'lib'))
+        libs << 'classes'                       if File.exists?(File.join(base, 'classes'))
+        libs << 'lib'                           if File.exists?(File.join(base, 'lib'))
+        libs << File.join('WEB-INF', 'classes') if File.exists?(File.join(base, 'WEB-INF', 'classes'))
+        libs << File.join('WEB-INF', 'lib')     if File.exists?(File.join(base, 'WEB-INF', 'lib'))
         return libs
     end
 
@@ -31,7 +31,7 @@ module CLASSPATH
         root = homedir
         path = File.join(root, path) if !(Pathname.new path).absolute?
         list = [ path ]
-        Dir["#{path}/*.jar"].each { |i|  list << i } if File.directory?(path)
+        Dir[File.join(path, '*.jar')].each { |i|  list << i } if File.directory?(path)
         list
     end
 
@@ -86,20 +86,20 @@ class JAVA < JVM
         if !@java_home
             if ENV['JAVA_HOME']
                 @java_home = ENV['JAVA_HOME']
-                puts_warning "Java home has not been defined by project. Use Java home specified by env. variable"
+                puts_warning 'Java home has not been defined by project. Use Java home specified by env. variable'
             else
                 @java_home = FileUtil.which('java')
                 @java_home = File.dirname(File.dirname(@java_home)) if @java_home
             end
         end
-        raise 'Java home cannot be identified' if !@java_home
+        raise 'Java home cannot be identified' if @java_home.nil?
         @java_home = @java_home.gsub('\\','/')
 
         @java_version_version = '?'
         @java_version_low     = '?'
         @java_version_high    = '?'
 
-        IO.popen([java(),  '-version',  :err=>[:child, :out]]) { | stdout |
+        IO.popen([java(), '-version',  :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
                     m = /java\s+version\s+\"([0-9]+)\.([0-9]+)\.([^\"]*)\"/.match(line.chomp)
@@ -112,7 +112,7 @@ class JAVA < JVM
                     end
                 }
             rescue Errno::EIO
-                puts_warning "Java version cannot be detected"
+                puts_warning 'Java version cannot be detected'
             end
         }
 
@@ -136,10 +136,10 @@ class JAVA < JVM
     protected
 
     def jtool(tool)
-        path = "#{@java_home}/bin/#{tool}"
+        path = File.join(@java_home, 'bin', tool)
         return path if File.exists?(path) || (File::PATH_SEPARATOR && File.exists?(path + '.exe'))
         puts_warning "'#{path}' not found. Use '#{tool}' as is"
-        tool
+        return tool
     end
 end
 
@@ -157,7 +157,7 @@ class GROOVY < JVM
             groovy_path = FileUtil.which('groovy')
             @groovy_home = File.dirname(File.dirname(groovy_path)) if groovy_path
         end
-        raise "Cannot find groovy home '#{@groovy_home}'" if !File.exists?(@groovy_home)
+        raise "Cannot find groovy home '#{@groovy_home}'" unless File.exists?(@groovy_home)
 
         puts "Groovy '#{groovy_home}'"
 
@@ -190,7 +190,7 @@ class KOTLIN < JVM
         super
 
         if !@kotlin_home
-            kotlinc_path = FileUtil.which("kotlinc")
+            kotlinc_path = FileUtil.which('kotlinc')
             @kotlin_home = File.dirname(File.dirname(kotlinc_path)) if kotlinc_path
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
@@ -205,8 +205,8 @@ class KOTLIN < JVM
     def build() end
 
     def runtime_libs()
-        return "#{@kotlin_home}/lib/kotlin-stdlib.jar",
-               "#{@kotlin_home}/lib/kotlin-reflect.jar"
+        return File.join(@kotlin_home, 'lib', 'kotlin-stdlib.jar'),
+               File.join(@kotlin_home, 'lib', 'kotlin-reflect.jar')
     end
 
     def what_it_does() "Initialize Kotlin environment '#{@name}' " end
@@ -227,7 +227,7 @@ class SCALA < JVM
         super
 
         if !@scala_home
-            scala_path = FileUtil.which("scalac")
+            scala_path = FileUtil.which('scalac')
             @scala_home = File.dirname(File.dirname(scala_path)) if scala_path
         end
 
@@ -241,7 +241,7 @@ class SCALA < JVM
 
     def build() end
 
-    def what_it_does() "Initialize Scala environment '#{@name}' " end
+    def what_it_does() "Initialize Scala environment '#{@name}'" end
 
     def scalac() File.join(@scala_home, 'bin', 'scalac') end
 

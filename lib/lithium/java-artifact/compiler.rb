@@ -24,8 +24,8 @@ class JavaCompiler < FileMask
 
         if !@destination
             @destination = fullpath('classes')
-            @destination = fullpath('WEB-INF/classes') unless File.exists?(@destination)
-            @destination = fullpath('lib')             unless File.exists?(@destination)
+            @destination = fullpath(File.join('WEB-INF', 'classes')) unless File.exists?(@destination)
+            @destination = fullpath('lib')                           unless File.exists?(@destination)
             puts_warning "Class destination is not specified. Stick to '#{@destination}' as default one"
         else
             @destination = fullpath(@destination) unless Pathname.new(@destination).absolute?
@@ -66,7 +66,7 @@ class JavaCompiler < FileMask
     def build_target(list)
         path = File.expand_path('to_be_compiled.lst')
         @_cleanup_files = [ path ]
-        File.open(path, "w") { |f| f.print(list.join("\n")) }
+        File.open(path, 'w') { |f| f.print(list.join("\n")) }
         return "\"@#{path}\""
     end
 
@@ -74,9 +74,9 @@ class JavaCompiler < FileMask
         cp       = build_classpath()
         compiler = build_compiler()
         if cp
-            "#{compiler} -classpath \"#{cp}\" #{@options} -d #{dest} #{target}"
+            [ compiler, '-classpath', "\"#{cp}\"", @options, '-d', dest, target ]
         else
-            "#{compiler} #{@options} -d #{dest} #{target}"
+            [ compiler, @options, '-d', dest, target ]
         end
     end
 
@@ -91,7 +91,7 @@ class JavaCompiler < FileMask
                 target = build_target(list)
                 cmd    = build_cmd(list, target, @destination)
                 go_to_homedir()
-                raise "Compilation has failed" if exec4(cmd) != 0
+                raise 'Compilation has failed' if exec4(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
             ensure
                 @_cleanup_files.each { | path | File.delete(path) }
