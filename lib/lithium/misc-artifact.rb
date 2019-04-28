@@ -1,13 +1,12 @@
 require 'lithium/core'
 require 'lithium/file-artifact/acquired'
 require 'lithium/file-artifact/command'
-require 'lithium/utils'
 
 require 'rexml/parsers/pullparser'
 
 class RunShell < FileCommand
     def build()
-        raise "Script '#{@name}' running failed" if exec4('sh', fullpath) != 0
+        raise "Script '#{@name}' running failed" if Artifact.exec('sh', fullpath) != 0
     end
 end
 

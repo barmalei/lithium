@@ -1,10 +1,10 @@
 require 'fileutils'
+require 'tmpdir'
 
 require 'lithium/core'
 require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/runner'
 require 'lithium/file-artifact/acquired'
-require 'lithium/utils'
 
 
 class JS < EnvArtifact
@@ -22,18 +22,17 @@ class JS < EnvArtifact
         return c.new(path, &block)
     end
 
-    def build() end
     def what_it_does() "Initialize JavaScript environment '#{@name}'" end
 end
 
 # Run JS with nodejs
 class RunNodejs < FileCommand
     def build()
-        raise "Run '#{@name}' JS failed" if exec4('node', "\"#{fullpath}\"") != 0
+        raise "Running of '#{@name}' JS script failed" if Artifact.exec('node', "\"#{fullpath}\"") != 0
     end
 
     def what_it_does()
-        "Run nodejs '#{@name}' script"
+        "Run JS '#{@name}' script with nodejs"
     end
 end
 
@@ -92,7 +91,7 @@ class UglifyJavaScript < CompressJavaScript
         opt << infile
         opt << '>'
         opt << outfile
-        raise 'JS Uglify failed' if exec4(opt.join(' ')) != 0
+        raise 'JS Uglify failed' if Artifact.exec(opt.join(' ')) != 0
     end
 
     def what_it_does() "Uglify (nodejs) #{@name}' JS script" end
@@ -201,7 +200,7 @@ class GenerateJavaScriptDoc < FileArtifact
 
         args << i
 
-        exec4(*args)
+        Artifact.exec(*args)
 
         FileUtils.rmtree(i) if istmp
     end

@@ -1,5 +1,4 @@
 require 'lithium/file-artifact/command'
-require 'lithium/utils'
 require 'lithium/misc-artifact'
 
 require 'pathname'
@@ -9,30 +8,39 @@ class RUBY < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
-    log_attr :libs
+    log_attr :libs, :ruby_home
 
     def initialize(name)
         super
-        @libs ||= [ 'lib' ]
+        @libs      ||= [ 'lib' ]
+        @ruby_home ||= nil
+        if @ruby_home.nil?
+            @ruby_home = FileArtifact.which('ruby')
+            raise 'Ruby cannot be found' if @ruby_home.nil?
+            @ruby_home = File.dirname(File.dirname(@ruby_home))
+        end
+
+        puts "Ruby home   : '#{@ruby_home}'\n     library: '#{rpath}'"
     end
 
     def rpath()
-        rpath = ''
+        rpath = []
         @libs.each { |  path |
             path = File.join(homedir, path) unless Pathname.new(path).absolute?
             if File.directory?(path)
-                rpath = "#{rpath} -I#{path}"
+                rpath.push("-I#{path}")
             else
                 puts_warning "Ruby library path '#{path}' cannot be found"
             end
         }
-        path = File.join(homedir, '.lithium', 'lib')
-        rpath = "#{rpath} -I#{path}" if File.directory?(path)
-        return rpath
+
+        path  = File.join(homedir, '.lithium', 'lib')
+        rpath.push("-I#{path}")  if File.directory?(path)
+        return rpath.join(' ')
     end
 
-    def ruby() 'ruby' end
-    def build() end
+    def ruby() File.join(@ruby_home, 'bin', 'ruby') end
+
     def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{rpath}'" end
 end
 
@@ -41,7 +49,7 @@ class RunRubyScript < FileCommand
     required RUBY
 
     def build()
-        raise "Run RUBY '#{@name}' script failed" if exec4(ruby().ruby, ruby().rpath, "\"#{fullpath()}\"") != 0
+        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(ruby().ruby, ruby().rpath, "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -58,7 +66,7 @@ class ValidateRubyScript < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if exec4('ruby', '-c', "\"#{fullpath(path)}\"") != 0
+        raise "Validation RUBY script '#{path}' failed" if Artifact.exec('ruby', '-c', "\"#{fullpath(path)}\"") != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end

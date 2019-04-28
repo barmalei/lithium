@@ -1,7 +1,6 @@
 require 'fileutils'
 
 require 'lithium/core'
-require 'lithium/utils'
 
 
 class CLEANUP < Artifact

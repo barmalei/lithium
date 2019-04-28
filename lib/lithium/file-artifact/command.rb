@@ -73,7 +73,7 @@ class CopyFile < FileCommand
 
         if File.directory?(source)
             filter = @ignore_hidden_files ? /^[\.].*/ : nil
-            FileUtil.cpdir(source, @destination, filter)
+            FileArtifact.cpdir(source, @destination, filter)
         else
             FileUtils.cp(source, @destination)
         end

@@ -1,6 +1,5 @@
 require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
-require 'lithium/utils'
 
 
 class BuildVaadinSass < FileCommand
@@ -14,10 +13,10 @@ class BuildVaadinSass < FileCommand
         fp = fullpath()
         on = "#{File.basename(fp, 'scss')}css"
 
-        r = exec4(java().java, '-cp ', "\"#{fullpath(File.join('WEB-INF', 'lib', '*'))}\"",
-                  'com.vaadin.sass.SassCompiler',
-                  fp,
-                  File.join(File.dirname(fp), on))
+        r = Artifact.exec(java().java, '-cp ', "\"#{fullpath(File.join('WEB-INF', 'lib', '*'))}\"",
+                          'com.vaadin.sass.SassCompiler',
+                          fp,
+                          File.join(File.dirname(fp), on))
 
         raise 'SASS error' if r != 0
     end

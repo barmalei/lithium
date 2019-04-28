@@ -3,7 +3,6 @@ require 'lithium/file-artifact/remote'
 require 'rexml/document'
 require 'fileutils'
 require 'pathname'
-require 'lithium/utils'
 require 'lithium/file-artifact/command'
 require 'lithium/core-std'
 
@@ -34,7 +33,7 @@ class POMFile < PermanentFile
     include StdFormater
 
     def initialize(name, &block)
-        super(FileUtil.look_file_up(fullpath(name), 'pom.xml', homedir), &block)
+        super(FileArtifact.look_file_up(fullpath(name), 'pom.xml', homedir), &block)
     end
 
     def list_items()
@@ -268,7 +267,7 @@ class RunMaven < POMFile
     def initialize(name, &block)
         super
 
-        @maven_path ||= FileUtil.which('mvn')
+        @maven_path ||= FileArtifact.which('mvn')
         @targets    ||= [ 'clean', 'install' ]
         @options    ||= ""
         raise 'maven path cannot be detected' unless @maven_path
@@ -284,7 +283,7 @@ class RunMaven < POMFile
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
 
         Dir.chdir(File.dirname(path));
-        raise 'Maven running failed' if exec4(@maven_path, @options,  @targets.join(' ')) != 0
+        raise 'Maven running failed' if Artifact.exec(@maven_path, @options,  @targets.join(' ')) != 0
     end
 
     def what_it_does() "Run maven: '#{@target}'" end

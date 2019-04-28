@@ -1,5 +1,4 @@
 require 'lithium/core'
-require 'lithium/utils'
 
 # acquired file artifact
 class GeneratedFile < FileArtifact
@@ -105,7 +104,7 @@ class ZipFile < MetaGeneratedFile
 
             zip_path = FileUtils.which('zip')
             raise 'command line zip tool cannot be found' unless zip_path.nil?
-            raise 'Archive building failed' if exec4(zip_path, @options, fullpath, list.join(' ')) != 0
+            raise 'Archive building failed' if Artifact.exec(zip_path, @options, fullpath, list.join(' ')) != 0
         else
             puts_warning 'No file to be packed'
         end

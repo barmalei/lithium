@@ -1,5 +1,4 @@
 require 'fileutils'
-require 'tempfile'
 
 require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
@@ -18,11 +17,11 @@ class CheckStyle < FileMask
 
     def build_item(path, mt)
         j = java()
-        raise "Cannot run check style" if exec4(j.java(),
-                                               '-cp', "#{@checkstyle_home}/checkstyle-8.16-all.jar",
-                                               'com.puppycrawl.tools.checkstyle.Main',
-                                               '-c', @checkstyle_config,
-                                               "\"#{fullpath(path)}\"") != 0
+        raise "Cannot run check style" if Artifact.exec(j.java(),
+                                                       '-cp', "#{@checkstyle_home}/checkstyle-8.16-all.jar",
+                                                       'com.puppycrawl.tools.checkstyle.Main',
+                                                       '-c', @checkstyle_config,
+                                                       "\"#{fullpath(path)}\"") != 0
     end
 
     def what_it_does() "Check '#{@name}' java code style" end
@@ -46,7 +45,10 @@ class PMD < FileCommand
         super
         fp = fullpath()
         raise "PMD target '#{fp}' cannot be found" unless File.exists?(fp)
-        raise "PMD failed for '#{fp}'" if exec4(File.join(@pmd_path, 'bin', @pmd_cmd), 'pmd', '-d', "\"#{fp}\"", '-format', @pmd_format, '-R', @pmd_rules) != 0
+        raise "PMD failed for '#{fp}'" if Artifact.exec(File.join(@pmd_path, 'bin', @pmd_cmd),
+                                                        'pmd', '-d', "\"#{fp}\"",
+                                                        '-format', @pmd_format,
+                                                        '-R', @pmd_rules) != 0
     end
 
     def what_it_does() "Validate '#{@name}' code applying PMD:#{@pmd_rules}" end

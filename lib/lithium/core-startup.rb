@@ -138,7 +138,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     path       = basedir
     prj        = nil
     while !path.nil?  do
-        path = FileUtil.look_directory_up(path, '.lithium')
+        path = FileArtifact.look_directory_up(path, '.lithium')
         unless path.nil?
             path = File.dirname(path)
             prjs_stack.unshift(path) if path != $lithium_code

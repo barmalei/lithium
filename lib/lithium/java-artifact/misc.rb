@@ -1,6 +1,5 @@
 require 'lithium/core'
 require 'lithium/java-artifact/base'
-require 'lithium/utils'
 
 class GenerateJavaDoc < FileArtifact
     include LogArtifactState

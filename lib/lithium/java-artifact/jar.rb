@@ -1,5 +1,4 @@
 require 'fileutils'
-require 'tempfile'
 
 require 'lithium/core'
 require 'lithium/file-artifact/command'
@@ -72,9 +71,9 @@ class CreateJAR < FileMask
 
         Dir.chdir(@base)
         if @manifest
-            r = exec4(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
+            r = Artifact.exec(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
         else
-            r = exec4(java().jar, "cf", "\"#{dest}\"",  list)
+            r = Artifact.exec(java().jar, "cf", "\"#{dest}\"",  list)
         end
         raise "JAR #{dest} creation error" if r != 0
     end
@@ -116,9 +115,9 @@ class JarFile < FileArtifact
 
         Dir.chdir(@base)
         if @manifest
-            r = exec4(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
+            r = Artifact.exec(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
         else
-            r = exec4(java().jar, 'cf', "\"#{dest}\"",  list)
+            r = Artifact.exec(java().jar, 'cf', "\"#{dest}\"",  list)
         end
         raise "JAR #{dest} creation error" if r != 0
     end

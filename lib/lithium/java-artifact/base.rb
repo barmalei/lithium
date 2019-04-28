@@ -1,8 +1,6 @@
-require 'tmpdir'
 require "pathname"
 
 require 'lithium/core'
-require 'lithium/utils'
 
 module CLASSPATH
     def build_classpath(*libs)
@@ -37,7 +35,7 @@ module CLASSPATH
 
     def self.join(*parts)
         cl = nil
-        parts.each { |part|
+        parts.each { | part |
             cl = cl ? cl + File::PATH_SEPARATOR + part : part if part
         }
         return CLASSPATH::norm_classpath(cl)
@@ -88,7 +86,7 @@ class JAVA < JVM
                 @java_home = ENV['JAVA_HOME']
                 puts_warning 'Java home has not been defined by project. Use Java home specified by env. variable'
             else
-                @java_home = FileUtil.which('java')
+                @java_home = FileArtifact.which('java')
                 @java_home = File.dirname(File.dirname(@java_home)) if @java_home
             end
         end
@@ -122,8 +120,6 @@ class JAVA < JVM
         @classpath = build_classpath(*@libs)
     end
 
-    def build() end
-
     def expired?() false end
 
     def javac()   jtool('javac')   end
@@ -154,7 +150,7 @@ class GROOVY < JVM
         super
 
         if !@groovy_home
-            groovy_path = FileUtil.which('groovy')
+            groovy_path = FileArtifact.which('groovy')
             @groovy_home = File.dirname(File.dirname(groovy_path)) if groovy_path
         end
         raise "Cannot find groovy home '#{@groovy_home}'" unless File.exists?(@groovy_home)
@@ -165,8 +161,6 @@ class GROOVY < JVM
         @runtime   = runtime_libs() if !@runtime
         @classpath = build_classpath(*(@runtime + @libs));
     end
-
-    def build() end
 
     def runtime_libs()
         return []
@@ -189,8 +183,8 @@ class KOTLIN < JVM
     def initialize(*args)
         super
 
-        if !@kotlin_home
-            kotlinc_path = FileUtil.which('kotlinc')
+        unless @kotlin_home
+            kotlinc_path = FileArtifact.which('kotlinc')
             @kotlin_home = File.dirname(File.dirname(kotlinc_path)) if kotlinc_path
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
@@ -201,8 +195,6 @@ class KOTLIN < JVM
         @runtime   = runtime_libs() if !@runtime
         @classpath = build_classpath(*(@runtime + @libs));
     end
-
-    def build() end
 
     def runtime_libs()
         return File.join(@kotlin_home, 'lib', 'kotlin-stdlib.jar'),
@@ -226,8 +218,8 @@ class SCALA < JVM
     def initialize(*args)
         super
 
-        if !@scala_home
-            scala_path = FileUtil.which('scalac')
+        unless @scala_home
+            scala_path = FileArtifact.which('scalac')
             @scala_home = File.dirname(File.dirname(scala_path)) if scala_path
         end
 
@@ -238,8 +230,6 @@ class SCALA < JVM
         @libs      = detect_libs()  if !@libs
         @classpath = build_classpath(*@libs);
     end
-
-    def build() end
 
     def what_it_does() "Initialize Scala environment '#{@name}'" end
 

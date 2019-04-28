@@ -2,7 +2,6 @@ require 'pathname'
 
 require 'lithium/core'
 require 'lithium/file-artifact/command'
-require 'lithium/utils'
 require 'lithium/misc-artifact'
 
 #
@@ -21,13 +20,13 @@ class PYTHON < EnvArtifact
 
         if !@python_home
             if @pyname
-                python_path = FileUtil.which(@pyname)
+                python_path = FileArtifact.which(@pyname)
             else
-                python_path = FileUtil.which('python')
+                python_path = FileArtifact.which('python')
                 if python_path
                     @pyname = 'python'
                 else
-                    python_path = FileUtil.which('python3')
+                    python_path = FileArtifact.which('python3')
                     @pyname= 'python3' if python_path
                 end
             end
@@ -54,7 +53,6 @@ class PYTHON < EnvArtifact
         File.join(@python_home, 'bin', @pyname)
     end
 
-    def build() end
     def what_it_does() "Initialize python environment '#{@name}'" end
 end
 
@@ -66,7 +64,7 @@ class RunPythonScript < FileCommand
 
     def build()
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
-        raise "Run #{self.class.name} failed" if exec4(python().python, '-u', "\"#{fullpath}\"") != 0
+        raise "Run #{self.class.name} failed" if Artifact.exec(python().python, '-u', "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -81,7 +79,7 @@ end
 
 class ValidatePythonCode < FileMask
     def build_item(path, mt)
-        raise 'Pyflake python code validation failed' if exec4('pyflake', "\"#{fullpath(path)}\"") != 0
+        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', "\"#{fullpath(path)}\"") != 0
     end
 end
 
@@ -99,6 +97,6 @@ except py_compile.PyCompileError:\n
     print sys.exc_info()[1]\n
     exit(1)
 "
-        exec4 "python", "-c", "\"#{script}\""
+        exec "python", "-c", "\"#{script}\""
     end
 end

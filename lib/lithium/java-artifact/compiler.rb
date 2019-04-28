@@ -1,6 +1,5 @@
 require 'fileutils'
 
-require 'lithium/utils'
 require 'lithium/java-artifact/base'
 
 #
@@ -91,7 +90,7 @@ class JavaCompiler < FileMask
                 target = build_target(list)
                 cmd    = build_cmd(list, target, @destination)
                 go_to_homedir()
-                raise 'Compilation has failed' if exec4(*cmd) != 0
+                raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
             ensure
                 @_cleanup_files.each { | path | File.delete(path) }

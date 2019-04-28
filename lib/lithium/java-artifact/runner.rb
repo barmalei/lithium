@@ -1,4 +1,3 @@
-require 'lithium/utils'
 require 'lithium/java-artifact/base'
 
 
@@ -12,7 +11,7 @@ class JavaFileRunner < FileCommand
 
     def build()
         go_to_homedir()
-        raise "Running '#{@name}' failed" if exec4(*cmd()) != 0
+        raise "Running '#{@name}' failed" if Artifact.exec(*cmd()) != 0
     end
 
     def cmd()
@@ -58,7 +57,7 @@ class RunJavaCode < JavaFileRunner
 
     def build_target()
         file = fullpath()
-        pkgname = FileUtil.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*;/)
+        pkgname = FileArtifact.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*;/)
         clname  = File.basename(file)
         clname[/\.java$/] = ''
 
@@ -141,7 +140,7 @@ class RunKotlinCode < JavaFileRunner
     def build_target()
         file = fullpath()
 
-        pkg    = FileUtil.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
+        pkg    = FileArtifact.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
         ext    = File.extname(file)
         name   = File.basename(file, ext)
         clname = name[0].upcase() + name[1..name.length-1]
@@ -172,8 +171,8 @@ class RunScalaCode < JavaFileRunner
     def build_target()
         file = fullpath()
 
-        pkg    = FileUtil.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
-        cln    = FileUtil.grep(file, /^object[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
+        pkg    = FileArtifact.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
+        cln    = FileArtifact.grep(file, /^object[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
         puts_warning 'Package name is empty.' if pkg.nil?
 
         return pkg ? "#{pkg[1]}.#{cln[-1]}" : cln[-1]
