@@ -152,9 +152,6 @@ class DownloadPOMDeps < POMFile
     end
 
     def expired?()
-
-        puts ">>>> #{@files}"
-
         @files.each { |f|
             p = fullpath(f)
             return true unless File.exists?(p)

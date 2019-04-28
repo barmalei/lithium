@@ -39,5 +39,4 @@ end
 
 # start lithium
 require 'lithium/core-startup'
-puts "lithium.rb: artifact_path = #{artifact_path} basedir = #{basedir}"
 STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)

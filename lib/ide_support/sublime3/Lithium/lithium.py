@@ -9,12 +9,13 @@ li_output_views = {}
 # TODO: has to be corrected to use unified output provided with
 # lithium
 place_detector = [
-    r"\[\[([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\:([0-9]+)\]\][\:]*(.*)",       # JAVA error and JAVA exception
+    r"\[\[([^\[\]\(\)\{\}\?\!\<\>\^\,\~\`]+)\:([0-9]+)\]\][\:]*(.*)",       # JAVA error and JAVA exception
   #  r"\[WARN\]\s+([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\:\s*([0-9]+)\:\s*[0-9]+\:\s*(.*)"     # JAVA style sheet
   #  r"\(ERR\)\s+\?\s+js\:\s*\"([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\",\s+line\s+([0-9]+)",  # JS
   #  r"\(ERR\)\s+\?\s+([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\:\s+([0-9]+)\:"                  # GROOVY
 ]
 
+li_path = "ruby Z:/projects/.lithium/lib/lithium.rb"
 
 def  li_is_debug():
     global li_is_debug
@@ -34,7 +35,20 @@ def  li_view_to_s(view):
     return "view [ id = " + str(view.id()) + ", name = '" + view.name() + "', winid = " + str(wid) + ", path = " + name + "]"
 
 
+def detect_li_project_home(pt):
+    if pt != None and os.path.abspath(pt) and os.path.exists(pt):
+        if os.path.isfile(pt):
+            pt = os.path.dirname(pt)
 
+        cnt = 0
+        while pt != "/" and pt != None and cnt < 100:
+            if os.path.exists(os.path.join(pt, ".lithium")):
+                return pt
+            else:
+                pt = os.path.dirname(pt)
+            cnt = cnt + 1
+
+    return None
 
 #
 # return array that contains list of detected files and lines if the files:
@@ -63,27 +77,6 @@ def li_paths_by_output(view):
     if li_is_debug():
         print("li_paths_by_output() res = " + str(paths))
         print("li_paths_by_output() << ")
-
-    return paths
-
-
-#
-# return array that contains list of detected files and lines if the files:
-# [ [path, lineNumber ], ...  ]
-def li_paths_by_output2(view):
-
-    regions = view.find_by_selector("li.path")
-    paths = []
-    for i in range(len(regions)):
-        region = regions[i]
-        path = [None, "-1"]
-        n = view.scope_name(region.a + 2)
-        if n and n.strip() == u'source.lithium li.path li.path.name':
-            path[0] = view.substr(view.extract_scope(region.a + 2))
-        n = view.scope_name(region.b - 3)
-        if n and n.strip() == u'source.lithium li.path li.path.line':
-            path[1] = view.substr(view.extract_scope(region.b - 3))
-        paths.append(path)
 
     return paths
 
@@ -128,6 +121,7 @@ def li_show_paths(view, win=None):
 
             def done(i):
                 if i >= 0:
+                    print("li_show_paths.done() " + str(i)+ ", " + paths[i][0] + "," + paths[i][1])
                     win.open_file(paths[i][0] + ":" + paths[i][1], sublime.ENCODED_POSITION)
 
             win.show_quick_panel([ [ v[0] + ":" + v[1], v[2]] for v in paths], done)
@@ -148,7 +142,7 @@ class liCommand(sublime_plugin.TextCommand):
             self.get_view().window().run_command('save')
 
         if li_is_debug():
-            print("liCommand.run_(): self = " + str(self))
+            print("liCommand.run(): self = " + str(self))
 
         # fetch command from args list
         self.command = ""
@@ -157,42 +151,48 @@ class liCommand(sublime_plugin.TextCommand):
 
         view = self.get_view()
         if li_is_debug():
-            print("liCommand.run_(): command = " + self.command + "," + li_view_to_s(view))
+            print("liCommand.run(): command = " + self.command + "," + li_view_to_s(view))
 
-        # if command exists and doesn't contain require current buffer as an input
-        # just change current directory to the directory where current edited file
-        # is located
-        if self.command != None and self.command[-1] != ":":
+        # detect home folder
+        li_home = None
+        if view.file_name() != None:
+            li_home = detect_li_project_home(view.file_name())
+        if li_home == None:
+            folders = self.get_view().window().folders()
+            if len(folders) > 0:
+                for folder in folders:
+                    li_home = detect_li_project_home(folder)
+                    if li_home != None:
+                        break
 
-            # check if this command has to be applied by mask
-            if self.command[-1] == "*":
-                #fname, target = os.path.splitext(view.file_name())
-                target = ""
-                self.command = "'" + self.command + os.path.splitext(view.file_name())[1] + "'"
-                if li_is_debug():
-                    print("liCommand.run_(): Extend mask command with extension, self.command = " + self.command)
-            else:
-                target = ""
-                os.chdir(os.path.dirname(view.file_name()))
+        placeholders = {}
 
-                if li_is_debug():
-                    print("liCommand.run_(): Switch directory to '" + os.path.dirname(view.file_name()) + "' set target to empty string")
-        else:
-            target = "'" + view.file_name() + "'"  # add current edited file as target for the command
-
+        if li_home == None:
             if li_is_debug():
-                print("liCommand.run_(): Set target to current file name " + target)
+                print("liCommand.run(): project home directory cannot be detected")
+        else:
+            placeholders['home'] = li_home
+            if li_is_debug():
+                print("liCommand.run(): Detected home folder " + str(li_home))
+
+        if view.file_name() != None:
+            placeholders['file'] = view.file_name()
+
+        try:
+            self.command = self.command.format(**placeholders)
+        except KeyError:
+            sublime.error_message("Lithium command '" + str(self.command) + "' cannot be interpolated with " + str(placeholders))
 
         if li_is_debug():
-            print("liCommand.run_(): Popen = " + "lithium -std SublimeStd " + self.command + target)
+            print("liCommand.run(): subprocess.Popen = " + "lithium -std=SublimeStd " + self.command)
 
         # run command as a subprocess
-        process = subprocess.Popen("lithium -std SublimeStd " + self.command + target, shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen(li_path + " -std=SublimeStd " + self.command, shell=True, stdout = subprocess.PIPE)
 
         # read the started process output and print it in put buffer
         while True:
-            line = process.stdout.read()
-            self.output(line, edit)
+            line = stdout.read()
+            self.output(line.strip(), edit)
             if process.poll() is not None:
                 return process.returncode
 
@@ -218,7 +218,6 @@ class liCommand(sublime_plugin.TextCommand):
 
         #edit = panel.begin_edit() // sublime 2
         panel.erase(edit, sublime.Region(0, panel.size()))
-        print(datetime.date.today())
         panel.insert(edit, panel.size(), str(datetime.datetime.today()) + "  ")
         panel.insert(edit, panel.size(), "'" + self.command + "'\n")
         panel.insert(edit, panel.size(), value.decode('utf-8'))

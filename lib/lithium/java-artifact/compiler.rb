@@ -73,7 +73,7 @@ class JavaCompiler < FileMask
         cp       = build_classpath()
         compiler = build_compiler()
         if cp
-            [ compiler, '-classpath', "\"#{cp}\"", @options, '-d', dest, target ]
+            [ compiler, '-classpath', "#{cp}", @options, '-d', dest, target ]
         else
             [ compiler, @options, '-d', dest, target ]
         end
@@ -90,6 +90,9 @@ class JavaCompiler < FileMask
                 target = build_target(list)
                 cmd    = build_cmd(list, target, @destination)
                 go_to_homedir()
+
+                puts "CMD = #{cmd.join(' ')}"
+
                 raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
             ensure

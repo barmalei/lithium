@@ -791,13 +791,13 @@ class Artifact
                 rescue Errno::ECHILD
                     begin
                         _read_std_(stdout, $stdout)
-                        _read_std_(stderr, $stderr)
+                        _read_std_(stderr, $stdout)
                     rescue
                     end
                     return thread.value
                 end
                 _read_std_(stdout, $stdout)
-                _read_std_(stderr, $stderr)
+                _read_std_(stderr, $stdout)
             end
 
             return thread.value
