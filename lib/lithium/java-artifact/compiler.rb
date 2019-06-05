@@ -8,7 +8,7 @@ require 'lithium/java-artifact/base'
 class JavaCompiler < FileMask
     include LogArtifactState
 
-    required JAVA
+    REQUIRE JAVA
 
     log_attr :destination, :options, :create_destination
 
@@ -45,11 +45,11 @@ class JavaCompiler < FileMask
     def expired?() false end
 
     def build_compiler()
-        java().javac
+        @java.javac
     end
 
     def build_classpath()
-        java().classpath
+        @java.classpath
     end
 
     def build_target_list()
@@ -73,7 +73,7 @@ class JavaCompiler < FileMask
         cp       = build_classpath()
         compiler = build_compiler()
         if cp
-            [ compiler, '-classpath', "#{cp}", @options, '-d', dest, target ]
+            [ compiler, '-classpath', "\"#{cp}\"", @options, '-d', dest, target ]
         else
             [ compiler, @options, '-d', dest, target ]
         end
@@ -90,9 +90,6 @@ class JavaCompiler < FileMask
                 target = build_target(list)
                 cmd    = build_cmd(list, target, @destination)
                 go_to_homedir()
-
-                puts "CMD = #{cmd.join(' ')}"
-
                 raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
             ensure
@@ -108,7 +105,7 @@ end
 # Groovy compiler
 #
 class GroovyCompiler < JavaCompiler
-    required GROOVY
+    REQUIRE GROOVY, JAVA
 
     def initialize(*args)
         super
@@ -116,11 +113,11 @@ class GroovyCompiler < JavaCompiler
     end
 
     def build_compiler()
-        groovy().groovyc
+        @groovy.groovyc
     end
 
     def build_classpath()
-        CLASSPATH::join(groovy().classpath, java().classpath)
+        CLASSPATH::join(@groovy.classpath, @java.classpath)
     end
 
     def what_it_does()
@@ -132,7 +129,7 @@ end
 # Kotlin compiler
 #
 class CompileKotlin < JavaCompiler
-    required KOTLIN
+    REQUIRE KOTLIN, JAVA
 
     def initialize(*args)
         super
@@ -140,11 +137,11 @@ class CompileKotlin < JavaCompiler
     end
 
     def build_compiler()
-        kotlin().kotlinc
+        @kotlin.kotlinc
     end
 
     def build_classpath()
-        CLASSPATH::join(kotlin().classpath, java().classpath)
+        CLASSPATH::join(@kotlin.classpath, @java.classpath)
     end
 
     def build_destination()
@@ -162,7 +159,7 @@ end
 # Scala compiler
 #
 class CompileScala < JavaCompiler
-    required SCALA
+    REQUIRE SCALA, JAVA
 
     def initialize(*args)
         super
@@ -170,11 +167,11 @@ class CompileScala < JavaCompiler
     end
 
     def build_compiler()
-        scala().scalac
+        @scala.scalac
     end
 
     def build_classpath()
-        CLASSPATH::join(scala().classpath, java().classpath)
+        CLASSPATH::join(@scala.classpath, @java.classpath)
     end
 
     def what_it_does()

@@ -46,27 +46,28 @@ end
 
 # Run ruby script
 class RunRubyScript < FileCommand
-    required RUBY
+    REQUIRE RUBY
 
     def build()
-        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(ruby().ruby, ruby().rpath, "\"#{fullpath}\"") != 0
+        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, @ruby.rpath, "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
 end
 
 class RunRubyString < StringRunner
-    required RUBY
-    def cmd() ruby().ruby end
+    REQUIRE RUBY
+
+    def cmd() @ruby.ruby end
 end
 
 # Validate RUBY script
 class ValidateRubyScript < FileMask
-    required RUBY
+    REQUIRE RUBY
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if Artifact.exec('ruby', '-c', "\"#{fullpath(path)}\"") != 0
+        raise "Validation RUBY script '#{path}' failed" if Artifact.exec(@ruby.ruby, '-c', "\"#{fullpath(path)}\"") != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end

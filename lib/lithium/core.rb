@@ -361,8 +361,8 @@ class ArtifactName < String
         unless @path.nil?
             mask_index = @path.index(/[\[\]\?\*\{\}]/)
             unless mask_index.nil?
-                @path_mask  = @path[mask_index, @path.length]
-                @path       = @path[0, mask_index]
+                @path_mask = @path[mask_index, @path.length]
+                @path      = @path[0, mask_index]
             end
             @path      = @path.length == 0 ? nil : Pathname.new(@path).cleanpath.to_s
             @mask_type = @mask_type | File::FNM_PATHNAME if @path_mask != '*' || !@path.nil?
@@ -395,7 +395,7 @@ class ArtifactName < String
         return false if @prefix != artname.prefix
 
         unless @path_mask.nil?
-            return false if artname.suffix.nil? || (artname.env_path? ^ env_path?)
+            return false if artname.suffix.nil? || (artname.env_path? ^ env_path?) # one of the path is environment but not both
             return File.fnmatch(@suffix, artname.suffix, @mask_type)
         else
             return @suffix == artname.suffix
@@ -633,29 +633,14 @@ class Artifact
         return @default_name
     end
 
-    def Artifact.required(clazz, &block)
-        self.send(:define_method, clazz.name.downcase) {
-            #an = instance_variable_get("@#{clazz.name}")
-            an = nil
-            begin
-                a  = owner.artifact(an.nil? ? clazz :  an) unless owner.nil?
-                return a unless a.nil?
-            rescue NameError => e
-            end
-            nil
-        }
+    def Artifact.REQUIRE(*args, &block)
+        @requires ||= []
+        @requires = @requires + args
+    end
 
-        rname = "#{clazz.name}__requires"
-        alias_method rname, "requires"
-        undef_method "requires"
-
-        self.send(:define_method, 'requires') {
-            r = self.send(rname.intern)
-            a = self.send(clazz.name.downcase)
-            raise "Dependency '#{clazz.name.downcase}' cannot be resolved in #{self.class}:'#{@name}'" if a.nil?
-            r.push(a)
-            return r
-        }
+    def Artifact.requires()
+        @requires ||= []
+        return @requires.dup()
     end
 
     # !!! this method creates wrapped with context class artifact
@@ -732,7 +717,14 @@ class Artifact
     # return cloned array of the artifact dependencies
     def requires()
         @requires ||= []
-        @requires.dup()
+        return self.class.requires + @requires
+    end
+
+    def requires_with_block()
+        @requires_exec ||= {}
+        requires.each { | dep |
+            yield(dep, @requires_exec[dep])
+        }
     end
 
     # test if the given artifact has expired and need to be built
@@ -747,13 +739,30 @@ class Artifact
     def what_it_does() return "Build '#{to_s}' artifact" end
 
     # add required for the artifact building dependencies (other artifact)
-    def REQUIRE(*args)
-        @requires ||= []
+    def REQUIRE(*args, &block)
+        raise 'No dependencies have been specified' if args.length == 0
+        @requires      ||= []
+        @requires_exec ||= {}
+
         args.each { | aa |
             raise "Null dependency has been detected in #{self.class}:'#{@name}' artifact" if aa.nil?
             @requires.push(aa)
         }
+
+        if block
+            raise "REUIRE can handle block for a single artifact dependency only" if args.length != 1
+            @requires_exec[args[0]] = block
+        end
     end
+
+    #
+    #   REQUIRE("test/**", :sources)
+    #   REQUIRE("test/**")>> :dsdsdsd
+    #
+    #    REQUIRE("test/**") { | art |
+    #       @source = art
+    #    }
+    #
 
     # Overload "eq" operation of two artifact instances.
     def ==(art)
@@ -775,7 +784,7 @@ class Artifact
         end
     end
 
-    def Artifact.exec(*args)
+    def Artifact.exec(*args, &block)
         # clone arguments
         args = args.dup
 
@@ -783,6 +792,8 @@ class Artifact
         args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
 
         Open3.popen3(args.join(' ')) { | stdin, stdout, stderr, thread |
+            block.call(stdin, stdout, stderr, thread) unless block.nil?
+
             while true
                 begin
                     return thread.value if Process.waitpid(thread.value.pid)
@@ -814,19 +825,17 @@ class ArtifactTree < Artifact
     class Node
         attr_accessor :art, :parent, :children, :expired, :expired_by_kid
 
-        def initialize(art, parent=nil)
+        def initialize(art, parent = nil)
             raise 'Artifact cannot be nil' if art.nil?
 
-            # TODO: make sure this is more proper way of artifact building than commented below
-            if art.kind_of?(String)
+            if art.kind_of?(String) || art.kind_of?(Class)
                 if parent.nil?
                     art = Project.artifact(art)
                 else
                     art = parent.art.owner.artifact(art)
                 end
             end
-            #art = Project.artifact(art) if art.kind_of?(String)
-            #
+
             @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
         end
 
@@ -864,14 +873,22 @@ class ArtifactTree < Artifact
     end
 
     def build_tree(root)
-        root.art.requires.each { | a |
-            kid_node, p = Node.new(a, root), root
-            while p && p.art != kid_node.art
-                p = p.parent
+        root.art.requires.each { | dep |
+            node, parent = Node.new(dep, root), root
+            while parent && parent.art != node.art
+                parent = parent.parent
             end
-            raise "'#{root.art}' has CYCLIC dependency on '#{p.art}'" if p
-            root.children << kid_node
-            build_tree(kid_node)
+
+            raise "#{root.art.class}:'#{root.art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" if parent
+
+            root.children << node
+            build_tree(node)
+
+            if node.art.kind_of?(EnvArtifact)
+                root.art.instance_variable_set("@#{node.art.class.name.downcase}".to_sym, node.art)
+            end
+
+            #root.art.instance_exec(node.art, &block) unless block.nil?
         }
     end
 
@@ -1156,13 +1173,14 @@ class Directory < FileArtifact
 end
 
 # File mask artifact that can identify set of file artifacts
+#
 class FileMask < FileArtifact
     def initialize(*args)
         @regexp_filter = nil
         @ignore_dirs   = false
         @ignore_files  = false
         super
-        raise "Files and directories are ignored at the same time" if @ignore_files && @ignore_dirs
+        raise 'Files and directories are ignored at the same time' if @ignore_files && @ignore_dirs
     end
 
     def print()
@@ -1177,9 +1195,11 @@ class FileMask < FileArtifact
         }
     end
 
+    # called for every detected item as a part of build process
     def build_item(path, m) end
 
-    def paths_to_list(rel = nil)
+    # the to lits items but collects all items to array
+    def list_items_to_array(rel = nil)
         list = []
         list_items(rel) { | path, m|
             list << path
@@ -1187,6 +1207,8 @@ class FileMask < FileArtifact
         return list
     end
 
+    # List items basing on the mask returns items relatively to the
+    # passed path
     def list_items(rel = nil)
         go_to_homedir()
 
@@ -1215,6 +1237,7 @@ class FileMask < FileArtifact
     def expired?() true end
 end
 
+
 module ArtifactContainer
     def artifact(name, shift ='',  &block)
         raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
@@ -1230,7 +1253,8 @@ module ArtifactContainer
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
             # path nil or doesn't match project then delegate finding an artifact in an owner project context
-            return owner.artifact(name, &block) if !owner.nil? && (artname.path.nil? || !match(artname.path))
+
+            return owner.artifact(name, &block) if !owner.nil? && !artname.env_path? && (artname.path.nil? || !match(artname.path))
             meta = _meta_from_owner(artname)
 
             unless meta.nil?
@@ -1256,6 +1280,7 @@ module ArtifactContainer
     end
 
     def _cache_artifact(artname, meta, art)
+        # always cache container
         if art.kind_of?(ArtifactContainer)
             _artifacts_cache[meta.artname] = art
         elsif artname == meta.artname
@@ -1486,7 +1511,13 @@ class Project < Directory
     end
 end
 
-class EnvArtifact < Artifact
+class SelfPopulatedArtifact < Artifact
+
+end
+
+
+# Environment artifact
+class EnvArtifact < SelfPopulatedArtifact
     def self.default_name(*args)
         @default_name ||= nil
         if args.length > 0
@@ -1504,10 +1535,6 @@ class EnvArtifact < Artifact
     end
 
     def build() end
-
-    # def validate_artifact_name(name)
-    #     EnvArtifact.validate_env_name(name)
-    # end
 end
 
 class GroupByExtension < FileMask
@@ -1534,4 +1561,3 @@ class GroupByExtension < FileMask
         }
     end
 end
-

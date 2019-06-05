@@ -47,7 +47,7 @@ STD_RECOGNIZERS({
 
     RunNodejs    => [ Std::FileLocRecognizer.new(ext: 'js')  ],
 
-    CheckStyle   => [ Std::FileLocRecognizer.new('\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+):') ],
+    CheckStyle   => [ Std::FileLocRecognizer.new('\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?') ],
 
     RunPhpScript => [ Std::FileLocRecognizer.new('\s*Parse error\:(?<file>${file_pattern}\.php)\s+in\s+on\s+line\s+(?<line>[0-9]+)')  ],
 
@@ -123,7 +123,11 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     std_clazz = LithiumStd
     if $lithium_options['std']
         std_s = $lithium_options['std'].strip()
-        std_clazz = std_s == 'null' ? nil : Module.const_get(std_s)
+        begin
+            std_clazz = std_s == 'null' ? nil : Module.const_get(std_s)
+        rescue NameError
+            raise "Unknown stdout/stderror formatter class name '#{std_s}'"
+        end
     end
 
     if std_clazz

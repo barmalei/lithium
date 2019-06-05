@@ -34,17 +34,11 @@ class StringRunner < Artifact
 
     def build()
         raise 'Script string has not been defined' unless @script
-        r = Open4.popen4(cmd()) { | pid, stdin, stdout, stderr |
+        r = Artifact.exec(*cmd()) { | stdin, stdout, stderr, thread |
             stdin << @script
             stdin.close
-
-            l = stderr.read()
-            $stderr.puts l if l.length != 0
-
-            l = stdout.read()
-            $stdout.puts(l)  if l.length != 0
         }
-        raise 'Run failed' if r.exitstatus != 0
+        raise 'Run string has failed' if r != 0
     end
 
     def what_it_does()

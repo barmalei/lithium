@@ -44,7 +44,7 @@ class CopyFile < FileCommand
     def destination=(v)
         raise 'Destination path is not defined' if !v
 
-        if Pathname.new(v).absolute?()
+        if Pathname.new(v).absolute?
             puts "Destination path is absolute path '#{v}'"
         else
             v = fullpath(v)

@@ -39,7 +39,7 @@ end
 
 # compress java script
 class CompressJavaScript < FileCommand
-    required JS
+    REQUIRE JS
 
     def initialize(*args)
         super
@@ -99,7 +99,7 @@ end
 
 
 class CompressedJavaScriptFile < FileArtifact
-    required JS
+    REQUIRE JS
 
     def initialize(*args)
         super

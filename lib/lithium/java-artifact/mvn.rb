@@ -33,7 +33,9 @@ class POMFile < PermanentFile
     include StdFormater
 
     def initialize(name, &block)
-        super(FileArtifact.look_file_up(fullpath(name), 'pom.xml', homedir), &block)
+        pom = FileArtifact.look_file_up(fullpath(name), 'pom.xml', homedir)
+        raise "POM file cannot be detected by '#{fullpath(name)}'" if pom.nil?
+        super(pom, &block)
     end
 
     def list_items()

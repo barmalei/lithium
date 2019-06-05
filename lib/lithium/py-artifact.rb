@@ -60,20 +60,20 @@ end
 #  Run python
 #
 class RunPythonScript < FileCommand
-    required PYTHON
+    REQUIRE PYTHON
 
     def build()
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
-        raise "Run #{self.class.name} failed" if Artifact.exec(python().python, '-u', "\"#{fullpath}\"") != 0
+        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, '-u', "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
 end
 
 class RunPythonString < StringRunner
-    required PYTHON
+    REQUIRE PYTHON
 
-    def cmd() "#{python.python} -" end
+    def cmd() [ @python.python,  '-' ] end
 end
 
 

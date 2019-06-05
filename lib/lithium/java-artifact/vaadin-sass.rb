@@ -3,7 +3,7 @@ require 'lithium/java-artifact/base'
 
 
 class BuildVaadinSass < FileCommand
-    required JAVA
+    REQUIRE JAVA
 
     def initialize(*args)
         super
@@ -13,7 +13,7 @@ class BuildVaadinSass < FileCommand
         fp = fullpath()
         on = "#{File.basename(fp, 'scss')}css"
 
-        r = Artifact.exec(java().java, '-cp ', "\"#{fullpath(File.join('WEB-INF', 'lib', '*'))}\"",
+        r = Artifact.exec(@java.java, '-cp ', "\"#{fullpath(File.join('WEB-INF', 'lib', '*'))}\"",
                           'com.vaadin.sass.SassCompiler',
                           fp,
                           File.join(File.dirname(fp), on))

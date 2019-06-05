@@ -6,7 +6,7 @@ require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
 class ExtractJAR < FileCommand
-    required JAVA
+    REQUIRE JAVA
 
     def initialize(*args)
         super
@@ -25,7 +25,7 @@ class ExtractJAR < FileCommand
 end
 
 class FindInJAR < FileCommand
-    required JAVA
+    REQUIRE JAVA
 
     def build()
         c = 0
@@ -43,7 +43,7 @@ class FindInJAR < FileCommand
 end
 
 class CreateJAR < FileMask
-    required JAVA
+    REQUIRE JAVA
     include LogArtifactState
 
     log_attr :destination, :base, :manifest
@@ -67,13 +67,13 @@ class CreateJAR < FileMask
 
     def build()
         dest = fullpath(@destination)
-        list = paths_to_list(@base).join(' ')
+        list = list_items_to_array(@base).join(' ')
 
         Dir.chdir(@base)
         if @manifest
-            r = Artifact.exec(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
+            r = Artifact.exec(@java.jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
         else
-            r = Artifact.exec(java().jar, "cf", "\"#{dest}\"",  list)
+            r = Artifact.exec(@java.jar, "cf", "\"#{dest}\"",  list)
         end
         raise "JAR #{dest} creation error" if r != 0
     end
@@ -85,22 +85,21 @@ end
 
 # TODO: this is copy paste of CreateJAR
 class JarFile < FileArtifact
-    required JAVA
+    REQUIRE JAVA
 
     include LogArtifactState
 
-    log_attr :destination, :base, :manifest
+    log_attr :source, :base, :manifest
 
     def initialize(*args)
+        @sources = []
         super
-
-        @destination ||= $lithium_args.length > 0 ? $lithium_args[0] : 'result.jar'
-        @manifest    ||= nil
         @ignore_dirs = true
-        @base        ||= $lithium_args.length > 1 ? $lithium_args[1] : nil
 
-        @base = fullpath('lib') unless @base
-        raise "Invalid base directory '#{@base}'" if !File.exists?(@base) || !File.directory?(@base)
+        @base        ||= 'classes'
+        @manifest    ||=  nil
+
+        raise "Invalid base directory '#{@base}'" unless File.directory?(@base)
 
         if @manifest
             @manifest = fullpath(@manifest)
@@ -110,16 +109,54 @@ class JarFile < FileArtifact
     end
 
     def build()
-        dest = fullpath(@destination)
-        list = paths_to_list(@base).join(' ')
+        tmpdir  = Dir.mktmpdir
 
-        Dir.chdir(@base)
-        if @manifest
-            r = Artifact.exec(java().jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{@base}\"", list)
-        else
-            r = Artifact.exec(java().jar, 'cf', "\"#{dest}\"",  list)
+        puts ">>> #{tmpdir}"
+        begin
+            list = []
+
+            list_items { | path, m |
+                list << path
+                basedir = File.dirname(path)
+                fp      = fullpath(path)
+                FileUtils.mkdir_p(File.join(tmpdir, basedir))
+                FileUtils.cp(fp, File.join(tmpdir, basedir, File.basename(path)))
+            }
+
+            Dir.chdir(tmpdir)
+            dest = fullpath()
+            if @manifest
+                r = Artifact.exec(@java.jar, 'cfm', "\"#{dest}\"", "\"#{@manifest}\"", "-C \"#{tmpdir}\"", list)
+            else
+                r = Artifact.exec(@java.jar, 'cf', "\"#{dest}\"",  "-C \"#{tmpdir}\"", list)
+            end
+            raise "JAR '#{dest}' creation error" if r != 0
+
+        ensure
+            #FileUtils.remove_entry tmpdir
         end
-        raise "JAR #{dest} creation error" if r != 0
+    end
+
+    def list_items_to_array(rel = nil)
+        res = []
+        @sources.each { | source |
+            res << source.list_items_to_array.map { | path | fullpath(path) }
+        }
+        return res
+    end
+
+    def list_items(rel = nil)
+        @sources.each { | source |
+            source.list_items { | path, m |
+                yield path, m
+            }
+        }
+    end
+
+    def CONTENT(path, base = nil)
+        fm = FileMask.new(path)
+        @sources << fm
+        REQUIRE fm
     end
 
     def what_it_does()

@@ -5,7 +5,7 @@ require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
 class CheckStyle < FileMask
-    required JAVA
+    REQUIRE JAVA
 
     def initialize(*args)
         super
@@ -13,11 +13,12 @@ class CheckStyle < FileMask
         raise "Checkstyle home '#{@checkstyle_home}' is incorrect"                  unless File.directory?(@checkstyle_home)
         @checkstyle_config = "#{@checkstyle_home}/jnet.xml"                         unless @checkstyle_config
         raise "Checkstyle config '#{@checkstyle_config}' cannot be found"           unless File.exists?(@checkstyle_config)
+
+        puts "Checkstyle home  : '#{@checkstyle_home}'     \n           config: '#{@checkstyle_config}'"
     end
 
     def build_item(path, mt)
-        j = java()
-        raise "Cannot run check style" if Artifact.exec(j.java(),
+        raise "Cannot run check style" if Artifact.exec(@java.java,
                                                        '-cp', "#{@checkstyle_home}/checkstyle-8.16-all.jar",
                                                        'com.puppycrawl.tools.checkstyle.Main',
                                                        '-c', @checkstyle_config,

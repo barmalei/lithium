@@ -30,7 +30,7 @@ end
 # Simple ant runner
 #
 class RunANT < FileCommand
-    required ANT
+    REQUIRE ANT
 
     def initialize(*args)
         super
@@ -40,7 +40,7 @@ class RunANT < FileCommand
     def build()
         fp = fullpath()
         Dir.chdir(File.dirname(fp))
-        raise 'ANT error' if 0 != Artifact.exec(ant().ant, '-buildfile', "\"#{fp}\"", @options)
+        raise 'ANT error' if 0 != Artifact.exec(@ant.ant, '-buildfile', "\"#{fp}\"", @options)
     end
 
     def what_it_does() "Run ANT '#{fullpath()}'" end

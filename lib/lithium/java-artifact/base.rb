@@ -115,7 +115,7 @@ class JAVA < JVM
         }
 
         raise "Java version cannot be identified for #{@java_home}" if @java_version.nil?
-        puts "Java version #{@java_version}, home '#{@java_home}'"
+        puts "Java version '#{@java_version}', home '#{@java_home}'"
 
         @classpath = build_classpath(*@libs)
     end
@@ -155,7 +155,7 @@ class GROOVY < JVM
         end
         raise "Cannot find groovy home '#{@groovy_home}'" unless File.exists?(@groovy_home)
 
-        puts "Groovy '#{groovy_home}'"
+        puts "Groovy home: '#{groovy_home}'"
 
         @libs      = detect_libs()  if !@libs
         @runtime   = runtime_libs() if !@runtime
@@ -225,7 +225,7 @@ class SCALA < JVM
 
         raise "Scala home '#{@kotlin_home}' cannot be found" if scala_home.nil? || !File.exist?(@scala_home)
 
-        puts "Scala '#{scala_home}'"
+        puts "Scala home: '#{scala_home}'"
 
         @libs      = detect_libs()  if !@libs
         @classpath = build_classpath(*@libs);

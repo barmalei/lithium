@@ -3,7 +3,7 @@ require 'lithium/java-artifact/base'
 
 class GenerateJavaDoc < FileArtifact
     include LogArtifactState
-    required JAVA
+    REQUIRE JAVA
 
     def initialize(*args)
         super
@@ -42,8 +42,7 @@ class GenerateJavaDoc < FileArtifact
         p = @pkgs.collect() { |e| e.tr('/', '.') }
         puts ['Packages:'] << p
 
-        j = java()
-        system "#{j.javadoc()} -classpath '#{j.classpath}' -d '#{fullpath()}' -sourcepath '#{fullpath(@sources)}' #{p.join(' ')}"
+        system "#{@java.javadoc} -classpath '#{@java.classpath}' -d '#{fullpath()}' -sourcepath '#{fullpath(@sources)}' #{p.join(' ')}"
         raise 'Java doc generation error' if $? != 0
     end
 
@@ -60,7 +59,7 @@ class FindClassAction < Artifact
 
         msg "Looking for '#{path}' class."
 
-        java.classpath.split(File::PATH_SEPARATOR).each { |i|
+        @java.classpath.split(File::PATH_SEPARATOR).each { |i|
             if File.directory?(i)
                 Dir[File.join(i, path)].each { |file|
                     next if File.directory?(file)

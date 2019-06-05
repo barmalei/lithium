@@ -2,7 +2,7 @@ require 'lithium/java-artifact/base'
 
 
 class JavaFileRunner < FileCommand
-    required JAVA
+    REQUIRE JAVA
 
     def initialize(*args)
         super
@@ -30,15 +30,17 @@ class JavaFileRunner < FileCommand
     end
 
     def build_classpath()
-        java().classpath
+        @java.classpath
     end
 
     def build_runner()
-        java().java()
+        @java.java
     end
 end
 
 class RunJavaClass < JavaFileRunner
+    REQUIRE JAVA
+
     def build_target()
         n = @name.dup
         n[/[.]class/] = ''
@@ -49,6 +51,8 @@ class RunJavaClass < JavaFileRunner
 end
 
 class RunJavaCode < JavaFileRunner
+    REQUIRE JAVA
+
     def initialize(*args)
         super
         # TODO: hardcoded artifact prefix
@@ -72,6 +76,8 @@ class RunJavaCode < JavaFileRunner
 end
 
 class RunJAR < JavaFileRunner
+    REQUIRE JAVA
+
     def build_target()
         "-jar #{@name}"
     end
@@ -82,14 +88,14 @@ class RunJAR < JavaFileRunner
 end
 
 class RunGroovyScript < JavaFileRunner
-    required GROOVY
+    REQUIRE GROOVY, JAVA
 
     def initialize(*args)
         super
     end
 
     def build_classpath()
-        CLASSPATH::join(groovy().classpath, java().classpath)
+        CLASSPATH::join(@groovy.classpath, @java.classpath)
     end
 
     def build_target()
@@ -97,7 +103,7 @@ class RunGroovyScript < JavaFileRunner
     end
 
     def build_runner()
-        groovy().groovy
+        @groovy.groovy
     end
 
     def what_it_does()
@@ -106,6 +112,8 @@ class RunGroovyScript < JavaFileRunner
 end
 
 class RunJavaCodeTests < RunJavaCode
+    REQUIRE JAVA
+
     def build_target()
         "Test" + super
     end
@@ -116,6 +124,8 @@ class RunJavaCodeTests < RunJavaCode
 end
 
 class RunJavaClassTests < RunJavaClass
+    REQUIRE JAVA
+
     def build_target()
         "Test" + super
     end
@@ -126,7 +136,7 @@ class RunJavaClassTests < RunJavaClass
 end
 
 class RunKotlinCode < JavaFileRunner
-    required KOTLIN
+    REQUIRE KOTLIN, JAVA
 
     def initialize(*args)
         super
@@ -134,7 +144,7 @@ class RunKotlinCode < JavaFileRunner
     end
 
     def build_classpath()
-        CLASSPATH::join(kotlin().classpath, java().classpath)
+        CLASSPATH::join(@kotlin.classpath, @java.classpath)
     end
 
     def build_target()
@@ -157,7 +167,7 @@ class RunKotlinCode < JavaFileRunner
 end
 
 class RunScalaCode < JavaFileRunner
-    required SCALA
+    REQUIRE SCALA, JAVA
 
     def initialize(*args)
         super
@@ -165,7 +175,7 @@ class RunScalaCode < JavaFileRunner
     end
 
     def build_classpath()
-        CLASSPATH::join(scala().classpath, java().classpath)
+        CLASSPATH::join(@scala.classpath, @java.classpath)
     end
 
     def build_target()
@@ -179,7 +189,7 @@ class RunScalaCode < JavaFileRunner
     end
 
     def build_runner()
-        scala().scala
+        @scala.scala
     end
 
     def what_it_does()
