@@ -15,11 +15,6 @@
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
-    ARTIFACT("a/a.txt", FileArtifact)
-    ARTIFACT("a/a.ru", FileArtifact)
-    ARTIFACT("a/*", FileArtifact)
-
-
     ARTIFACT("run:*") {
         ARTIFACT('**/*.java',   RunJavaCode)
         ARTIFACT('**/*.js',     RunNodejs)
@@ -31,16 +26,11 @@
         ARTIFACT('**/*.kt',     RunKotlinCode)
         ARTIFACT('**/*.scala',  RunScalaCode)
         ARTIFACT('**/*.class',  RunJavaClass)
-        ARTIFACT('**/*.rb',  RunRubyScript)
-
-        ARTIFACT("*") {
-            ARTIFACT('**/*.rb',  RunRubyScript)
-            ARTIFACT('**/*.java',  RunRubyScript)
-        }
+        ARTIFACT('**/*.rb',     RunRubyScript)
     }
 
     ARTIFACT("compile:*") {
-        ARTIFACT('**/*.java',   JavaCompiler)  { @options = "-Xlint:deprecation" }
+        ARTIFACT('**/*.java',   JavaCompiler)  { OPT "-Xlint:deprecation" }
         ARTIFACT('**/*.groovy', GroovyCompiler)
         ARTIFACT('**/*.kt',     CompileKotlin)
         ARTIFACT('**/*.scala',  CompileScala)
@@ -59,7 +49,6 @@
             }
         }
     }
-
 
     ARTIFACT('checkstyle:**/*.java', CheckStyle)
     ARTIFACT('pmd:**/*.java',        PMD)

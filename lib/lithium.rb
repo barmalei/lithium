@@ -1,7 +1,7 @@
 require 'pathname'
 
-$lithium_version    = '3.1.2'
-$lithium_date       = 'Apr 2019'
+$lithium_version    = '3.1.4'
+$lithium_date       = 'Jun 2019'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 artifact            = ARGV[ $lithium_options.length ]
@@ -9,6 +9,7 @@ artifact_path       = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[
 artifact_prefix     = artifact.nil? ? nil : (artifact_path.nil? ? artifact : artifact.chomp(artifact_path))
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
 $lithium_args     ||= []
+
 
 # modify ruby modules lookup path
 $: << File.join($lithium_code, 'lib')

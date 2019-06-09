@@ -2,12 +2,9 @@ require 'lithium/java-artifact/base'
 
 
 class JavaFileRunner < FileCommand
-    REQUIRE JAVA
+    include OptionsSupport
 
-    def initialize(*args)
-        super
-        @options ||= ''
-    end
+    REQUIRE JAVA
 
     def build()
         go_to_homedir()
@@ -19,9 +16,9 @@ class JavaFileRunner < FileCommand
         target = build_target()
         runner = build_runner()
         if clpath
-            return [runner, '-classpath', "\"#{clpath}\"", @options, target]
+            return [runner, '-classpath', "\"#{clpath}\"", OPTS(), target]
         else
-            return [runner, @options, target]
+            return [runner, OPTS(), target]
         end
     end
 

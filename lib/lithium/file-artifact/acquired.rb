@@ -78,12 +78,14 @@ class MetaGeneratedFile < GeneratedFile
 end
 
 class ZipFile < MetaGeneratedFile
+    include OptionsSupport
+
     def initialize(*args)
         super
         fp = fullpath
         raise "Zip file name points to directory #{fp}" if File.exists?(fp) && File.directory?(fp)
-        @options ||= '-9q'
-        @base    ||= nil
+        OPT '-9q'
+        @base ||= nil
     end
 
     def pre_build() cleanup() end
@@ -104,7 +106,7 @@ class ZipFile < MetaGeneratedFile
 
             zip_path = FileUtils.which('zip')
             raise 'command line zip tool cannot be found' unless zip_path.nil?
-            raise 'Archive building failed' if Artifact.exec(zip_path, @options, fullpath, list.join(' ')) != 0
+            raise 'Archive building failed' if Artifact.exec(zip_path, OPTS(), fullpath, list.join(' ')) != 0
         else
             puts_warning 'No file to be packed'
         end

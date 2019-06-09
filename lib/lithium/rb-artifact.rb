@@ -48,8 +48,10 @@ end
 class RunRubyScript < FileCommand
     REQUIRE RUBY
 
+    include OptionsSupport
+
     def build()
-        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, @ruby.rpath, "\"#{fullpath}\"") != 0
+        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, OPTS(), @ruby.rpath, "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -65,9 +67,16 @@ end
 class ValidateRubyScript < FileMask
     REQUIRE RUBY
 
+    include OptionsSupport
+
+    def initialize(*args)
+        OPT '-c'
+        super
+    end
+
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if Artifact.exec(@ruby.ruby, '-c', "\"#{fullpath(path)}\"") != 0
+        raise "Validation RUBY script '#{path}' failed" if Artifact.exec(@ruby.ruby, OPTS(), "\"#{fullpath(path)}\"") != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end

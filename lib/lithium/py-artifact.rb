@@ -60,11 +60,18 @@ end
 #  Run python
 #
 class RunPythonScript < FileCommand
+    include OptionsSupport
+
     REQUIRE PYTHON
+
+    def initialize(*args)
+        OPT '-u'
+        super
+    end
 
     def build()
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
-        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, '-u', "\"#{fullpath}\"") != 0
+        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, OPTS(), "\"#{fullpath}\"") != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -78,8 +85,10 @@ end
 
 
 class ValidatePythonCode < FileMask
+    include OptionsSupport
+
     def build_item(path, mt)
-        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', "\"#{fullpath(path)}\"") != 0
+        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', OPTS(), "\"#{fullpath(path)}\"") != 0
     end
 end
 

@@ -70,7 +70,9 @@ end
 
 # nodejs uglyfier
 class UglifyJavaScript < CompressJavaScript
-    attr_accessor :lib, :options
+    include OptionsSupport
+
+    attr_accessor :lib
 
     def initialize(*args)
         super
@@ -81,17 +83,10 @@ class UglifyJavaScript < CompressJavaScript
         end
 
         raise "'uglify' node JS module has to be installed in a context of target project ('#{owner}'') " unless File.exists?(@lib)
-
-        @options ||= {}
     end
 
     def compress(infile, outfile)
-        opt = [ File.join(@lib, 'bin', 'uglifyjs') ]
-        opt << @options
-        opt << infile
-        opt << '>'
-        opt << outfile
-        raise 'JS Uglify failed' if Artifact.exec(opt.join(' ')) != 0
+        raise 'JS Uglify failed' if Artifact.exec(File.join(@lib, 'bin', 'uglifyjs'), OPTS(), infile, '>', outfile) != 0
     end
 
     def what_it_does() "Uglify (nodejs) #{@name}' JS script" end

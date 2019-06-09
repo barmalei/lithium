@@ -25,20 +25,20 @@ end
 #      META:compile:**/*.java    # mark 'compile:**/*.java' as target artifact in meta tree
 #
 class META < Artifact
+    include OptionsSupport
+
     def initialize(*args, &block)
         super
-        @options ||= $lithium_options['meta.opt']
-        @options = [] if @options.nil?
-        @options = @options.split(',') if @options.kind_of?(String)
+        OPT($lithium_options['meta.opt'])
     end
 
     def build()
         p  = Project.current
         unless p.nil?
-            if @options.include?('current')
+            if OPT?('current')
                 stack = [ p ]
                 traverse(stack, stack.length - 1)
-            elsif @options.include?('owner')
+            elsif OPT?('owner')
                 if p.owner.nil?
                     raise "Project '#{p}' doesn't have an owner project"
                 else
@@ -78,7 +78,7 @@ class META < Artifact
                 ps = " (#{prj.owner}:#{pmeta.artname})" unless pmeta.nil?
             end
             pp = m[0].match(artname) ? " : [ '#{artname}' ]" : ''
-            if !@options.include?('path') || pp.length > 0
+            if OPT?('path') == false || pp.length > 0
                 printf("#{shift}    %-20s => '%s'#{ps}#{pp}\n", m[1][:clazz], m[1].artname)
                 puts_prj_metas(prj._artifact_by_meta(m[1].artname, m[1]), artname, shift + '    ') if m[1][:clazz] <= FileMaskContainer
                 count += 1

@@ -1,4 +1,5 @@
 require 'fileutils'
+require 'tempfile'
 
 require 'lithium/java-artifact/base'
 
@@ -7,6 +8,7 @@ require 'lithium/java-artifact/base'
 #
 class JavaCompiler < FileMask
     include LogArtifactState
+    include OptionsSupport
 
     REQUIRE JAVA
 
@@ -15,9 +17,7 @@ class JavaCompiler < FileMask
     def initialize(*args)
         @create_destination = false
         @description        = 'JAVA compiler'
-        @options            = ''
         @list_expired       = false
-        @_cleanup_files     = []
 
         super
 
@@ -55,27 +55,24 @@ class JavaCompiler < FileMask
     def build_target_list()
         list = []
         if @list_expired
-            list_expired() { |n, t|  list << "#{n}" }
+            list_expired() { | n, t |  list << "#{n}" }
         else
-            list_items() { |n, t|  list << "#{n}" }
+            list_items()   { | n, t |  list << "#{n}" }
         end
         list
     end
 
     def build_target(list)
-        path = File.expand_path('to_be_compiled.lst')
-        @_cleanup_files = [ path ]
-        File.open(path, 'w') { |f| f.print(list.join("\n")) }
-        return "\"@#{path}\""
+        return Tempfile.open('lithium') { | f | f << list.join("\n") }
     end
 
     def build_cmd(list, target, dest)
         cp       = build_classpath()
         compiler = build_compiler()
         if cp
-            [ compiler, '-classpath', "\"#{cp}\"", @options, '-d', dest, target ]
+            [ compiler, '-classpath', "\"#{cp}\"", OPTS(), '-d', dest, target ]
         else
-            [ compiler, @options, '-d', dest, target ]
+            [ compiler, OPTS(), '-d', dest, target ]
         end
     end
 
@@ -86,14 +83,15 @@ class JavaCompiler < FileMask
         if list.nil? || list.length == 0
             puts_warning "Nothing to be compiled"
         else
+            target = nil
             begin
                 target = build_target(list)
-                cmd    = build_cmd(list, target, @destination)
+                cmd    = build_cmd(list, target.kind_of?(File) ? "@#{target.path}" : target, @destination)
                 go_to_homedir()
                 raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
             ensure
-                @_cleanup_files.each { | path | File.delete(path) }
+                target.delete() if target.kind_of?(File)
             end
         end
     end

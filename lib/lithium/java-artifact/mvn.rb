@@ -263,12 +263,13 @@ class MavenJarFile < HTTPRemoteFile
 end
 
 class RunMaven < POMFile
+    include OptionsSupport
+
     def initialize(name, &block)
         super
 
         @maven_path ||= FileArtifact.which('mvn')
         @targets    ||= [ 'clean', 'install' ]
-        @options    ||= ""
         raise 'maven path cannot be detected' unless @maven_path
         raise "maven path '#{@maven_path}' doesn't exist be detected" unless File.exists?(@maven_path)
     end
@@ -282,7 +283,7 @@ class RunMaven < POMFile
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
 
         Dir.chdir(File.dirname(path));
-        raise 'Maven running failed' if Artifact.exec(@maven_path, @options,  @targets.join(' ')) != 0
+        raise 'Maven running failed' if Artifact.exec(@maven_path, OPTS(),  @targets.join(' ')) != 0
     end
 
     def what_it_does() "Run maven: '#{@target}'" end

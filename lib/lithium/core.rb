@@ -633,14 +633,25 @@ class Artifact
         return @default_name
     end
 
-    def Artifact.REQUIRE(*args, &block)
-        @requires ||= []
-        @requires = @requires + args
+    # stub class to perform chainable calls
+    class AssignRequiredTo
+        def initialize(item) @item = item end
+        def TO(an) @item[1] = an; return self end
+        def OWN() @item[2] = true; return self end
     end
 
-    def Artifact.requires()
+    def Artifact.REQUIRE(*args)
         @requires ||= []
-        return @requires.dup()
+        args.each { | art |
+            @requires.push([art, nil, nil])
+        }
+
+        return AssignRequiredTo.new(@requires[-1]) if args.length == 1
+    end
+
+    def Artifact.requires_as_array()
+        @requires ||= []
+        @requires
     end
 
     # !!! this method creates wrapped with context class artifact
@@ -658,6 +669,7 @@ class Artifact
                 instance_proxy.owner = last_caller.owner
             end
         end
+
         instance.send(:initialize, *args, &block)
         return instance_proxy
     end
@@ -717,13 +729,22 @@ class Artifact
     # return cloned array of the artifact dependencies
     def requires()
         @requires ||= []
-        return self.class.requires + @requires
-    end
+        req = self.class.requires_as_array + @requires
+        req = req.reverse.uniq { | e |
+            art = e[0]
+            if art.kind_of?(Artifact)
+                art.name
+            elsif art.kind_of?(Class)
+                art.default_name
+            elsif art.kind_of?(String)
+                art
+            else
+                raise "Unknown artifact type '#{art}' dependency"
+            end
+        }.reverse
 
-    def requires_with_block()
-        @requires_exec ||= {}
-        requires.each { | dep |
-            yield(dep, @requires_exec[dep])
+        req.each { | dep |
+            yield dep[0], dep[1], dep[2]
         }
     end
 
@@ -739,30 +760,14 @@ class Artifact
     def what_it_does() return "Build '#{to_s}' artifact" end
 
     # add required for the artifact building dependencies (other artifact)
-    def REQUIRE(*args, &block)
+    def REQUIRE(*args)
         raise 'No dependencies have been specified' if args.length == 0
-        @requires      ||= []
-        @requires_exec ||= {}
-
-        args.each { | aa |
-            raise "Null dependency has been detected in #{self.class}:'#{@name}' artifact" if aa.nil?
-            @requires.push(aa)
+        @requires ||= []
+        args.each { | art |
+            @requires.push([art, nil, nil])
         }
-
-        if block
-            raise "REUIRE can handle block for a single artifact dependency only" if args.length != 1
-            @requires_exec[args[0]] = block
-        end
+        return AssignRequiredTo.new(@requires[-1]) if args.length == 1
     end
-
-    #
-    #   REQUIRE("test/**", :sources)
-    #   REQUIRE("test/**")>> :dsdsdsd
-    #
-    #    REQUIRE("test/**") { | art |
-    #       @source = art
-    #    }
-    #
 
     # Overload "eq" operation of two artifact instances.
     def ==(art)
@@ -873,7 +878,7 @@ class ArtifactTree < Artifact
     end
 
     def build_tree(root)
-        root.art.requires.each { | dep |
+        root.art.requires { | dep, an, is_own |
             node, parent = Node.new(dep, root), root
             while parent && parent.art != node.art
                 parent = parent.parent
@@ -884,11 +889,20 @@ class ArtifactTree < Artifact
             root.children << node
             build_tree(node)
 
-            if node.art.kind_of?(EnvArtifact)
-                root.art.instance_variable_set("@#{node.art.class.name.downcase}".to_sym, node.art)
-            end
+            if an
+                asn = "@#{an.to_s}".to_sym
+                av  = root.art.instance_variable_get(asn)
+                node.art.owner =  root.art.owner if is_own
+                if av.kind_of?(Array)
+                    av.push(node.art)
+                    root.art.instance_variable_set(asn, av)
+                else
+                    root.art.instance_variable_set(asn, node.art)
+                end
 
-            #root.art.instance_exec(node.art, &block) unless block.nil?
+            elsif node.art.class < AssignArtifactTo
+                node.art.assign_to(root.art)
+            end
         }
     end
 
@@ -1239,7 +1253,7 @@ end
 
 
 module ArtifactContainer
-    def artifact(name, shift ='',  &block)
+    def artifact(name, &block)
         raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
 
         artname = ArtifactName.new(name)
@@ -1253,7 +1267,6 @@ module ArtifactContainer
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
             # path nil or doesn't match project then delegate finding an artifact in an owner project context
-
             return owner.artifact(name, &block) if !owner.nil? && !artname.env_path? && (artname.path.nil? || !match(artname.path))
             meta = _meta_from_owner(artname)
 
@@ -1511,13 +1524,45 @@ class Project < Directory
     end
 end
 
-class SelfPopulatedArtifact < Artifact
-
+module AssignArtifactTo
+    def assign_to(target)
+        target.instance_variable_set("@#{self.class.name.downcase}".to_sym, self)
+    end
 end
 
 
+module OptionsSupport
+    def OPTS(*args)
+        @options ||= []
+        if args.length > 0
+            @options = []
+            args.each { | o |
+                OPT(o)
+            }
+        end
+        return @options.join(' ')
+    end
+
+    def OPT(opt)
+        @options ||= []
+        @options.push(opt)
+    end
+
+    def OPT?(op)
+        @options ||= []
+        return @options.include?(op)
+    end
+
+    def OPTS?()
+        @options ||= []
+        return @options.length > 0
+    end
+end
+
 # Environment artifact
-class EnvArtifact < SelfPopulatedArtifact
+class EnvArtifact < Artifact
+    include AssignArtifactTo
+
     def self.default_name(*args)
         @default_name ||= nil
         if args.length > 0

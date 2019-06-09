@@ -5,6 +5,8 @@ require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
 class CheckStyle < FileMask
+    include OptionsSupport
+
     REQUIRE JAVA
 
     def initialize(*args)
@@ -32,6 +34,8 @@ end
 #  PMD code analyzer
 #
 class PMD < FileCommand
+    include OptionsSupport
+
     def initialize(*args)
         super
         @pmd_path = File.join($lithium_code, 'tools', 'pmd')
