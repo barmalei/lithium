@@ -26,6 +26,8 @@ class ExtractJar < FileCommand
 end
 
 class FindInZip < FileMask
+    include ZipTool
+
     REQUIRE JAVA
 
     attr_accessor  :pattern
@@ -33,7 +35,6 @@ class FindInZip < FileMask
     def initialize(*args)
         super
         @pattern ||= $lithium_args[0]
-        @zipinfo   = FileArtifact.which('zipinfo')
     end
 
     def build()
@@ -46,10 +47,11 @@ class FindInZip < FileMask
         # detect if class name is regexp
         mt = Regexp.new(@pattern) unless @pattern.index(/[\*\?\[\]\{\}\^]/).nil?
 
+        zi = detect_zipinfo
         list_items { | path, m |
             fp = fullpath(path)
-            if @zipinfo
-                find_with_zipinfo(fp, mt) { | found |
+            unless zi.nil?
+                find_with_zipinfo(zi, fp, mt) { | found |
                     puts "    #{Pathname.new(fp).relative_path_from(Pathname.new(hd))} : #{found}"
                     c += 1
                 }
@@ -69,8 +71,8 @@ class FindInZip < FileMask
         }
     end
 
-    def find_with_zipinfo(jar, match)
-        IO.popen(['zipinfo', '-1',  jar, :err=>[:child, :out]]) { | stdout |
+    def find_with_zipinfo(zi, jar, match)
+        IO.popen([zi, '-1',  jar, :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
                     yield line.chomp unless line.chomp.index(match).nil?
@@ -85,19 +87,14 @@ class FindInZip < FileMask
 end
 
 
-class JarFile < FileArtifact
+class JarFile < ArchiveFile
     REQUIRE JAVA
 
-    include LogArtifactState
-
-    log_attr :source, :base, :manifest
+    log_attr :manifest
 
     def initialize(*args)
-        @sources = []
-        @bases   = []
-
         super
-        @manifest ||=  nil
+        @manifest ||= nil
 
         if @manifest
             @manifest = fullpath(@manifest)
@@ -106,84 +103,8 @@ class JarFile < FileArtifact
         end
     end
 
-    def build()
-        tmpdir = Dir.mktmpdir
-        begin
-            list = []
-            list_items { | path, m, base |
-                dir = File.dirname(path)
-                if base
-                    dir = Pathname.new(dir).relative_path_from(Pathname.new(base)).to_s
-                    if dir == '.'
-                        list << File.basename(path)
-                    elsif dir.start_with?('..')
-                        raise "Invalid base path '#{base}'"
-                    else
-                        list << File.join(dir, File.basename(path))
-                    end
-                else
-                    list << path
-                end
-
-                FileUtils.mkdir_p(File.join(tmpdir, dir))
-                FileUtils.cp(fullpath(path), File.join(tmpdir, dir, File.basename(path)))
-            }
-
-            raise "Cannot detect files to archive by '#{@sources}' sources" if list.length == 0
-            list.each { | item |
-                puts "    '#{item}'"
-            }
-
-            dest = fullpath()
-            Dir.chdir(tmpdir)
-            raise "JAR '#{dest}' creation error" if arhive_with_zip(dest, tmpdir, list) != 0
-        ensure
-            #FileUtils.remove_entry tmpdir
-        end
-    end
-
-    def list_items_to_array(rel = nil)
-        res = []
-        @sources.each { | source |
-            res << source.list_items_to_array.map { | path | fullpath(path) }
-        }
-        return res
-    end
-
-    def list_items(rel = nil)
-        @sources.each_index { | i |
-            source = @sources[i]
-            base   = @bases[i]
-            source.list_items { | path, m |
-                yield path, m, base
-            }
-        }
-    end
-
-    def arhive_with_jar(jar, source, list)
-        return Artifact.exec(@java.jar, 'cfm', "\"#{jar}\"", "\"#{@manifest}\"", "-C \"#{source}\"", list) if @manifest
-        return Artifact.exec(@java.jar, 'cf', "\"#{jar}\"",  "-C \"#{source}\"", list)
-    end
-
-    def arhive_with_zip(jar, source, list)
-        return Artifact.exec('zip', "\"#{jar}\"",  list.join(' '))
-    end
-
-    def SOURCE(path, base = nil)
-        @sources ||= []
-        @bases   ||= []
-        fm = FileMask.new(path)
-        @sources << fm
-        unless base.nil?
-            base = base[0 .. base.length - 1] if base[-1] != '/'
-            raise "Invalid base '#{base}' directory for '#{path}' path" unless path.start_with?(base)
-        end
-
-        @bases << base
-        REQUIRE fm
-    end
-
-    def what_it_does()
-        return "Create'#{@name}' by '#{@sources.map { | item | item.name }}'"
+    def genarate(jar, destdir, list)
+        return Artifact.exec(@java.jar, 'cfm', "\"#{jar}\"", "\"#{@manifest}\"", "-C \"#{destdir}\"", list) unless @manifest.nil?
+        return Artifact.exec(@java.jar, 'cf', "\"#{jar}\"",  "-C \"#{destdir}\"", list)
     end
 end

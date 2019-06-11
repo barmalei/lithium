@@ -1209,6 +1209,10 @@ class FileMask < FileArtifact
         }
     end
 
+    def ignore_hidden()
+        @regexp_filter = /^[\.].*/
+    end
+
     # called for every detected item as a part of build process
     def build_item(path, m) end
 
@@ -1229,22 +1233,19 @@ class FileMask < FileArtifact
         rel = rel[0, rel.length - 1] if !rel.nil? && rel[-1] == '/'
 
         Dir[@name].each { | path |
-            b = false
-            b = (path =~ @regexp_filter) != nil if @regexp_filter
+            next if @regexp_filter && !(path =~ @regexp_filter)
 
-            if b == false && (@ignore_files || @ignore_dirs)
+            if @ignore_files || @ignore_dirs
                 b = File.directory?(path)
-                b = (@ignore_files && !b) || (@ignore_dirs && b)
+                next if (@ignore_files && !b) || (@ignore_dirs && b)
             end
 
-            if b == false
-                mt = File.mtime(path).to_i()
-                unless rel.nil?
-                    "Relative path '#{rel}' cannot be applied to '#{path}'" unless _contains_path?(rel, path)
-                    path = path[rel.length + 1, path.length - rel.length]
-                end
-                yield path, mt
+            mt = File.mtime(path).to_i()
+            unless rel.nil?
+                "Relative path '#{rel}' cannot be applied to '#{path}'" unless _contains_path?(rel, path)
+                path = path[rel.length + 1, path.length - rel.length]
             end
+            yield path, mt
         }
     end
 

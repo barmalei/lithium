@@ -1,65 +1,188 @@
+require 'fileutils'
+require 'pathname'
+
 require 'lithium/core'
 
 # acquired file artifact
 class GeneratedFile < FileArtifact
-    def initialize(*args)
+    include OptionsSupport
+
+    def build()
         super
-        fp = fullpath()
-        raise "File '#{fp}' points to directory" if File.directory?(fp)
+
+        tmpdir, remove = detstination_dir()
+        begin
+            list = []
+            list_items { | path, m, base |
+                fp = fullpath(path)
+                raise "File '#{fp}' cannot be found" unless File.exists?(fp)
+
+                is_path_dir = File.directory?(fp)
+                dir         = is_path_dir ? path : File.dirname(path)
+                unless base.nil?
+                    dir = Pathname.new(dir).relative_path_from(Pathname.new(base)).to_s
+                    if dir == '.' # relative path completely eats directory from path
+                        raise "Invalid relative path detected for '#{path}' by '#{base}' base" if is_path_dir
+                        list << File.basename(path)
+                    elsif dir.start_with?('..') # relative path could not be resolved
+                        raise "Invalid base path '#{base}'"
+                    else
+                        list << is_path_dir ? File.join(dir) : File.join(dir, File.basename(path))
+                    end
+                else
+                    list << path
+                end
+
+                dest_dir = File.join(tmpdir, dir)
+                if File.exists?(dest_dir)
+                    raise "Destination directory '#{dest_dir}' already exists as a file" unless File.directory?(dest_dir)
+                else
+                    FileUtils.mkdir_p(dest_dir)
+                end
+
+                FileUtils.cp(fp, File.join(dest_dir, File.basename(path))) unless is_path_dir
+            }
+
+            raise "Cannot detect generated file items" if list.length == 0
+            list.each { | item |
+                puts "    '#{item}'"
+            }
+
+            dest = fullpath()
+            Dir.chdir(tmpdir)
+            raise "File '#{dest}' generation error" if generate(dest, tmpdir, list) != 0
+        ensure
+            FileUtils.remove_entry(tmpdir) if remove
+        end
+    end
+
+    def detstination_dir()
+       return Dir.mktmpdir, true
+    end
+
+    # yield (path, mtime, base = nil)
+    def list_items(rel = nil)
+        raise NotImplementedError, ''
     end
 
     def cleanup() File.delete(fullpath) if File.exists?(fullpath) end
     def expired?() !File.exists?(fullpath) end
-    def build() raise NotImplementedError, '' end
+    def generate(dest, dest_dir, list) raise NotImplementedError, '' end
+end
+
+module ZipTool
+    def detect_zip()
+        @zip_path ||= nil
+        @zip_path = FileArtifact.which('zip') if @zip_path.nil?
+        return @zip_path
+    end
+
+    def detect_zipinfo()
+        @zipinfo_path ||= nil
+        @zipinfo_path = FileArtifact.which('zipinfo') if @zipinfo_path.nil?
+        return @zipinfo_path
+    end
+
+    def run_zip(*args)
+        z = detect_zip
+        raise 'zip command line tool cannot be found' if z.nil?
+        return Artifact.exec(*([ z ] << args))
+    end
+
+    def run_zipinfo(*args)
+        zi = detect_zipinfo
+        raise 'zip command line tool cannot be found' if zi.nil?
+        return Artifact.exec(*([ zi ] << args))
+    end
+end
+
+class ArchiveFile < GeneratedFile
+    include LogArtifactState
+
+    def initialize(*args)
+        @sources = []
+        @bases   = []
+        super
+
+        fp = fullpath()
+        raise "File '#{fp}' points to directory" if File.directory?(fp)
+    end
+
+    def list_items(rel = nil)
+        @sources.each_index { | i |
+            @sources[i].list_items { | path, m |
+                yield path, m, @bases[i]
+            }
+        }
+    end
+
+    def SOURCE(path, base = nil)
+        fm = FileMask.new(path)
+        @sources << fm
+        unless base.nil?
+            base = base[0 .. base.length - 1] if base[-1] != '/'
+            raise "Invalid base '#{base}' directory for '#{path}' path" unless path.start_with?(base)
+        end
+
+        @bases << base
+    end
+
+    def what_it_does()
+        return "Create'#{@name}' by '#{@sources.map { | item | item.name }}'"
+    end
+end
+
+class ZipFile < ArchiveFile
+    include ZipTool
+
+    def initialize(*args)
+        OPT '-9q'
+        super
+    end
+
+    def generate(path, dest_dir, list)
+        return run_zip(OPTS(), "\"#{path}\"",  list.join(' '))
+    end
 end
 
 # file that contains artifacts paths of a composite target artifact
 class MetaFile < FileArtifact
     include LogArtifactState
 
-    def list_items(check_existance = false)
+    attr_accessor :validate_items
+
+    def initialize(*args)
+        super
+        @validate_items ||= true
+    end
+
+    def list_items(rel = nil)
         fp = fullpath
         return unless File.exists?(fp)
 
-        if File.directory?(fp)
-            puts_error "Template file points to '#{fp}' directory, file is required"
-            return
-        end
-
         go_to_homedir
         # read meta file line by line
-        File.readlines(fp).each { | i |
-            i = i.strip
-            next if i.length == 0 || i[0,1]=='#'  # skip comment and empty strings
+        File.readlines(fp).each { | item |
+            item = item.strip
+            next if item.length == 0 || item[0,1]=='#'  # skip comment and empty strings
 
-            if i[0,1] == ':'  # try to handle it as an artifact specific command
-                raise "Unknown empty command '#{i}'" if !@command_listener
-                @command_listener.handle_command(i)
-                next
-            end
+            files = FileMask.new(item)
+            files.list_items { | path, m |
+                if @validate_items
+                    fp = fullpath(path)
+                    raise "File '#{fp}' cannot be found" unless File.exists?(fp)
+                end
 
-            if i.index(/[\[\]\?\*\{\}]/) != nil  # check if file mask is in
-                cc = 0
-                Dir[i].each { | j |
-                    yield j, File.mtime(fullpath(j)).to_i
-                    cc += 1
-                }
-                raise "Mask '#{@name}>#{i}' doesn't match any file" if cc == 0 && check_existance
-            else
-                p = fullpath(i)
-                raise "File '#{@name}>#{i}' cannot be found" if check_existance && !File.exists?(p)
-                yield i, File.exists?(i) ? File.mtime(p).to_i : -1
-            end
+                yield path, m, nil
+            }
         }
     end
 
-    def build() end
-    def what_it_does() '' end
-
-    def command_listener(l)
-        raise "Object '#{l}' does not declare 'handle_command(cmd)' method" if l && !l.respond_to?(:handle_command)
-        @command_listener = l
+    def build()
+        raise "Meta file '#{fp}' points to directory, file is required" if File.directory?(fp)
     end
+
+    def what_it_does() nil end
 end
 
 class MetaGeneratedFile < GeneratedFile
@@ -70,50 +193,44 @@ class MetaGeneratedFile < GeneratedFile
     end
 
     def META()
-        MetaFile.new(File.join('.lithium', 'meta', @name))
-        MetaFile.owner = owner
+        meta = MetaFile.new(File.join('.lithium', 'meta', relative_path))
+        fp = meta.fullpath
+        raise "Invalid meta file path '#{fp}'" if !File.exists?(fp) || File.directory?(fp)
+        return meta
     end
 
-    def what_it_does() "Create file by '#{@meta.name}'" end
+    def list_items(rel = nil)
+        @meta.list_items { | p, m |
+            yield p, m, nil
+        }
+    end
+
+    def what_it_does() "Generate file by '#{@meta.name}'" end
 end
 
-class ZipFile < MetaGeneratedFile
-    include OptionsSupport
+class MetaGeneratedZipFile < MetaGeneratedFile
+    include ZipTool
 
     def initialize(*args)
+        OPT '-9q'
         super
+        @base ||= nil
         fp = fullpath
         raise "Zip file name points to directory #{fp}" if File.exists?(fp) && File.directory?(fp)
-        OPT '-9q'
-        @base ||= nil
     end
 
-    def pre_build() cleanup() end
+    def list_items(rel = nil)
+        list_items { | p, m |
+            yield p, m, @base
+        }
+    end
 
-    def build()
-        go_to_homedir
-
-        list = []
-        @meta.list_items(true) { |n,t| list << "#{n}" }
-
-        if list.length > 0
-            bb = @base.nil? ? homedir() : @base
-            list.each_index { |i| list[i] = list[i].gsub("#{bb}/", '') }
-            Dir.chdir(bb)
-
-            list.each { |f| raise "'#{f}' file cannot be found" unless File.exists?(f) }
-            list = list.collect { |f| "'#{f}'" }
-
-            zip_path = FileUtils.which('zip')
-            raise 'command line zip tool cannot be found' unless zip_path.nil?
-            raise 'Archive building failed' if Artifact.exec(zip_path, OPTS(), fullpath, list.join(' ')) != 0
-        else
-            puts_warning 'No file to be packed'
-        end
+    def generate(path, source, list)
+        return run_zip(OPTS(), "\"#{path}\"",  list.join(' '))
     end
 
     def build_failed() cleanup() end
-    def what_it_does() "Create ZIP file by '#{@meta.name}'" end
+    def what_it_does() "Generate ZIP file by '#{@meta.name}'" end
 end
 
 # Copy file format:
@@ -122,21 +239,16 @@ end
 #   3. pattern: src/lib                        - copy "lib" directorty to "./lib"
 #   4. pattern: src/lib && preserve_path       - copy "lib" directorty as "./src/lib"
 class MetaGeneratedDirectory < MetaGeneratedFile
-    CONTENT_FN = 'list_of_files'
+    CONTENT_FN = '.dir_content'
 
     def cleanup()
-        @preserve_path = false
-        fp = fullpath()
-        @meta.list_items { |n, t|
-            p =  @preserve_path ? File.join(fp, n): File.join(fp, File.basename(n))
+        fp = fullpath
+        list_items { |n, t|
+            p =  File.join(fp, n)
 
             next unless File.exists?(p)
             if File.directory?(p)
-                if @preserve_path
-                    FileUtils.rm_r(File.join(fp, n.split('/')[0]))
-                else
-                    FileUtils.rm_r(p)
-                end
+                FileUtils.rm_r(File.join(fp, n.split('/')[0]))
             else
                 FileUtils.rm(p)
             end
@@ -146,57 +258,34 @@ class MetaGeneratedDirectory < MetaGeneratedFile
     def expired?()
         return true if super
 
-        @preserve_path = false
         fp = fullpath
-        @meta.list_items() { |n, t|
-            p =  @preserve_path ? File.join(fp, n) : File.join(fp, File.basename(n))
+        list_items { |n, t|
+            p =  File.join(fp, n)
             return true unless File.exists?(p)
         }
         false
     end
 
-    def pre_build() cleanup() end
-
-    def build()
-        @preserve_path = false
-        fp = fullpath
-        FileUtils.mkdir_p(fp) unless File.exists?(fp)
-
-        go_to_homedir
-        @meta.list_items(true) { |n, t|
-            s = fullpath(n)
-            raise "File '#{s}' cannot be found" unless File.exists?(s)
-
-            d = fp
-            if @preserve_path  # keep source path
-                d = File.join(d, File.dirname(n))  # preserve source directories in destination
-                FileUtils.mkdir_p(d) unless File.exists?(d) # create directory or directories in destination
-                d = File.join(d, File.basename(n)) # add file to be copied to destination
-            end
-
-            if File.directory?(s)
-                if @preserve_path
-                    FileUtils.cp_r(s, File.join(fp, n))
-                else
-                    FileUtils.cp_r(s, File.join(fp, File.basename(n)))
-                end
-            else
-                FileUtils.cp(s, d)
-            end
-        }
+    def pre_build()
+        cleanup()
     end
 
-    def handle_command(c)
-        raise "Unknown command '#{c}'" unless c.start_with?(':preserve_path')
-        @preserve_path = true
+    def generate(dir, tmpdir, list) return 0 end
+
+    def detstination_dir()
+       fp = fullpath
+       FileUtils.mkdir_p(fp) unless File.exists?(fp)
+       return fp, false
     end
 
     def META()
-        meta = MetaFile.new(File.join('.lithium', 'meta', name, CONTENT_FN))
-        meta.command_listener(self)
+        meta = MetaFile.new(File.join('.lithium', 'meta', relative_path, CONTENT_FN))
+        raise "Meta file cannot be found #{meta.fullpath}" if !File.exists?(meta.fullpath)
         meta
     end
 
-    def what_it_does() "Create folder '#{@name}' and its content" end
+    def build_failed() cleanup() end
+
+    def what_it_does() "Generate folder '#{@name}' and its content" end
 end
 
