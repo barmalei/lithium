@@ -91,7 +91,7 @@ class JavaCompiler < FileMask
                 raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
             ensure
-                target.delete() if target.kind_of?(File)
+                File.delete(target.path) if target.kind_of?(File)
             end
         end
     end
