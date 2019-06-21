@@ -8,16 +8,9 @@ require 'lithium/core-std'
 
 def LOC_MAVEN(group, id, ver)
     p = File.expand_path("~/.m2/repository")
-    return nil unless File.exists?(p)
+    raise "Maven local repo '#{p}' cannot be detetced" unless File.exists?(p)
     group = group.gsub('.', '/') if group.index('.') != nil
-
-    puts "p = #{p} group = #{group} id = #{id} ver = #{ver}"
-
-    p = File.join(p, group, id, ver, "#{id}-#{ver}.jar")
- #   raise "Maven artifact '#{p}' cannot be found" if !File.exists?(p)
-    puts_warning "cannot find #{p}" if !File.exists?(p)
-    return nil if !File.exists?(p)
-    return p
+    return File.join(p, group, id, ver, "#{id}-#{ver}.jar")
 end
 
 # class LocalMavenJar < AquaredFile
@@ -26,6 +19,36 @@ end
 #         super "#{id}-#{ver}.jar"
 #     end
 # end
+
+
+
+class MavenArtifact < CopyOfFile
+    attr_reader :id, :group
+
+    def initialize(*args)
+        super
+
+        name = File.dirname(@name) == '.' ? @name : File.basename(@name)
+        if @id.nil?
+            m = /(.*)\-(\d+\.\d+)(\.\d+)?([-.]\w+)?\.[a-zA-Z]+$/.match(name)
+            raise "Incorrect maven artifact name '#{name}'" if m.nil? || m.length < 3
+            @id     ||= m[1]
+            @group  ||= m[1]
+            @ver    ||= m[2] + (m[3] ? m[3] : '') +  (m[4] ? m[4] : '')
+            @group = @group.tr('.', '/')
+        end
+
+        @source = LOC_MAVEN(@group, @id, @ver)
+
+        unless File.exists?(@source)
+            p = File.expand_path("~/.m2/repository")
+            `find #{p}/. -name #{name}`.each_line { | fp |
+                @source = File.expand_path(fp.chomp)
+                break
+            }
+        end
+    end
+end
 
 
 class POMFile < PermanentFile
@@ -262,6 +285,7 @@ class MavenJarFile < HTTPRemoteFile
     end
 end
 
+
 class RunMaven < POMFile
     include OptionsSupport
 
@@ -271,7 +295,7 @@ class RunMaven < POMFile
         @maven_path ||= FileArtifact.which('mvn')
         @targets    ||= [ 'clean', 'install' ]
         raise 'maven path cannot be detected' unless @maven_path
-        raise "maven path '#{@maven_path}' doesn't exist be detected" unless File.exists?(@maven_path)
+        raise "maven path '#{@maven_path}' is invalid" unless File.exists?(@maven_path)
     end
 
     def expired?
@@ -289,7 +313,7 @@ class RunMaven < POMFile
     def what_it_does() "Run maven: '#{@target}'" end
 end
 
-class MavenCompile < RunMaven
+class CompileMaven < RunMaven
     def initialize(*args)
         super
         @targets = [ 'compile' ]
@@ -310,4 +334,11 @@ class MavenCompile < RunMaven
         }
     end
 end
+
+
+m = MavenArtifact.new("commons-validator-1.4.0.jar")
+puts "id = #{m.id} group = #{m.group} ver = #{m.ver}"
+
+m = MavenArtifact.new("jnc-easy-config-1.2.0-SNAPSHOT.jar")
+puts "id = #{m.id} group = #{m.group} ver = #{m.ver}"
 

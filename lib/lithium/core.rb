@@ -778,10 +778,11 @@ class Artifact
     def mtime() -1 end
 
     def Artifact._read_std_(std, out)
+
         while (rr = IO.select([ std ], nil, nil, 2)) != nil
             next if rr.empty?
             begin
-                l = std.readline.strip
+                l = std.readline.encode('utf-8').rstrip()
                 out.puts l if l
             rescue IOError => e
                 break
@@ -797,11 +798,22 @@ class Artifact
         args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
 
         Open3.popen3(args.join(' ')) { | stdin, stdout, stderr, thread |
+
+            stdin.close
+            stdout.set_encoding(Encoding::UTF_8)
+            stderr.set_encoding(Encoding::UTF_8)
+
             block.call(stdin, stdout, stderr, thread) unless block.nil?
 
-            while true
+            while thread.status != false && thread.status != nil
                 begin
-                    return thread.value if Process.waitpid(thread.value.pid)
+
+                    # thread.wakeup if !thread.alive? && thread.status != false
+
+                    # the line can block forever with "thread.value" or  "Process.waitpid(thread[:pid])"
+                    #return thread.value if Process.waitpid(thread[:pid])
+
+
                 #rescue Errno::ESRCH #Errno::ECHILD
                 #rescue Exception => e
                 rescue Errno::ECHILD
@@ -810,8 +822,10 @@ class Artifact
                         _read_std_(stderr, $stdout)
                     rescue
                     end
+
                     return thread.value
                 end
+
                 _read_std_(stdout, $stdout)
                 _read_std_(stderr, $stdout)
             end

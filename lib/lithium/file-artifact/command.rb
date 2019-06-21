@@ -3,9 +3,7 @@ require 'pathname'
 
 require 'lithium/core'
 
-#
 #  Touch file - change the file updated time stamp
-#
 class Touch < FileCommand
     def build()
         super
@@ -19,37 +17,36 @@ class Touch < FileCommand
     end
 end
 
-#
 #  Copy of a file artifact
-#
 class CopyOfFile < FileCommand
-    attr_reader :destination
+    attr_reader :source
 
     def expired?
-        dest = validate_destination()
-        return !File.exists?(fullpath()) || File.mtime(fullpath()).to_i < File.mtime(dest).to_i
+        src = validate_source()
+        return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
     end
 
     def cleanup()
-        File.delete(fullpath()) if File.exists?(fullpath())
+        File.delete(fullpath) if File.exists?(fullpath)
     end
 
     def build()
         super
-        dest   = validate_destination()
-        source = fullpath()
-        raise "Source file '#{source}' points to a directory" if File.directory?(source)
-        FileUtils.cp(dest, source)
+        src  = validate_source()
+        dest = fullpath()
+        raise "Source file '#{src}' points to a directory" if File.directory?(src)
+        FileUtils.cp(src, dest)
     end
 
-    def validate_destination()
-        raise 'Destination path is not defined' if @destination.nil?
-        dest = fullpath(@destination)
-        raise "Destination '#{dest}' doesn't exist or points to a directory"  if !File.exists?(dest) || File.directory?(dest)
-        return dest
+    def validate_source()
+        raise 'Source path is not defined' if @source.nil?
+        src = Pathname.new(@source).absolute? ? @source : fullpath(@source)
+        raise "Source '#{src}' doesn't exist or points to a directory"  if !File.exists?(src) || File.directory?(src)
+        return src
     end
 
-    def what_it_does() "Copy file from: '#{fullpath()}'\n     to  : '#{@destination}'" end
+
+    def what_it_does() "    '#{@source}' => '#{fullpath()}'" end
 end
 
 #  Remove a file or directory
