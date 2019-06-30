@@ -61,6 +61,7 @@ STD_RECOGNIZERS({
 def BUILD_ARTIFACT(name)
     $current_artifact = nil
 
+    # instantiate tree artifact in a context of project to have proper owner set
     tree = Project.current.new_artifact {
         ArtifactTree.new(name)
     }
@@ -86,13 +87,13 @@ def BUILD_ARTIFACT_TREE(root, level = 0)
             puts wid unless wid.nil?
             art.pre_build()
             art.build()
+            art.build_done()
         rescue
             art.build_failed()
             raise
         ensure
             $current_artifact = nil
         end
-        art.build_done()
     else
         puts_warning "'#{art.name}' does not declare build() method"
     end
@@ -126,7 +127,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         begin
             std_clazz = std_s == 'null' ? nil : Module.const_get(std_s)
         rescue NameError
-            raise "Unknown stdout/stderror formatter class name '#{std_s}'"
+            raise "Unknown stdout/stderr formatter class name '#{std_s}'"
         end
     end
 
@@ -160,8 +161,8 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # reg self registered artifact in lithium project if they have not been defined yet
     top_prj = prj.top
     AutoRegisteredArtifact.artifact_classes.each { | clazz |
-        artname = ArtifactName.new(clazz)
-        top_prj.ARTIFACT(clazz) if prj._meta[artname].nil?
+        meta = ArtifactName.new(clazz)
+        top_prj.ARTIFACT(meta) if prj.find_meta(meta).nil?
     }
 
     # build target artifact including its dependencies

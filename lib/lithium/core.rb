@@ -177,7 +177,7 @@ module LogArtifactState
     end
 
     def update_logs()
-        return if !can_artifact_be_tracked?()
+        return unless can_artifact_be_tracked?
 
         t = Time.now
         if is_items_log_enabled?
@@ -260,8 +260,13 @@ module LogArtifactState
         path = attrs_log_path()
         if self.class.has_log_attrs()
             data = {}
-            self.class.each_log_attrs { |a| data[a] = self.send(a) }
-            File.open(path, 'w') { |f| Marshal.dump(data, f) }
+            begin
+                self.class.each_log_attrs { |a| data[a] = self.send(a) }
+                File.open(path, 'w') { |f| Marshal.dump(data, f) }
+            rescue
+                File.delete(path)
+                raise
+            end
         else
             File.delete(path) if File.exists?(path)
         end
@@ -281,7 +286,14 @@ module LogArtifactState
 
             if File.exists?(path)
                 File.open(path, 'r') { | f |
-                    d = Marshal.load(f)
+                    d = nil
+                    begin
+                        d = Marshal.load(f)
+                    rescue
+                        File.delete(path)
+                        raise
+                    end
+
                     raise "Incorrect serialized object type '#{d.class}' (Hash is expected)" if !d.kind_of?(Hash)
 
                     attrs.each { | a |
@@ -334,19 +346,36 @@ end
 #   [ "aa:test/", "aa:test/*", "aa:test/**/*", "aa:", "bb:", "compile:test/test/a",
 #     "compile:test/**/*", "compile:", "test/com", "test/com/**" ]
 class ArtifactName < String
-    attr_reader :prefix, :suffix, :path, :path_mask, :mask_type
+    attr_reader :prefix, :suffix, :path, :path_mask, :mask_type, :clazz, :block
 
     # return artname as is if it is passed as an instance of artifact name
-    def self.new(name)
-        return name if name.kind_of?(ArtifactName)
-        super(name)
+    def self.new(*args, &block)
+        return args[0] if args.length == 1 && args[0].kind_of?(ArtifactName)
+        super(*args, &block)
     end
 
-    def initialize(name)
-        if name.kind_of?(Class)
-            name = name.default_name.nil? ? name.to_s : name.default_name
-        elsif name.kind_of?(Symbol)
-            name = name.to_s
+    # 1) (name | class | Symbol)
+    # 2) (name | Symbol, clazz)
+    def initialize(*args, &block)
+        @clazz = nil
+
+        name = args[0]
+        if args.length == 1
+            if name.kind_of?(Symbol)
+                name = name.to_s
+            elsif name.kind_of?(Class)
+                @clazz = name
+                name = name.default_name
+                name = "#{@clazz.name}:*" if name.nil?
+            elsif !name.kind_of?(String)
+                raise "Invalid artifact name type '#{name.class}'"
+            end
+        elsif args.length == 2
+            name = name.to_s if name.kind_of?(Symbol)
+            raise "Invalid class type '#{args[1]}'" if !args[1].nil? && !args[1].kind_of?(Class)
+            @clazz = args[1]
+        else
+            raise "Unexpected number of parameters #{args.length}, #{args}, one or two parameters are expected"
         end
 
         ArtifactName.nil_name(name)
@@ -367,6 +396,15 @@ class ArtifactName < String
             @path      = @path.length == 0 ? nil : Pathname.new(@path).cleanpath.to_s
             @mask_type = @mask_type | File::FNM_PATHNAME if @path_mask != '*' || !@path.nil?
         end
+
+        if args.length == 1 && @clazz.nil? && !@prefix.nil?
+            begin
+                @clazz = Module.const_get(@prefix[0..-2])
+            rescue
+            end
+        end
+
+        @block = block
 
         super(name)
     end
@@ -389,22 +427,20 @@ class ArtifactName < String
     end
 
     def match(name)
-        artname = ArtifactName.new(name)
+        name = ArtifactName.new(name)
 
         # prefix doesn't match each other
-        return false if @prefix != artname.prefix
+        return false if @prefix != name.prefix
 
         unless @path_mask.nil?
-            return false if artname.suffix.nil? || (artname.env_path? ^ env_path?) # one of the path is environment but not both
-            return File.fnmatch(@suffix, artname.suffix, @mask_type)
-        else
-            return @suffix == artname.suffix
-        end
-    end
 
-    # TODO: correct the method to take in account mask and file mask
-    def path=(path)
-        @path = path
+            puts "ArtifactName.match(): is #{name.class}:'#{name}' match #{self.class}:'#{self}'"
+
+            return false if name.suffix.nil? #|| (name.env_path? ^ env_path?) # one of the path is environment but not both
+            return File.fnmatch(@suffix, name.suffix, @mask_type)
+        else
+            return @suffix == name.suffix
+        end
     end
 
     def <=>(p)
@@ -427,75 +463,10 @@ class ArtifactName < String
     end
 
     def inspect()
-        return "#{self.class.name}: { prefix='#{@prefix}', suffix='#{@suffix}', path='#{@path}', mask='#{@path_mask}' mask_type=#{mask_type} }"
-    end
-end
-
-# Artifact meta info class that keeps:
-#     :clazz    - detected class of the given artifact
-#     :block    - initialization block of the given artifact
-#     :def_name - default path of the given artifact
-#     :clean    - boolean flag that say if artifact has to be cleaned up before building
-class ArtifactMeta < Hash
-    attr_reader :artname
-
-    def initialize(*args, &block)
-        if args[-1].kind_of?(ArtifactMeta)
-            cm              = args[-1]
-            @artname        = args.length > 1 ? args[0] : cm.artname
-            self[:clazz]    = cm[:clazz]
-            self[:def_name] = cm[:def_name]
-
-            if block.nil?
-                self[:block] = cm[:block]
-            elsif cm[:block].nil?
-                self[:block] = block
-            else
-                sb = cm[:block]
-                self[:block] = Proc.new {
-                    self.instance_eval &sb
-                    self.instance_eval &block
-                }
-            end
-        else
-            @artname = ArtifactName.new(args[0])
-            clazz    = args[0].kind_of?(Class) ? args[0]  : nil
-
-            # if there is only one argument then consider as a class or class name
-            # In this case name of artifact is fetched as to_s of class
-            if args.length == 1
-                raise "Class cannot be detected for '#{@artname}'" if clazz.nil? && @artname.prefix.nil?
-
-                if clazz.nil?
-                    begin
-                        cn    = @artname.prefix[0..-2]
-                        clazz = Module.const_get(cn)
-                    rescue
-                        raise "Artifact class cannot be resolved by artifact name '#{cn}'"
-                    end
-                end
-            elsif args.length > 1   # first argument should contain artifact name and the last one should point to class
-                if args[-1].kind_of?(String)
-                    clazz = Module.const_get(args[-1])
-                elsif args[-1].kind_of?(Class)
-                    clazz = args[-1]
-                else
-                    raise "Unknown artifact '#{args[0]}' class"
-                end
-            else
-                raise 'No artifact information has been passed'
-            end
-
-            if args.length > 2 && !@artname.suffix.nil?
-                raise "Default name cannot be specified since artifact '#{@artname}' already defines target name"
-            end
-
-            self[:clazz]    = clazz
-            self[:block]    = block
-            self[:def_name] = args.length > 2 ? args[1] : nil
-        end
+        "#{self.class.name}: { prefix='#{@prefix}', suffix='#{@suffix}', path='#{@path}', mask='#{@path_mask}' mask_type=#{mask_type}, clazz=#{@clazz}}"
     end
 
+    # re-create the artifact name with new block
     def reuse(&block)
         bk = block
         unless self[:block].nil?
@@ -510,21 +481,7 @@ class ArtifactMeta < Hash
             end
         end
 
-        mt = ArtifactMeta.new(@artname, self[:clazz], &bk)
-        mt[:def_name] = self[:def_name]
-        return mt
-    end
-
-    def ==(meta)
-        !meta.nil? && meta.class == self.class && meta[:clazz] == self[:clazz] && meta[:block] == self[:block] && meta[:def_name] == self[:def_name]
-    end
-
-    def to_s
-        "#{self.class} : { " + super + " artname = '#{artname}' }"
-    end
-
-    def inspect()
-        return "#{self.class.name}: { class='#{self[:clazz]}', def_val='#{self[:def_value]}', artname='#{@artname}' }"
+        return ArtifactName.new(@artname, @clazz, &bk)
     end
 end
 
@@ -710,6 +667,14 @@ class Artifact
         end
     end
 
+    def project()
+        ow = owner
+        while ow && !ow.kind_of?(Project) do
+            ow = ow.owner
+        end
+        return ow
+    end
+
     def homedir()
         return owner.homedir unless owner.nil? # if has a container the artifact belongs
         return File.expand_path(Dir.pwd)
@@ -778,7 +743,6 @@ class Artifact
     def mtime() -1 end
 
     def Artifact._read_std_(std, out)
-
         while (rr = IO.select([ std ], nil, nil, 2)) != nil
             next if rr.empty?
             begin
@@ -847,13 +811,8 @@ class ArtifactTree < Artifact
         def initialize(art, parent = nil)
             raise 'Artifact cannot be nil' if art.nil?
 
-            if art.kind_of?(String) || art.kind_of?(Class)
-                if parent.nil?
-                    art = Project.artifact(art)
-                else
-                    art = parent.art.owner.artifact(art)
-                end
-            end
+            p = parent.nil? ? Project : parent.art.owner
+            art = p.artifact(art) unless art.kind_of?(Artifact)
 
             @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
         end
@@ -906,14 +865,13 @@ class ArtifactTree < Artifact
             if an
                 asn = "@#{an.to_s}".to_sym
                 av  = root.art.instance_variable_get(asn)
-                node.art.owner =  root.art.owner if is_own
+                node.art.owner = root.art.owner if is_own
                 if av.kind_of?(Array)
                     av.push(node.art)
                     root.art.instance_variable_set(asn, av)
                 else
                     root.art.instance_variable_set(asn, node.art)
                 end
-
             elsif node.art.class < AssignArtifactTo
                 node.art.assign_to(root.art)
             end
@@ -1233,7 +1191,7 @@ class FileMask < FileArtifact
     # the to lits items but collects all items to array
     def list_items_to_array(rel = nil)
         list = []
-        list_items(rel) { | path, m|
+        list_items(rel) { | path, m |
             list << path
         }
         return list
@@ -1254,11 +1212,12 @@ class FileMask < FileArtifact
                 next if (@ignore_files && !b) || (@ignore_dirs && b)
             end
 
-            mt = File.mtime(path).to_i()
+            mt = File.mtime(path).to_i
             unless rel.nil?
                 "Relative path '#{rel}' cannot be applied to '#{path}'" unless _contains_path?(rel, path)
                 path = path[rel.length + 1, path.length - rel.length]
             end
+
             yield path, mt
         }
     end
@@ -1268,8 +1227,9 @@ end
 
 
 module ArtifactContainer
+    #  (name : String | ArtifactName | Class)
     def artifact(name, &block)
-        raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 100
+        raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 15
 
         artname = ArtifactName.new(name)
 
@@ -1279,111 +1239,101 @@ module ArtifactContainer
         # fund local info about the given artifact
         meta = find_meta(artname)
 
+        puts "artifact(): cont = #{self} target name = #{name}  meta = #{meta}  "
+
+
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
             # path nil or doesn't match project then delegate finding an artifact in an owner project context
             return owner.artifact(name, &block) if !owner.nil? && !artname.env_path? && (artname.path.nil? || !match(artname.path))
-            meta = _meta_from_owner(artname)
+
+
+
+            meta = _meta_from_owner(name)
+
+
+            puts "artifact(): get meta from owner #{owner} -- #{meta.nil?}"
 
             unless meta.nil?
+                # attempt to handle situation when an artifact meta the container has been
+                # created is going to be applied to artifact creation. It can indicate we
+                # have cyclic come back
                 raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
-                meta = _meta_by_name(artname)
+                puts "artifact(): use artifact itself as meta #{artname.inspect}"
+
+                meta = artname unless artname.clazz.nil?
             end
-            raise NameError.new("No artifact is associated with '#{name}'") if meta.nil?
+
+            raise NameError.new("No artifact is associated with '#{name}' meta = #{meta}") if meta.nil?
         end
 
         # manage cache
-        _remove_from_cache(artname, meta) unless block.nil?
-        art = _artifact_from_cache(artname, meta)
+        _remove_from_cache(artname) unless block.nil?  # remove from cache if a custom block has been passed
+        art = _artifact_from_cache(artname)
+
+        # instantiate artifact with meta if it has not been found in cache
         art = _artifact_by_meta(artname, meta, &block) if art.nil?
+        art = _cache_artifact(artname, art)
 
-        # always cache container
-        if art.kind_of?(ArtifactContainer)
-            art = _cache_artifact(artname, meta, art)
-            return art.artifact(artname.suffix)
-        else
-            return _cache_artifact(artname, meta, art)
-        end
-    end
+        # if the artifact is a container handling of target (suffix) is delegated to the container
+        return art.artifact(artname.suffix) if art.kind_of?(ArtifactContainer)
 
-    def _cache_artifact(artname, meta, art)
-        # always cache container
-        if art.kind_of?(ArtifactContainer)
-            _artifacts_cache[meta.artname] = art
-        elsif artname == meta.artname
-            _artifacts_cache[artname] = art
-        end
+        # return artifact
         return art
     end
 
-    def _artifact_from_cache(name, meta)
-        artname = ArtifactName.new(name)
-        if !meta.nil? && meta[:clazz].included_modules.include?(ArtifactContainer)
-            return _artifacts_cache[meta.artname]
-        elsif !_artifacts_cache[artname].nil? && artname.path_mask.nil?
-            return _artifacts_cache[artname]
-        else
-            return nil
-        end
+    # cache artifact only if it is not identified by a mask or is an artifact container
+    def _cache_artifact(name, art)
+        name = ArtifactName.new(name)
+        _artifacts_cache[name] = art if name.path_mask.nil? || art.kind_of?(ArtifactContainer)
+        return art
     end
 
-    # { <art_name> => <art_class_instance>, ...}
+    # fetch an artifact from cache
+    def _artifact_from_cache(name)
+        name = ArtifactName.new(name)
+        return _artifacts_cache[name] unless _artifacts_cache[name].nil?
+    end
+
+    # { art_name:ArtifactName => instance : Artifact ...}
     def _artifacts_cache()
         @artifacts = {} unless defined? @artifacts
         @artifacts
     end
 
-    def _remove_from_cache(artname, meta)
-        artname = ArtifactName.new(name)
-        if meta[:clazz].included_modules.include?(ArtifactContainer)
-            _artifacts_cache.delete(meta.artname) if _artifacts_cache[meta.artname]
-        elsif artname.path_mask.nil?
-            _artifacts_cache.delete(artname) if _artifacts_cache[artname]
-        end
-        nil
+    def _remove_from_cache(name)
+        name = ArtifactName.new(name)
+        _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
     end
 
+    # instantiate the given artifact by its meta
     def _artifact_by_meta(name, meta, &block)
-        artname = ArtifactName.new(name)
+        name  = ArtifactName.new(name)
+        clazz = meta.clazz
 
-        clazz = meta[:clazz]
-        raise 'Invalid nil artifact class' if clazz.nil?
-        begin
-            clazz = Module.const_get(clazz) if clazz.kind_of?(String)
-        rescue NameError
-            raise "Class '#{clazz}' not found"
-        end
+        puts "1: _artifact_by_meta(): #{name} #{meta.inspect}"
 
-        art = clazz.new(artname.suffix.nil? ? meta[:def_name] : artname.suffix,
-            &(block.nil? ? meta[:block] : Proc.new {
-                self.instance_eval &meta[:block] unless meta[:block].nil?
+        art = clazz.new(name.suffix,
+            &(block.nil? ? meta.block : Proc.new {
+                self.instance_eval &meta.block unless meta.block.nil?
                 self.instance_eval &block
             })
         )
 
-        art.createdByMeta = meta
 
-        # TODO: the key :clean is never set, since ARTIFACT doesn't support the parameter
-        art.cleanup() if meta[:clean] == true
+        puts "2: _artifact_by_meta(): art = #{art}  art.owner = #{art.owner}"
+
+        art.createdByMeta = meta
         return art
     end
 
-    def _meta_by_name(name)
-        artname = ArtifactName.new(name)
-        begin
-            return ArtifactMeta.new(artname) unless artname.prefix.nil?
-        rescue NameError => e
-        end
-        return nil
-    end
-
     def _meta_from_owner(name)
-        artname = ArtifactName.new(name)
+        name = ArtifactName.new(name)
         ow   = owner
         meta = nil
         while !ow.nil? && meta.nil? do
-            meta = ow.find_meta(artname)
+            meta = ow.find_meta(name)
             ow = ow.owner
         end
         return meta;
@@ -1395,54 +1345,47 @@ module ArtifactContainer
     #     def_name: name
     # }
     def _meta()
-        @meta = {} unless defined? @meta
+        @meta = [] unless defined? @meta
         return @meta
     end
 
+    # find appropriate for the given artifact name registered meta if possible
     def find_meta(name)
-        artname = relative_art(name)
-        meta    = _meta[artname]
-        return meta unless meta.nil?
-
-        meta  = _meta.detect { | p | p[0].match(artname) }
-        return meta[1] unless meta.nil?
-        return nil
+        name = relative_art(name)
+        return _meta.detect { | p | p.match(name) }
     end
 
     def ==(prj)
         super(prj) && _meta == prj._meta
     end
 
-    # ([name, []] clazz, [&block])
+    # 1. (class : Class)
+    # 2. (name  : String | ArtifactName)
+    # 3. (meta  : ArtifavtMeta)
+    # 4. (name, class)
     def ARTIFACT(*args, &block)
-        if args[-1].kind_of?(Class)
-            m = ArtifactMeta.new(*args, &block)
-        else
-            args = args.dup()
-            args.push(FileMaskContainer)
-            m = ArtifactMeta.new(*args, &block)
-        end
-
-        # try to find previously stored meta
-        #puts "Override previously defined '#{m.artname}' artifact" if _meta[m.artname]
+        # if class has not been passed use default one
+        args = args.dup().push(FileMaskContainer) if args.length == 1 && !args[0].kind_of?(ArtifactName) && !args[0].kind_of?(Class)
 
         # store meta
-        _meta[m.artname] = m
+        name = ArtifactName.new(*args, &block)
+        raise "Unknown class for '#{name}' artifact" if name.clazz.nil?
+        _meta.push(name)
 
-        # sort dictionary by key
-        @meta = _meta.sort.to_h
+        # sort meta array
+        _meta.sort
     end
 
     def REF(name)
-        artname = ArtifactName.new(name)
-        meta = find_meta(artname)
+        name = ArtifactName.new(name)
+        meta = find_meta(name)
         if meta.nil?
-            meta = _meta_from_owner(artname)
+            meta = _meta_from_owner(name)
 
             unless meta.nil?
                 raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
-                meta = _meta_by_name(artname)
+                meta = name
             end
             raise NameError.new("No artifact is associated with '#{name}'") if meta.nil?
         end
@@ -1590,7 +1533,7 @@ class EnvArtifact < Artifact
     end
 
     def self.validate_env_name(name)
-        raise "Environment artifact cannot be assigned with '#{name}' name. Use '$/<artifact_name>' name pattern" if name[0] != '$' || name[1] != '/'
+        raise "Environment artifact cannot be assigned with '#{name}' name. Use '.env/<artifact_name>' name pattern" unless name.start_with?('.env/')
         name
     end
 
@@ -1621,3 +1564,8 @@ class GroupByExtension < FileMask
         }
     end
 end
+
+
+
+
+

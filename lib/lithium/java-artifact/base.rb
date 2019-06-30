@@ -3,40 +3,10 @@ require "pathname"
 require 'lithium/core'
 
 module CLASSPATH
-    def build_classpath(*libs)
-        classpath = nil
-
-        libs.each { | lib |
-            expand_class_path(lib).each { | path |
-                classpath = classpath ? classpath + File::PATH_SEPARATOR + path : path
-            }
-        }
-
-        return classpath ? CLASSPATH::norm_classpath(classpath) : nil
-    end
-
-    def detect_libs()
-        base = homedir()
-        libs = []
-        libs << 'classes'                       if File.exists?(File.join(base, 'classes'))
-        libs << 'lib'                           if File.exists?(File.join(base, 'lib'))
-        libs << File.join('WEB-INF', 'classes') if File.exists?(File.join(base, 'WEB-INF', 'classes'))
-        libs << File.join('WEB-INF', 'lib')     if File.exists?(File.join(base, 'WEB-INF', 'lib'))
-        return libs
-    end
-
-    def expand_class_path(path)
-        root = homedir
-        path = File.join(root, path) if !(Pathname.new path).absolute?
-        list = [ path ]
-        Dir[File.join(path, '*.jar')].each { |i|  list << i } if File.directory?(path)
-        list
-    end
-
     def self.join(*parts)
         cl = nil
         parts.each { | part |
-            cl = cl ? cl + File::PATH_SEPARATOR + part : part if part
+            cl = cl.nil? || cl.length == 0 ? part : cl + File::PATH_SEPARATOR + part  if part && parts.length > 0
         }
         return CLASSPATH::norm_classpath(cl)
     end
@@ -63,25 +33,75 @@ module CLASSPATH
     end
 end
 
+
 class JVM < EnvArtifact
     include CLASSPATH
     include LogArtifactState
+
+    attr_reader :classpath
+
+    def initialize(*args, &block)
+        super
+        @libs               ||= []
+        @libs_autodetection ||= true
+
+        libs = @libs.length == 0 && @libs_autodetection ? autodetected_libs() : @libs.dup()
+        @classpath = build_classpath(*libs)
+    end
+
+    def build_classpath(*libs)
+        classpath = nil
+        root      = homedir
+
+        libs.each { | lib_path |
+            path = File.join(root, lib_path) unless (Pathname.new lib_path).absolute?
+            classpath = classpath ? classpath + File::PATH_SEPARATOR + path : path
+            if File.directory?(path)
+                Dir[File.join(path, '*.jar')].each { | item |
+                    classpath = classpath + File::PATH_SEPARATOR + item
+                }
+            end
+        }
+
+        cp_path = File.join(root, '.lithium', '.classpath')
+        if File.exists?(cp_path) && File.directory?(cp_path)
+            Dir[File.join(cp_path, '*')].each { | item |
+                if File.size(item) > 0
+                    content = File.read(item)
+                    content = content.strip
+                    classpath = classpath ? classpath + File::PATH_SEPARATOR + content : content if content.length > 0
+                end
+            }
+        end
+
+        return classpath ? CLASSPATH::norm_classpath(classpath) : nil
+    end
+
+    def autodetected_libs()
+        pp = project
+        while pp do
+            base = pp.homedir
+            libs = []
+            libs << 'classes'                       if File.exists?(File.join(base, 'classes'))
+            libs << 'lib'                           if File.exists?(File.join(base, 'lib'))
+            libs << File.join('WEB-INF', 'classes') if File.exists?(File.join(base, 'WEB-INF', 'classes'))
+            libs << File.join('WEB-INF', 'lib')     if File.exists?(File.join(base, 'WEB-INF', 'lib'))
+            pp = pp.project
+        end
+        return libs
+    end
 end
 
 class JAVA < JVM
     include AutoRegisteredArtifact
-
-    attr_reader :classpath
 
     log_attr :java_home, :java_version, :libs, :java_version_low, :java_version_high
 
     def initialize(*args)
         super
 
-        @libs = detect_libs() if !@libs
-
         # identify Java Home
-        if !@java_home
+        unless @java_home
             if ENV['JAVA_HOME']
                 @java_home = ENV['JAVA_HOME']
                 puts_warning 'Java home has not been defined by project. Use Java home specified by env. variable'
@@ -116,8 +136,6 @@ class JAVA < JVM
 
         raise "Java version cannot be identified for #{@java_home}" if @java_version.nil?
         puts "Java version '#{@java_version}', home '#{@java_home}'"
-
-        @classpath = build_classpath(*@libs)
     end
 
     def expired?() false end
@@ -144,26 +162,16 @@ class GROOVY < JVM
 
     log_attr :groovy_home, :runtime, :libs
 
-    attr_reader :classpath
-
     def initialize(*args)
         super
 
-        if !@groovy_home
+        unless @groovy_home
             groovy_path = FileArtifact.which('groovy')
             @groovy_home = File.dirname(File.dirname(groovy_path)) if groovy_path
         end
         raise "Cannot find groovy home '#{@groovy_home}'" unless File.exists?(@groovy_home)
 
         puts "Groovy home: '#{groovy_home}'"
-
-        @libs      = detect_libs()  if !@libs
-        @runtime   = runtime_libs() if !@runtime
-        @classpath = build_classpath(*(@runtime + @libs));
-    end
-
-    def runtime_libs()
-        return []
     end
 
     def groovyc() File.join(@groovy_home, 'bin', 'groovyc') end
@@ -176,9 +184,7 @@ end
 class KOTLIN < JVM
     include AutoRegisteredArtifact
 
-    log_attr :kotlin_home, :runtime, :libs
-
-    attr_reader :classpath
+    log_attr :kotlin_home, :runtime_libs, :libs
 
     def initialize(*args)
         super
@@ -188,17 +194,14 @@ class KOTLIN < JVM
             @kotlin_home = File.dirname(File.dirname(kotlinc_path)) if kotlinc_path
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
-
         puts "Kotlin home: '#{@kotlin_home}'"
 
-        @libs      = detect_libs()  if !@libs
-        @runtime   = runtime_libs() if !@runtime
-        @classpath = build_classpath(*(@runtime + @libs));
-    end
+        unless @runtime_libs
+            @runtime_libs = [ File.join(@kotlin_home, 'lib', 'kotlin-stdlib.jar'),
+                              File.join(@kotlin_home, 'lib', 'kotlin-reflect.jar') ]
+        end
 
-    def runtime_libs()
-        return File.join(@kotlin_home, 'lib', 'kotlin-stdlib.jar'),
-               File.join(@kotlin_home, 'lib', 'kotlin-reflect.jar')
+        @classpath = CLASSPATH::join(@classpath, *@runtime_libs)
     end
 
     def what_it_does() "Initialize Kotlin environment '#{@name}' " end
@@ -213,8 +216,6 @@ class SCALA < JVM
 
     log_attr :scala_home
 
-    attr_reader :classpath
-
     def initialize(*args)
         super
 
@@ -224,11 +225,7 @@ class SCALA < JVM
         end
 
         raise "Scala home '#{@kotlin_home}' cannot be found" if scala_home.nil? || !File.exist?(@scala_home)
-
         puts "Scala home: '#{scala_home}'"
-
-        @libs      = detect_libs()  if !@libs
-        @classpath = build_classpath(*@libs);
     end
 
     def what_it_does() "Initialize Scala environment '#{@name}'" end
@@ -237,4 +234,5 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
+
 

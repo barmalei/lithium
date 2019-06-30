@@ -74,13 +74,13 @@ class META < Artifact
         prj._meta.each { | m |
             ps = ''
             unless prj.owner.nil?
-                pmeta = prj.owner.find_meta(m[1].artname)
-                ps = " (#{prj.owner}:#{pmeta.artname})" unless pmeta.nil?
+                pmeta = prj.owner.find_meta(m)
+                ps = " (#{prj.owner}:#{pmeta})" unless pmeta.nil?
             end
-            pp = m[0].match(artname) ? " : [ '#{artname}' ]" : ''
+            pp = m.match(artname) ? " : [ '#{artname}' ]" : ''
             if OPT?('path') == false || pp.length > 0
-                printf("#{shift}    %-20s => '%s'#{ps}#{pp}\n", m[1][:clazz], m[1].artname)
-                puts_prj_metas(prj._artifact_by_meta(m[1].artname, m[1]), artname, shift + '    ') if m[1][:clazz] <= FileMaskContainer
+                printf("#{shift}    %-20s => '%s'#{ps}#{pp}\n", m.clazz, m)
+                puts_prj_metas(prj._artifact_by_meta(m, m), artname, shift + '    ') if m.clazz <= FileMaskContainer
                 count += 1
             end
         }
@@ -90,6 +90,18 @@ class META < Artifact
 
     def what_it_does()
         "List meta tree"
+    end
+end
+
+# TODO: remove me
+class PROJECT < Artifact
+    def build()
+        traverse(Project.current)
+    end
+
+    def traverse(prj, shift = '')
+        puts "#{shift}#{prj.homedir} owner = #{prj.owner}"
+        traverse(prj.owner, shift + '    ') unless prj.owner.nil?
     end
 end
 
@@ -168,10 +180,13 @@ class INSPECT < Artifact
             }
         end
 
-        puts "Artifact (#{is_tracked_art_sign}):'#{art.name}' (class = #{art.class}) {"
+        puts "Artifact (#{is_tracked_art_sign}) #{art.class}:'#{art}' {"
+        puts "    (-) project() = '#{project}'"
+        puts "    (-) homedir() = '#{homedir}'"
+        puts "    (-) expired?  = #{expired?}"
         variables.each { | var_name |
             is_tracked_sign = tracked_attrs.include?(var_name[2, var_name.length - 2]) ? 'T' : ' '
-            puts "    (#{is_tracked_sign}) #{var_name}= #{format_val(art.instance_variable_get(var_name))}" if var_name != '@name'
+            puts "    (#{is_tracked_sign}) #{var_name} = #{format_val(art.instance_variable_get(var_name))}" if var_name != '@name'
         }
         puts '}'
     end
@@ -182,14 +197,15 @@ class INSPECT < Artifact
 
     def format_val(val)
         return 'nil' if val.nil?
-        return val.inspect if val.kind_of?(Array) || val.kind_of?(Hash) || val.kind_of?(String)
-        return val.to_s
+        val = val.kind_of?(Array) || val.kind_of?(Hash) || val.kind_of?(String) ? val.inspect : val.to_s
+        val = val[0 .. 128] + " [more ..] " if val.length > 128
+        return val
     end
 end
 
 class INIT < FileCommand
     def initialize(*args)
-        super
+        super(args.length == 0 || args[0].nil? ? '.' : args[0])
         @template ||= 'generic'
     end
 
@@ -282,4 +298,3 @@ eval \"$vc\"
 
     def what_it_does() "Install Lithium '#{@script_path}' script" end
 end
-

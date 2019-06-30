@@ -34,7 +34,10 @@ class CopyOfFile < FileCommand
         super
         src  = validate_source()
         dest = fullpath()
-        raise "Source file '#{src}' points to a directory" if File.directory?(src)
+        fetch()
+    end
+
+    def fetch()
         FileUtils.cp(src, dest)
     end
 

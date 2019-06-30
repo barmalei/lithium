@@ -21,20 +21,24 @@ class JavaCompiler < FileMask
 
         super
 
-        if !@destination
-            @destination = fullpath('classes')
-            @destination = fullpath(File.join('WEB-INF', 'classes')) unless File.exists?(@destination)
-            @destination = fullpath('lib')                           unless File.exists?(@destination)
-            puts_warning "Class destination is not specified. Stick to '#{@destination}' as default one"
+        hd = homedir()
+
+        puts "JavaCompiler: HOME DIR = #{project.project.homedir}"
+
+        if @destination.nil?
+            @destination = File.join(hd, 'classes')
+            @destination = File.join(hd, 'WEB-INF', 'classes')  unless File.exists?(@destination)
+
+            pp = project.project
+            @destination = File.join(pp.homedir, 'classes')  if !File.exists?(@destination) && !pp.nil?
+            puts_warning "Destination has not been specified. Use '#{@destination}' as a default one"
         else
-            @destination = fullpath(@destination) unless Pathname.new(@destination).absolute?
+            @destination = File.join(hd, @destination) unless Pathname.new(@destination).absolute?
             if !File.exists?(@destination) && @create_destination
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
             end
         end
-
-        assert_destination()
     end
 
     def assert_destination()
@@ -78,6 +82,8 @@ class JavaCompiler < FileMask
 
     def build()
         super
+
+        assert_destination()
 
         list = build_target_list()
         if list.nil? || list.length == 0

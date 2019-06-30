@@ -15,7 +15,7 @@ class ANT < EnvArtifact
 
         unless @ant_home
             @ant_home = FileArtifact.which('ant')
-            @ant_home = File.dirname(File.dirname(@ant_home)) if @ant_home
+            @ant_home = File.dirname(File.dirname(@ant_home)) unless @ant_home.nil?
         end
         raise "ANT home '#{@ant_home}' cannot be found" if @ant_home.nil? || !File.exist?(@ant_home)
         puts "ANT home: '#{@ant_home}'"
@@ -33,6 +33,12 @@ class RunANT < FileCommand
     include OptionsSupport
 
     REQUIRE ANT
+
+    def initialize(name, &block)
+        ant_build = FileArtifact.look_file_up(fullpath(name), 'build.xml', homedir)
+        raise "ANT build file cannot be detected by '#{fullpath(name)}'" if ant_build.nil?
+        super(ant_build, &block)
+    end
 
     def build()
         fp = fullpath()
