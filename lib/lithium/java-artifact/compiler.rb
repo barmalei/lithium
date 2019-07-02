@@ -3,9 +3,7 @@ require 'tempfile'
 
 require 'lithium/java-artifact/base'
 
-#
 #  Java compiler
-#
 class JavaCompiler < FileMask
     include LogArtifactState
     include OptionsSupport
@@ -22,8 +20,6 @@ class JavaCompiler < FileMask
         super
 
         hd = homedir()
-
-        puts "JavaCompiler: HOME DIR = #{project.project.homedir}"
 
         if @destination.nil?
             @destination = File.join(hd, 'classes')
@@ -109,7 +105,8 @@ end
 # Groovy compiler
 #
 class GroovyCompiler < JavaCompiler
-    REQUIRE GROOVY, JAVA
+    REQUIRE JAVA
+    REQUIRE GROOVY
 
     def initialize(*args)
         super
@@ -121,7 +118,7 @@ class GroovyCompiler < JavaCompiler
     end
 
     def build_classpath()
-        CLASSPATH::join(@groovy.classpath, @java.classpath)
+        JavaClasspath::join(@groovy.classpath, @java.classpath)
     end
 
     def what_it_does()
@@ -133,7 +130,8 @@ end
 # Kotlin compiler
 #
 class CompileKotlin < JavaCompiler
-    REQUIRE KOTLIN, JAVA
+    REQUIRE JAVA
+    REQUIRE KOTLIN
 
     def initialize(*args)
         super
@@ -145,7 +143,7 @@ class CompileKotlin < JavaCompiler
     end
 
     def build_classpath()
-        CLASSPATH::join(@kotlin.classpath, @java.classpath)
+        JavaClasspath::join(@kotlin.classpath, @java.classpath)
     end
 
     def build_destination()
@@ -163,7 +161,8 @@ end
 # Scala compiler
 #
 class CompileScala < JavaCompiler
-    REQUIRE SCALA, JAVA
+    REQUIRE JAVA
+    REQUIRE SCALA
 
     def initialize(*args)
         super
@@ -175,7 +174,7 @@ class CompileScala < JavaCompiler
     end
 
     def build_classpath()
-        CLASSPATH::join(@scala.classpath, @java.classpath)
+        JavaClasspath::join(@scala.classpath, @java.classpath)
     end
 
     def what_it_does()

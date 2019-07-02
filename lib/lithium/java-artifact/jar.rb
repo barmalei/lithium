@@ -6,18 +6,17 @@ require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
-class ExtractJar < FileCommand
+class JarFileContent < Directory
     REQUIRE JAVA
 
-    def initialize(*args)
-        super
-        @destination ||= 'tmp'
-    end
-
     def build()
-        FileUtils.mkdir_p(@destination) unless File.exists?(@destination)
-        Dir.chdir(@destination)
-        `#{@java.jar} -xfv '#{fullpath()}'`.each_line { |i|
+        raise 'Invalid source file' if @source.nil?
+        raise "Source file '#{@source.fullpath}' doesn't exist or points to directory" if !File.exists?(@source.fullpath) || File.directory?(@source.fullpath)
+
+        fp = fullpath
+        FileUtils.mkdir_p(fp) unless File.exists?(fp)
+        Dir.chdir(fp)
+        `#{@java.jar} -xfv '#{@source.fullpath}'`.each_line { |i|
             puts " :: #{i.chomp}"
         }
     end

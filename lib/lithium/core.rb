@@ -207,7 +207,7 @@ module LogArtifactState
                 f.each { |i|
                     i = i.strip()
                     j = i.rindex(' ')
-                    name, time = i[0, j], i[j+1, i.length]
+                    name, time = i[0, j], i[j + 1, i.length]
                     e[name] = time.to_i
                 }
             }
@@ -366,7 +366,7 @@ class ArtifactName < String
             elsif name.kind_of?(Class)
                 @clazz = name
                 name = name.default_name
-                name = "#{@clazz.name}:*" if name.nil?
+                raise "Artifact default name cannot be detected by #{@clazz} class" if name.nil?
             elsif !name.kind_of?(String)
                 raise "Invalid artifact name type '#{name.class}'"
             end
@@ -433,10 +433,11 @@ class ArtifactName < String
         return false if @prefix != name.prefix
 
         unless @path_mask.nil?
-
-            puts "ArtifactName.match(): is #{name.class}:'#{name}' match #{self.class}:'#{self}'"
-
-            return false if name.suffix.nil? #|| (name.env_path? ^ env_path?) # one of the path is environment but not both
+            # Condition "(name.env_path? ^ env_path?)" helps to prevent eating environment
+            # artifact with file masks. For instance imagine we have file mask "**/*"
+            # defined in project.rb, in this case the artifact will match '.env/JAVA' what
+            # cause the instantiated artifact will have invalid type
+            return false if name.suffix.nil? || (name.env_path? ^ env_path?) # one of the path is environment but not both
             return File.fnmatch(@suffix, name.suffix, @mask_type)
         else
             return @suffix == name.suffix
@@ -597,13 +598,11 @@ class Artifact
         def OWN() @item[2] = true; return self end
     end
 
-    def Artifact.REQUIRE(*args)
+    def Artifact.REQUIRE(art, &block)
+        raise 'Dependency cannot be null artifact' if art.nil?
         @requires ||= []
-        args.each { | art |
-            @requires.push([art, nil, nil])
-        }
-
-        return AssignRequiredTo.new(@requires[-1]) if args.length == 1
+        @requires.push([art, nil, nil, block])
+        return AssignRequiredTo.new(@requires[-1])
     end
 
     def Artifact.requires_as_array()
@@ -626,6 +625,9 @@ class Artifact
                 instance_proxy.owner = last_caller.owner
             end
         end
+
+        # if artifact name has not been passed let's try to use default one
+        args = [ instance.default_name ] if args.length == 0 && !instance.default_name.nil?
 
         instance.send(:initialize, *args, &block)
         return instance_proxy
@@ -709,7 +711,7 @@ class Artifact
         }.reverse
 
         req.each { | dep |
-            yield dep[0], dep[1], dep[2]
+            yield dep[0], dep[1], dep[2], dep[3]
         }
     end
 
@@ -725,13 +727,11 @@ class Artifact
     def what_it_does() return "Build '#{to_s}' artifact" end
 
     # add required for the artifact building dependencies (other artifact)
-    def REQUIRE(*args)
-        raise 'No dependencies have been specified' if args.length == 0
+    def REQUIRE(art, &block)
+        raise 'No dependencies have been specified' if art.nil?
         @requires ||= []
-        args.each { | art |
-            @requires.push([art, nil, nil])
-        }
-        return AssignRequiredTo.new(@requires[-1]) if args.length == 1
+        @requires.push([art, nil, nil, block])
+        return AssignRequiredTo.new(@requires[-1])
     end
 
     # Overload "eq" operation of two artifact instances.
@@ -808,11 +808,16 @@ class ArtifactTree < Artifact
     class Node
         attr_accessor :art, :parent, :children, :expired, :expired_by_kid
 
-        def initialize(art, parent = nil)
+        def initialize(art, parent = nil, &block)
             raise 'Artifact cannot be nil' if art.nil?
 
             p = parent.nil? ? Project : parent.art.owner
-            art = p.artifact(art) unless art.kind_of?(Artifact)
+
+            if !art.kind_of?(Artifact)
+                art = p.artifact(art, &block)
+            elsif !block.nil?
+                art.instance_eval(&block)
+            end
 
             @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
         end
@@ -851,8 +856,8 @@ class ArtifactTree < Artifact
     end
 
     def build_tree(root)
-        root.art.requires { | dep, an, is_own |
-            node, parent = Node.new(dep, root), root
+        root.art.requires { | dep, assignMeTo, is_own, block |
+            node, parent = Node.new(dep, root, &block), root
             while parent && parent.art != node.art
                 parent = parent.parent
             end
@@ -862,8 +867,15 @@ class ArtifactTree < Artifact
             root.children << node
             build_tree(node)
 
-            if an
-                asn = "@#{an.to_s}".to_sym
+            if !assignMeTo.nil? || node.art.class < AssignableDependecy
+
+                # if an attribute name the dependency has to be assigned has not bee defined
+                # that means we have get using AssignableDependecy API
+                assignMeTo = node.art.assign_me_to if assignMeTo.nil?
+
+                raise "Invalid attribute name 'node.art' artifact has to be assigned" if assignMeTo.nil?
+
+                asn = "@#{assignMeTo.to_s}".to_sym
                 av  = root.art.instance_variable_get(asn)
                 node.art.owner = root.art.owner if is_own
                 if av.kind_of?(Array)
@@ -872,8 +884,6 @@ class ArtifactTree < Artifact
                 else
                     root.art.instance_variable_set(asn, node.art)
                 end
-            elsif node.art.class < AssignArtifactTo
-                node.art.assign_to(root.art)
             end
         }
     end
@@ -1188,7 +1198,7 @@ class FileMask < FileArtifact
     # called for every detected item as a part of build process
     def build_item(path, m) end
 
-    # the to lits items but collects all items to array
+    # list items to array
     def list_items_to_array(rel = nil)
         list = []
         list_items(rel) { | path, m |
@@ -1239,20 +1249,12 @@ module ArtifactContainer
         # fund local info about the given artifact
         meta = find_meta(artname)
 
-        puts "artifact(): cont = #{self} target name = #{name}  meta = #{meta}  "
-
-
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
             # path nil or doesn't match project then delegate finding an artifact in an owner project context
             return owner.artifact(name, &block) if !owner.nil? && !artname.env_path? && (artname.path.nil? || !match(artname.path))
 
-
-
             meta = _meta_from_owner(name)
-
-
-            puts "artifact(): get meta from owner #{owner} -- #{meta.nil?}"
 
             unless meta.nil?
                 # attempt to handle situation when an artifact meta the container has been
@@ -1260,8 +1262,6 @@ module ArtifactContainer
                 # have cyclic come back
                 raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
-                puts "artifact(): use artifact itself as meta #{artname.inspect}"
-
                 meta = artname unless artname.clazz.nil?
             end
 
@@ -1312,17 +1312,12 @@ module ArtifactContainer
         name  = ArtifactName.new(name)
         clazz = meta.clazz
 
-        puts "1: _artifact_by_meta(): #{name} #{meta.inspect}"
-
         art = clazz.new(name.suffix,
             &(block.nil? ? meta.block : Proc.new {
                 self.instance_eval &meta.block unless meta.block.nil?
                 self.instance_eval &block
             })
         )
-
-
-        puts "2: _artifact_by_meta(): art = #{art}  art.owner = #{art.owner}"
 
         art.createdByMeta = meta
         return art
@@ -1482,13 +1477,16 @@ class Project < Directory
     end
 end
 
-module AssignArtifactTo
-    def assign_to(target)
-        target.instance_variable_set("@#{self.class.name.downcase}".to_sym, self)
+# an artifact has to include the module to be assigned to an attribute of an artifact
+# that requires the AssignableDependecy artifact
+module AssignableDependecy
+    #  an attribute name the dependency artifact has to be assigned
+    def assign_me_to()
+        self.class.name.downcase
     end
 end
 
-
+# Option support
 module OptionsSupport
     def OPTS(*args)
         @options ||= []
@@ -1519,14 +1517,14 @@ end
 
 # Environment artifact
 class EnvArtifact < Artifact
-    include AssignArtifactTo
+    include AssignableDependecy
 
     def self.default_name(*args)
         @default_name ||= nil
         if args.length > 0
             @default_name = validate_env_name(args[0])
         elsif @default_name.nil?
-            @default_name = ".env/#{self.name}"
+            @default_name = File.join('.env', self.name)
         end
 
         return @default_name
@@ -1564,8 +1562,3 @@ class GroupByExtension < FileMask
         }
     end
 end
-
-
-
-
-

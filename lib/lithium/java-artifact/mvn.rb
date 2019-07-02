@@ -3,6 +3,7 @@ require 'lithium/file-artifact/remote'
 require 'fileutils'
 require 'pathname'
 require 'lithium/file-artifact/command'
+require 'lithium/java-artifact/base'
 require 'lithium/core-std'
 
 class MVN < EnvArtifact
@@ -75,6 +76,7 @@ end
 class POMFile < PermanentFile
     include LogArtifactState
     include StdFormater
+    include AssignableDependecy
 
     REQUIRE MVN
 
@@ -85,6 +87,10 @@ class POMFile < PermanentFile
         super(pom, &block)
     end
 
+    def assign_me_to()
+        return 'pom'
+    end
+
     def list_items()
         f = fullpath
         yield f, File.mtime(f).to_i
@@ -92,31 +98,24 @@ class POMFile < PermanentFile
 end
 
 
-class MavenClasspath < FileArtifact
+class MavenClasspath < JavaClasspathFile
+    REQUIRE MVN
+
     include StdFormater
-    include LogArtifactState
 
     log_attr :excludeGroupIds, :excludeTransitive
 
-    REQUIRE MVN
-
-    default_name(File.join('.lithium', '.classpath', 'mvn_classpath'))
-
+    default_name(JavaClasspath::classpath_path('mvn_classpath'))
 
     def initialize(*args, &block)
         @excludeTransitive = false
-        name = args.length == 0 || args[0].nil? ?  MavenClasspath.default_name : args[0]
-        super(name, &block)
-        raise "Classpath file points to existing directory '#{fullpath()}'" if File.directory?(fullpath())
-        REQUIRE(POMFile.new(homedir)).TO(:pom)
-        @excludeGroupIds ||= [ ]
-    end
-
-    def expired?()
-        !File.exists?(fullpath)
+        super(*args, &block)
+        REQUIRE(POMFile.new(homedir))
+        @excludeGroupIds ||= []
     end
 
     def build()
+        super
         Dir.chdir(File.dirname(@pom.fullpath))
         raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(@mvn.mvn,
                                                                        "dependency:build-classpath",
@@ -128,26 +127,27 @@ class MavenClasspath < FileArtifact
     def what_it_does()
         "Store MVN classpath to '#{fullpath}'\n                   by '#{@pom.fullpath}'"
     end
-
-    def classpath
-        return File.exists?(fullpath) ? File.read(fullpath) : ''
-    end
 end
 
-class POMDependenciesDir < FileArtifact
+class MavenDependenciesDir < FileArtifact
     include StdFormater
 
     REQUIRE MVN
 
     def initialize(name, &block)
+        @excludeTransitive = false
+
         super(name, &block)
 
         fp = fullpath()
         raise "POMDependencies should point to file #{fp}" if File.exists?(fp) && !File.directory?(fp)
 
-        REQUIRE(POMFile.new(@name)).TO(:pom)
-        @excludeTransitive ||= true
+        REQUIRE(POMFile.new(@name))
         @excludeGroupIds   ||= [ ]
+    end
+
+    def expired?
+        true
     end
 
     def build()
@@ -157,10 +157,6 @@ class POMDependenciesDir < FileArtifact
                                                                        "-DexcludeTransitive=#{@excludeTransitive}",
                                                                        @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
                                                                        "-DoutputDirectory=#{fullpath}")
-    end
-
-    def clean
-
     end
 end
 

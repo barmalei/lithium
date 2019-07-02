@@ -2,13 +2,20 @@ require "pathname"
 
 require 'lithium/core'
 
-module CLASSPATH
+class JavaClasspath < Artifact
+    include AssignableDependecy
+    include LogArtifactState
+
+    log_attr :libs, :classpath
+
+    def self.classpath_path(name)
+        raise 'Class path file name cannot be nil or empty' if name.nil? || name.length == 0
+        File.join('.env', 'classpath', name)
+    end
+
     def self.join(*parts)
-        cl = nil
-        parts.each { | part |
-            cl = cl.nil? || cl.length == 0 ? part : cl + File::PATH_SEPARATOR + part  if part && parts.length > 0
-        }
-        return CLASSPATH::norm_classpath(cl)
+        cl = parts.select { | part | !part.nil? && parts.length > 0 }.join(File::PATH_SEPARATOR)
+        return JavaClasspath::norm_classpath(cl)
     end
 
     def self.norm_classpath(cp)
@@ -31,71 +38,172 @@ module CLASSPATH
         }
         return res.join(File::PATH_SEPARATOR)
     end
-end
 
-
-class JVM < EnvArtifact
-    include CLASSPATH
-    include LogArtifactState
-
-    attr_reader :classpath
-
-    def initialize(*args, &block)
-        super
-        @libs               ||= []
-        @libs_autodetection ||= true
-
-        libs = @libs.length == 0 && @libs_autodetection ? autodetected_libs() : @libs.dup()
-        @classpath = build_classpath(*libs)
-    end
-
-    def build_classpath(*libs)
+    def self.build_classpath(root, *libs)
         classpath = nil
-        root      = homedir
-
         libs.each { | lib_path |
-            path = File.join(root, lib_path) unless (Pathname.new lib_path).absolute?
-            classpath = classpath ? classpath + File::PATH_SEPARATOR + path : path
-            if File.directory?(path)
-                Dir[File.join(path, '*.jar')].each { | item |
+            lib_path = File.join(root, lib_path) unless (Pathname.new lib_path).absolute?
+            classpath = classpath ? classpath + File::PATH_SEPARATOR + lib_path : lib_path
+            if File.directory?(lib_path)
+                Dir[File.join(lib_path, '*.jar')].each { | item |
                     classpath = classpath + File::PATH_SEPARATOR + item
                 }
             end
         }
-
-        cp_path = File.join(root, '.lithium', '.classpath')
-        if File.exists?(cp_path) && File.directory?(cp_path)
-            Dir[File.join(cp_path, '*')].each { | item |
-                if File.size(item) > 0
-                    content = File.read(item)
-                    content = content.strip
-                    classpath = classpath ? classpath + File::PATH_SEPARATOR + content : content if content.length > 0
-                end
-            }
-        end
-
-        return classpath ? CLASSPATH::norm_classpath(classpath) : nil
+        return classpath ? JavaClasspath::norm_classpath(classpath) : nil
     end
 
-    def autodetected_libs()
-        pp = project
-        while pp do
-            base = pp.homedir
-            libs = []
-            libs << 'classes'                       if File.exists?(File.join(base, 'classes'))
-            libs << 'lib'                           if File.exists?(File.join(base, 'lib'))
-            libs << File.join('WEB-INF', 'classes') if File.exists?(File.join(base, 'WEB-INF', 'classes'))
-            libs << File.join('WEB-INF', 'lib')     if File.exists?(File.join(base, 'WEB-INF', 'lib'))
-            pp = pp.project
-        end
+    default_name classpath_path('java_classpath')
+
+    def initialize(*args, &block)
+        super
+        @libs ||= []
+        @classpath = resolve_classpath()
+    end
+
+    def assign_me_to()
+        'classpaths'
+    end
+
+    # keep it to logging to track the artifact expiration state
+    def expired?
+        false
+    end
+
+    def detect_libs()
+        base = project().homedir
+        libs = []
+        libs << 'classes' if File.exists?(File.join(base, 'classes'))
+        libs << 'lib'     if File.exists?(File.join(base, 'lib'))
         return libs
+    end
+
+    def build()
+    end
+
+    def resolve_classpath()
+        libs = @libs.length > 0 ? @libs.dup() : detect_libs()
+
+        return JavaClasspath::build_classpath(homedir, *libs)
+    end
+end
+
+class WarClasspath < JavaClasspath
+    default_name JavaClasspath::classpath_path('war_classpath')
+
+    def detect_libs()
+        base = project().homedir
+        libs = []
+        libs << File.join('WEB-INF', 'classes') if File.exists?(File.join(base, 'WEB-INF', 'classes'))
+        libs << File.join('WEB-INF', 'lib')     if File.exists?(File.join(base, 'WEB-INF', 'lib'))
+        return libs
+    end
+end
+
+class JavaClasspathFile < FileArtifact
+    include AssignableDependecy
+    include LogArtifactState
+
+    def assign_me_to()
+        'classpaths'
+    end
+
+    def expired?()
+        !File.exists?(fullpath)
+    end
+
+    def build()
+        super
+        raise "Classpath file points to existing directory '#{fullpath()}'" if File.directory?(fullpath())
+    end
+
+    def classpath()
+        return File.exists?(fullpath) ? File.read(fullpath) : nil
+    end
+end
+
+
+class WildflyWarClasspath < JavaClasspath
+    default_name JavaClasspath::classpath_path('wildfly_war_classpath')
+
+    def detect_libs()
+        libs = []
+        modules_path = FileArtifact.look_directory_up(homedir, 'modules')
+        raise "Invalid Wildfly module path '#{modules_path}'" if !File.exists?(modules_path) || !File.directory?(modules_path)
+        javax_modules(modules_path, 'servlet', libs)
+        javax_modules(modules_path, 'security', libs)
+        return libs
+    end
+
+    def javax_modules(modules_path, path, libs)
+        path = File.join(modules_path, 'system', 'layers', 'base', 'javax', path, '**', '*.jar')
+        Dir[path].each { | jar_path |
+            libs << jar_path
+        }
+    end
+end
+
+
+class JavaClasspathDirectory < FileArtifact
+    include AssignableDependecy
+    include LogArtifactState
+
+    default_name JavaClasspath::classpath_path('.classpath')
+
+    def assign_me_to()
+        'classpaths'
+    end
+
+    def expired?()
+        false
+    end
+
+    def build()
+    end
+
+    def list_items(rel = nil)
+        FileMask.new(File.join(fullpath, '*')).list_items(rel) { | it, m |
+            yield it, m
+        }
+    end
+
+    def classpath()
+        cp_path = fullpath
+
+        list = []
+        list_items { | it, m |
+            list << it
+        }
+
+        cp = list.map { | item |
+            File.size(item) > 0 ? File.read(item).strip : nil
+        }.select { | item | !item.nil? && item.length > 0 }.join(File::PATH_SEPARATOR)
+
+        return cp.nil? || cp.strip.length == 0 ? nil : cp
+    end
+end
+
+
+class JVM < EnvArtifact
+    include LogArtifactState
+
+    def initialize(*args, &block)
+        super
+        @classpaths = []
+
+        REQUIRE(JavaClasspath)
+    end
+
+    def classpath()
+        classpath = @classpaths.map { | art | art.classpath }.select { | cp | !cp.nil? && cp.length > 0 }.join(File::PATH_SEPARATOR)
+        return classpath.nil? || classpath.length == 0 ? nil : classpath
     end
 end
 
 class JAVA < JVM
     include AutoRegisteredArtifact
 
-    log_attr :java_home, :java_version, :libs, :java_version_low, :java_version_high
+    log_attr :java_home, :java_version, :java_version_low, :java_version_high
 
     def initialize(*args)
         super
@@ -160,7 +268,7 @@ end
 class GROOVY < JVM
     include AutoRegisteredArtifact
 
-    log_attr :groovy_home, :runtime, :libs
+    log_attr :groovy_home
 
     def initialize(*args)
         super
@@ -184,7 +292,7 @@ end
 class KOTLIN < JVM
     include AutoRegisteredArtifact
 
-    log_attr :kotlin_home, :runtime_libs, :libs
+    log_attr :kotlin_home, :runtime_libs
 
     def initialize(*args)
         super
@@ -200,8 +308,16 @@ class KOTLIN < JVM
             @runtime_libs = [ File.join(@kotlin_home, 'lib', 'kotlin-stdlib.jar'),
                               File.join(@kotlin_home, 'lib', 'kotlin-reflect.jar') ]
         end
+    end
 
-        @classpath = CLASSPATH::join(@classpath, *@runtime_libs)
+    def classpath()
+        if @runtime_libs.length > 0
+            cp = @runtime_libs.dup
+            cp << super
+            return JavaClasspath::join(*cp)
+        else
+            return super
+        end
     end
 
     def what_it_does() "Initialize Kotlin environment '#{@name}' " end
@@ -234,5 +350,3 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
-
-

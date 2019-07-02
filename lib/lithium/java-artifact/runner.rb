@@ -85,14 +85,11 @@ class RunJAR < JavaFileRunner
 end
 
 class RunGroovyScript < JavaFileRunner
-    REQUIRE GROOVY, JAVA
-
-    def initialize(*args)
-        super
-    end
+    REQUIRE JAVA
+    REQUIRE GROOVY
 
     def build_classpath()
-        CLASSPATH::join(@groovy.classpath, @java.classpath)
+        JavaClasspath::join(@groovy.classpath, @java.classpath)
     end
 
     def build_target()
@@ -133,7 +130,8 @@ class RunJavaClassTests < RunJavaClass
 end
 
 class RunKotlinCode < JavaFileRunner
-    REQUIRE KOTLIN, JAVA
+    REQUIRE JAVA
+    REQUIRE KOTLIN
 
     def initialize(*args)
         super
@@ -141,7 +139,7 @@ class RunKotlinCode < JavaFileRunner
     end
 
     def build_classpath()
-        CLASSPATH::join(@kotlin.classpath, @java.classpath)
+        JavaClasspath::join(@kotlin.classpath, @java.classpath)
     end
 
     def build_target()
@@ -164,7 +162,8 @@ class RunKotlinCode < JavaFileRunner
 end
 
 class RunScalaCode < JavaFileRunner
-    REQUIRE SCALA, JAVA
+    REQUIRE JAVA
+    REQUIRE SCALA
 
     def initialize(*args)
         super
@@ -172,7 +171,7 @@ class RunScalaCode < JavaFileRunner
     end
 
     def build_classpath()
-        CLASSPATH::join(@scala.classpath, @java.classpath)
+        JavaClasspath::join(@scala.classpath, @java.classpath)
     end
 
     def build_target()
