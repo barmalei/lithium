@@ -152,8 +152,8 @@ class MetaFile < FileArtifact
     attr_accessor :validate_items
 
     def initialize(*args)
+        @validate_items = true
         super
-        @validate_items ||= true
     end
 
     def list_items(rel = nil)

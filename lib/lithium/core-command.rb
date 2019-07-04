@@ -93,28 +93,13 @@ class META < Artifact
     end
 end
 
-# TODO: remove me
-class PROJECT < Artifact
-    def build()
-        traverse(Project.current)
-    end
-
-    def traverse(prj, shift = '')
-        puts "#{shift}#{prj.homedir} owner = #{prj.owner}"
-        traverse(prj.owner, shift + '    ') unless prj.owner.nil?
-    end
-end
-
 class REQUIRE < Artifact
     def build()
-        res = Project.artifact(@name).requires()
 
         puts "Artifact '#{@shortname}' dependencies list {"
-        res.each { | e |
-            printf("    %-20s => '%s'\n", e.class, e)
+        Project.artifact(@name).requires { | dep, assignTo, is_own, block |
+            printf("    %-20s : '%s' (assignTo = %s)\n", dep.name, ArtifactName.new(dep, &block), (assignTo.nil? ? '<none>' : assignTo))
         }
-
-        puts '    < dependencies list is empty! >' if res.length == 0
         puts '}'
     end
 

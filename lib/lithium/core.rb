@@ -840,8 +840,8 @@ class ArtifactTree < Artifact
     end
 
     def initialize(*args)
+        @show_mtime = true
         super
-        @show_mtime ||= true
     end
 
     # build tree starting from the root artifact (identified by @name)

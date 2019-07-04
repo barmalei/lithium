@@ -125,7 +125,7 @@ class MavenClasspath < JavaClasspathFile
     end
 
     def what_it_does()
-        "Store MVN classpath to '#{fullpath}'\n                   by '#{@pom.fullpath}'"
+        "Build maven classpath by #{@pom.fullpath}"
     end
 end
 

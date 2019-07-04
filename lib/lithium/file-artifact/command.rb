@@ -66,7 +66,7 @@ class RmFile < FileCommand
     end
 
     def expired?()
-        File.exists?(fullpath())
+        File.exists?(fullpath)
     end
 end
 
