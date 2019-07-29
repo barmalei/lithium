@@ -8,6 +8,7 @@ class JavaClasspath < Artifact
 
     log_attr :libs, :classpath
 
+    # form class path artifact name
     def self.classpath_path(name)
         raise 'Class path file name cannot be nil or empty' if name.nil? || name.length == 0
         File.join('.env', 'classpath', name)

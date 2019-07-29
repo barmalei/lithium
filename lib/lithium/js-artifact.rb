@@ -158,7 +158,7 @@ class GenerateJavaScriptDoc < FileArtifact
     end
 
     def expired?()
-       return !File.exists?(fullpath())
+       return !File.exists?(fullpath)
     end
 
     def cleanup

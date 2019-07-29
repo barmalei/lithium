@@ -15,6 +15,10 @@
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
+    ARTIFACT(".lithium/lib/test.jar", CopyOfFile) {
+        @source = "jnc-easy/jnc-easy-1.1.1/test.jar"
+    }
+
     ARTIFACT("run:*") {
         ARTIFACT('**/*.java',   RunJavaCode)
         ARTIFACT('**/*.js',     RunNodejs)
@@ -39,7 +43,7 @@
 
         ARTIFACT('**/*.py',    ValidatePythonScript)
         ARTIFACT('**/*.xml',   ValidateXML)
-        ARTIFACT('**/pom.xml', MavenCompile)
+        ARTIFACT('**/pom.xml', CompileMaven)
         ARTIFACT('**/*.tt',    CompileTTGrammar)
         ARTIFACT('**/*.sass',  CompileSass)
 
@@ -50,21 +54,22 @@
         }
     }
 
-    ARTIFACT('checkstyle:**/*.java', CheckStyle)
+    ARTIFACT('check:**/*.java', CheckStyle)
     ARTIFACT('pmd:**/*.java',        PMD)
-    ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
+    #ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
 
     ARTIFACT('grep:', GREP) {
         @grep = $lithium_args[0] if $lithium_args.length > 0
     }
 
     ARTIFACT('inspect:*',  INSPECT)
-    ARTIFACT('tree:*',  TREE)
-    ARTIFACT('require:*', REQUIRE)
-    ARTIFACT('cleanup:*', CLEANUP)
-    ARTIFACT('meta:*',  META)
+    ARTIFACT('tree:*',     TREE)
+    ARTIFACT('require:*',  REQUIRE)
+    ARTIFACT('cleanup:*',  CLEANUP)
+    ARTIFACT('meta:*',     META)
 
     ARTIFACT('INSTALL:', INSTALL)
 
-    ARTIFACT('init:', '.', INIT)
+
+    ARTIFACT('init:', INIT)
 }

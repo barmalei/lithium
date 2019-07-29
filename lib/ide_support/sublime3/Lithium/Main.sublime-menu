@@ -7,16 +7,17 @@
                 "caption": "Lithium",
                 "children":
                 [
-                     { "caption": "Compile", "command": "li", "args": {"command":"compile:"}  }
-                    ,{ "caption": "Run", "command": "li", "args": {"command":"run:"} }
-                    ,{ "caption": "Check", "command": "li", "args": { "command": "checkstyle:"} }
-                    ,{ "caption": "PMD Check", "command": "li", "args": { "command": "pmd:"} }
+                     { "caption": "Compile",   "command": "li", "args": { "command": "compile:{file}"    } }
+                    ,{ "caption": "Run",       "command": "li", "args": { "command": "run:{file}"        } }
+                    ,{ "caption": "Check",     "command": "li", "args": { "command": "check:{file}" } }
+                    ,{ "caption": "PMD Check", "command": "li", "args": { "command": "pmd:{file}"        } }
 
                     ,{ "caption": "-" }
 
-                    ,{ "caption": "Compile All", "command": "li", "args": {"command":"compile:src/**/*"}  }
-                    ,{ "caption": "Check All", "command": "li", "args": {"command":"checkstyle:src/**/*"}  }
-                    ,{ "caption": "PMD Check All", "command": "li", "args": {"command":"pmd:src/**/*"}  }
+                    ,{ "caption": "Run maven",     "command": "li", "args": {"command":"mvn:{home}"                 } }
+                    ,{ "caption": "Compile All",   "command": "li", "args": {"command":"compile:{home}/src/**/*"    } }
+                    ,{ "caption": "Check All",     "command": "li", "args": {"command":"check:{home}src/**/*"  } }
+                    ,{ "caption": "PMD Check All", "command": "li", "args": {"command":"pmd:{home}/src/**/*"        } }
                     ,{ "caption": "Build", "command": "li" }
                     ,{ "caption": "Cleanup", "command": "cleanup" }
 

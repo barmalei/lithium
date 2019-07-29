@@ -23,7 +23,7 @@ class GenerateJavaDoc < FileArtifact
 
         raise 'Packages have not been identified' if @pkgs.length == 0
 
-        @pkgs.each() { |p|
+        @pkgs.each { |p|
             p = fullpath(File.join(@sources, p.tr('.', '/')))
             raise "Package '#{p}' cannot be found" if !File.exists?(p)
         }

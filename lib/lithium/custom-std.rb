@@ -47,3 +47,15 @@ class SublimeStd < LithiumStd
     end
 end
 
+class VSCodeStd < LithiumStd
+    def normalize(entities)
+        fe = entities['file']
+        yield fe.clone("file://#{fe}##{entities['line']}") if fe
+
+        le = entities['line']
+        yield le.empty if le
+
+        ce = entities['column']
+        yield ce.empty if ce
+    end
+end

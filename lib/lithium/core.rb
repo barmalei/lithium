@@ -534,7 +534,7 @@ class Artifact
     # from which a method has been called.
     # c
     class Proxy
-        instance_methods.each() { |m|
+        instance_methods.each { | m |
             if not m.to_s =~ /__[a-z]+__/
                 undef_method m if not m.to_s =~ /object_id/
             end

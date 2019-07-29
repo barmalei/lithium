@@ -1,13 +1,13 @@
 [
    {
- 	   "keys": ["f10"],
+ 	   "keys": ["f11"],
  	   "command": "li",
 	   "args": { "command":"run:"}
  	 },
  	 {
   	  "keys": ["super+b"],
   	  "command": "li",
- 	    "args": { "command":"compile:"},
+ 	    "args": { "command":"compile:{file}"},
       "context":
       [
           { "key": "selector", "operator": "not_equal", "operand" : "source.json-tmlanguage"}, 
@@ -35,7 +35,7 @@
    {
       "keys": ["super+enter"],
       "command": "li",
-      "args": { "command":"run:"},
+      "args": { "command":"run:{file}"},
       "context":
       [
           { "key": "selector", "operator": "not_equal", "operand" : "source.json-tmlanguage"}, 
@@ -51,7 +51,7 @@
       "command": "li_show_paths"
    },
  	 {
-  	   "keys": ["enter"],
+  	   "keys": ["f10"],
   	   "command": "li_go",
  	     "context":
 	   	 [

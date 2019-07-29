@@ -15,7 +15,8 @@ place_detector = [
   #  r"\(ERR\)\s+\?\s+([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\:\s+([0-9]+)\:"                  # GROOVY
 ]
 
-li_path = "ruby Z:/projects/.lithium/lib/lithium.rb"
+li_script_path = "ruby Z:/projects/.lithium/lib/lithium.rb"
+li_std_formatter = "SublimeStd"
 
 def  li_is_debug():
     global li_is_debug
@@ -121,7 +122,6 @@ def li_show_paths(view, win=None):
 
             def done(i):
                 if i >= 0:
-                    print("li_show_paths.done() " + str(i)+ ", " + paths[i][0] + "," + paths[i][1])
                     win.open_file(paths[i][0] + ":" + paths[i][1], sublime.ENCODED_POSITION)
 
             win.show_quick_panel([ [ v[0] + ":" + v[1], v[2]] for v in paths], done)
@@ -184,15 +184,15 @@ class liCommand(sublime_plugin.TextCommand):
             sublime.error_message("Lithium command '" + str(self.command) + "' cannot be interpolated with " + str(placeholders))
 
         if li_is_debug():
-            print("liCommand.run(): subprocess.Popen = " + "lithium -std=SublimeStd " + self.command)
+            print("liCommand.run(): subprocess.Popen = " + li_script_path + " -std=" + li_std_formatter + " " + self.command)
 
         # run command as a subprocess
-        process = subprocess.Popen(li_path + " -std=SublimeStd " + self.command, shell=True, stdout = subprocess.PIPE)
+        process = subprocess.Popen(li_script_path + " -std=" + li_std_formatter + " " + self.command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         # read the started process output and print it in put buffer
         while True:
-            line = stdout.read()
-            self.output(line.strip(), edit)
+            line = process.stdout.read()
+            self.output(line, edit)
             if process.poll() is not None:
                 return process.returncode
 

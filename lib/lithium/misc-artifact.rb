@@ -17,7 +17,7 @@ class ValidateXML < FileMask
         parser = REXML::Parsers::PullParser.new(File.new(fp, 'r'))
         raise "test ex"
         begin
-            parser.each() { |res| }
+            parser.each { |res| }
         rescue Exception => ee
             puts_error("#{fp}:#{ee.line}: #{ee.to_s}")
         end
@@ -43,7 +43,7 @@ class StringRunner < Artifact
 
     def what_it_does()
         formated, line = [], 1
-        @script.each_line() { |l|
+        @script.each_line { | l |
             formated << "  #{line}: #{l.strip}"
             line += 1
         }

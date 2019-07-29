@@ -1,4 +1,5 @@
 require 'pathname'
+require 'json'
 
 # !!! debug field
 # Can be useful to debug lithium stdout. Using original
@@ -38,8 +39,21 @@ def STD_RECOGNIZERS(args)
     }
 end
 
-def puts_error(*args)   Std.std().puts_error(*args)                end
-def puts_warning(*args) Std.std().puts_warning(*args) if Std.std() end
+def puts_error(*args)
+    if Std.std
+        Std.std.puts_error(*args)
+    else
+        puts args
+    end
+end
+
+def puts_warning(*args)
+    if Std.std
+        Std.std.puts_warning(*args)
+    else
+        puts args
+    end
+end
 
 class Std
     @@std                    = nil  # singleton object static variable
@@ -65,13 +79,13 @@ class Std
         def write(msg) @block.call(msg)  end
 
         def puts(*args)
-            args.each() {|a|
+            args.each { | a |
                 a = a.to_s
                 write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a)
             }
         end
 
-        def print(*args) args.each() {|a| write(a.to_s) } end
+        def print(*args) args.each { | a | write(a.to_s) } end
         def <<(*args) print(*args) end
 
         def flush() end
@@ -95,18 +109,29 @@ class Std
             return clone('')
         end
 
+        def to_hash()
+            { :type => @type, :start => @start_at, :end => @end_at, :text => to_s}
+        end
+
         def clone(text)
             return Entity.new(text, @type, [@start_at, @end_at])
         end
     end
 
     class RegexpRecognizer
-        attr_reader :regexp
+        attr_reader   :regexp
+        attr_accessor :classifier
 
         def initialize(regexp = '.*')
             @regexp = Regexp.new(regexp)
         end
 
+        def classifier(value)
+            @classifier = value
+            return self
+        end
+
+        # yield number of entities object { type => entity }
         def recognize(msg)
             m = @regexp.match(msg.chop)
             if m && m.length > 0
@@ -120,6 +145,8 @@ class Std
                 normalize(entities) { | entity |
                     entities[entity.type] = entity
                 }
+
+                entities['classifier'] = Entity.new(@classifier, 'classifier') unless @classifier.nil?
 
                 entities.each_value { | v |
                     yield v
@@ -171,8 +198,8 @@ class Std
                         if File.exists?(npath)
                             yield path.clone(npath)
                         else
-                            # TODO: can consume time if src exits and conatins tons of sources
-                            found = Dir.glob(File.join(home, "src", "**", path.to_s))
+                            # TODO: can consume time if src exists and contains tons of sources
+                            found = Dir.glob(File.join(home, 'src', '**', path.to_s))
                             yield path.clone(found[0]) if found && found.length > 0
                         end
                     end
@@ -183,20 +210,21 @@ class Std
 
     def initialize(format = nil)
         @stdout, @stderr, @ebuffer, @buffer = $stdout, $stderr, [], []
-        $stdout, $stderr, @format = Std.new() { |m| self.write(m, 0) }, Std.new() { |m| self.write(m, 2) }, format
+        $stdout, $stderr, @format = Std.new() { | m | self.write(m, 0) }, Std.new() { |m| self.write(m, 2) }, format
+
     end
 
     def <<(msg) @stdout << msg end
 
     def puts_warning(*args)
-        args.each() { |a|
+        args.each { |a|
             a = a.to_s
             write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a, 1)
         }
     end
 
     def puts_error(*args)
-        args.each() { |a|
+        args.each { | a |
             a = a.to_s
             write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a, 2)
         }
@@ -215,7 +243,7 @@ class Std
                     _exception_($!)
                 end
             else
-                msg.each_line() { |line|
+                msg.each_line { | line |
                     if line[-1, 1] != "\n"
                         @buffer << line
                     else
@@ -240,7 +268,7 @@ class Std
         # fatal error has happened in Std implementation
         $M.puts 'Fatal error has occurred:'
         $M.puts " #{$!.message}:"
-        e.backtrace().each() { |line| $M.puts "     #{line}" }
+        e.backtrace().each { | line | $M.puts "     #{line}" }
     end
 
     # show exception stack trace according to configured "@@backtrace_deepness"
@@ -263,7 +291,7 @@ class Std
 
         # collect default recognized entities
         if $RECOGNIZERS['default']
-            $RECOGNIZERS['default'].each() { | r |
+            $RECOGNIZERS['default'].each { | r |
                 r.recognize(msg) { | e |
                     entities[e.type] = e unless entities.has_key?(e.type)
                 }
@@ -278,7 +306,7 @@ class Std
                 recognizer = $RECOGNIZERS[parent_class.name]
 
                 if recognizer && recognizer.length > 0
-                    recognizer.each() { | r |
+                    recognizer.each { | r |
                         r.recognize(msg) { | e |
                             entities[e.type] = e unless entities.has_key?(e.type)
                         }
@@ -289,18 +317,25 @@ class Std
             end
         end
 
+        if entities.length > 0
+            ent = entities.dup()
+            ent[:artifact] = cur_art.class
+            entities_detected(msg, ent)
+        end
+
         # normalized found entities, expect normalize() method yield normalized entities
         normalize(entities) { | e |
             entities[e.type] = e;
         }
 
         a = []
-        entities.each_pair() { | k, v | a << v }              # collect all found entities in "a" array
-        a.sort!() { |aa, bb| aa.start_at <=> bb.start_at  }   # sort found entities by its location in the message
+        entities.each_pair { | k, v | a << v }               # collect all found entities in "a" array
+        a.sort!() { |aa, bb| aa.start_at <=> bb.start_at  }  # sort found entities by its location in the message
+
 
         # perform replacing found entities fragments in initial
         # string with normalized version of the entities
-        a.each_index() { | i |
+        a.each_index { | i |
             e = a[i]
             msg[e.start_at .. e.end_at - 1] = e.to_s  # replace fragment in original message
             dt = e.start_at + e.length - e.end_at
@@ -316,6 +351,8 @@ class Std
         else
             self << format(msg, level, entities) # print formatted message
         end
+
+        return a
     end
 
     def format(msg, level, entities = {})
@@ -339,7 +376,11 @@ class Std
         end
     end
 
-    def time(format = "%H:%M:%S %d/%b/%Y") Time.now().strftime(format) end
+    def time(format = "%H:%M:%S %d/%b/%Y") Time.now.strftime(format) end
+
+    # called when the given line has number of detected entities
+    def entities_detected(msg, entities)
+    end
 end
 
 module StdFormater

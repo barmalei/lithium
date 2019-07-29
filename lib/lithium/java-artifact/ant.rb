@@ -26,9 +26,7 @@ class ANT < EnvArtifact
     def ant() File.join(@ant_home, 'bin', 'ant') end
 end
 
-#
 # Simple ant runner
-#
 class RunANT < FileCommand
     include OptionsSupport
 
