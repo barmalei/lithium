@@ -43,7 +43,7 @@ STD_RECOGNIZERS({
     ],
 
     [ ValidateRubyScript, RunRubyScript ] => [
-        Std::FileLocRecognizer.new(ext: 'rb')
+
     ],
 
     ValidateXML  => [ Std::FileLocRecognizer.new(ext: 'xml') ],
@@ -58,10 +58,13 @@ STD_RECOGNIZERS({
         Std::FileLocRecognizer.new('\s*\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]')
     ],
 
-    'default'    => [ /.*(?<url>\b(http|https|ftp|ftps|sftp)\:\/\/[^ \t]*)/  ] # URL recognizer
+    'default'    => [
+        /.*(?<url>\b(http|https|ftp|ftps|sftp)\:\/\/[^ \t]*)/, # URL recognizer
+        Std::FileLocRecognizer.new(ext: 'rb')                  # catch unexpected ruby exception
+    ]
 })
 
-def BUILD_ARTIFACT(name)
+def BUILD_ARTIFACT(name, &block)
     $current_artifact = nil
 
     # instantiate tree artifact in a context of project to have proper owner set
@@ -72,6 +75,7 @@ def BUILD_ARTIFACT(name)
     tree.build()
     tree.norm_tree()
     BUILD_ARTIFACT_TREE(tree.root_node)
+    return tree.root_node.art
 end
 
 def BUILD_ARTIFACT_TREE(root, level = 0)
@@ -89,7 +93,10 @@ def BUILD_ARTIFACT_TREE(root, level = 0)
             wid = art.what_it_does()
             puts wid unless wid.nil?
             art.pre_build()
+
             art.build()
+            art.instance_eval(&art.done) unless art.done.nil?
+
             art.build_done()
         rescue
             art.build_failed()

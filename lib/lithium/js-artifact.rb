@@ -7,28 +7,93 @@ require 'lithium/java-artifact/runner'
 require 'lithium/file-artifact/acquired'
 
 
+$NODEJS_MODULES_DIR = 'node_modules'
+
+# node js  environment
 class JS < EnvArtifact
     include AutoRegisteredArtifact
 
-    attr :compressorClassName
+    attr_reader :nodejs, :npm
 
     def initialize(*args)
         super
-        @compressorClassName ||= 'UglifyJavaScript'
+
+        @nodejs ||= FileArtifact.which('node')
+        raise 'Node JS cannot be detected' if @nodejs.nil?
+
+        @npm ||= FileArtifact.which('npm')
+        raise 'Node JS npm cannot be detected' if @npm.nil?
     end
 
-    def compressor(path, &block)
-        c = Object.const_get(@compressorClassName)
-        return c.new(path, &block)
+    def nodejs()
+        return @nodejs
     end
 
-    def what_it_does() "Initialize JavaScript environment '#{@name}'" end
+    def npm()
+        return @npm
+    end
+
+    def module_home(name)
+        raise 'Name of module cannot be empty' if name.nil? || name.length == 0
+        module_home = File.join(homedir, $NODEJS_MODULES_DIR, name)
+        module_home = File.join(owner.homedir, $NODEJS_MODULES_DIR, name) if     !File.exists?(module_home) && !owner.nil?
+        module_home = File.join($lithium_code, $NODEJS_MODULES_DIR, name) unless File.exists?(module_home)
+        return module_home
+    end
+
+    def uglifyjs()
+        File.join(module_runner('uglify-js'), 'bin', 'uglifyjs')
+    end
+
+    def what_it_does() "Initialize Node JS environment '#{@name}'" end
+
+    def expired?
+        return false
+    end
+end
+
+# nodejs module
+class NodejsModule < FileArtifact
+    REQUIRE JS
+
+    def initialize(name, &block)
+        name = File.join(project.homedir, $NODEJS_MODULES_DIR, name) unless Pathname.new(name).absolute?
+        super(name, &block)
+
+        bn = File.basename(File.dirname(fullpath))
+        if bn != $NODEJS_MODULES_DIR
+            raise "Invalid module '#{fullpath}' path. '[<homedir>/]node_modules/<module-name>' path module is expected"
+        end
+    end
+
+    def build()
+        project.go_to_homedir
+        puts "Install module in #{Dir.pwd} hd = #{homedir} owner = #{owner}"
+        raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'install', File.basename(fullpath)) != 0
+    end
+
+    def expired?
+        return !File.exists?(fullpath)
+    end
+
+    def clean()
+        if File.exists?(fullpath)
+            project.go_to_homedir
+            raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0
+        end
+    end
+
+    def what_it_does()
+        return "Install '#{File.basename(fullpath)}' nodejs module"
+    end
 end
 
 # Run JS with nodejs
 class RunNodejs < FileCommand
+    REQUIRE JS
+
     def build()
-        raise "Running of '#{@name}' JS script failed" if Artifact.exec('node', "\"#{fullpath}\"") != 0
+        raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, "\"#{fullpath}\"") != 0
     end
 
     def what_it_does()
@@ -36,132 +101,111 @@ class RunNodejs < FileCommand
     end
 end
 
-
-# compress java script
-class CompressJavaScript < FileCommand
-    REQUIRE JS
-
-    def initialize(*args)
-        super
-    end
-
-    def build()
-        f = fullpath()
-
-        if @output_dir
-            o = fullpath(File.join(@output_dir, File.basename(f)))
-        else
-            e = File.extname(f)
-            n = File.basename(f).chomp(e)
-            o = File.join(File.dirname(f), "#{n}.min#{e}")
-        end
-
-        raise "Source '#{f}' JS script file cannot be found "     unless File.exists?(src)
-        raise "Destination directory for '#{o}' cannot be found " unless File.exists?(File.dirname(dest))
-        raise "Output file is identical to input one '#{f}'"      if f == o
-
-        compress(f, o)
-    end
-
-    def compress(src, dest) end
-
-    def what_it_does() "Compress '#{@name}' JS script" end
-end
-
 # nodejs uglyfier
-class UglifyJavaScript < CompressJavaScript
+class UglifiedJSFile < ArchiveFile
+    REQUIRE(JS)
+
     include OptionsSupport
 
-    attr_accessor :lib
-
-    def initialize(*args)
+    def initialize(*args, &block)
         super
-
-        unless @lib
-            @lib = File.join(owner.homedir, "node_modules", "uglify-js") unless owner.nil?
-            @lib = File.join($lithium_code, "node_modules", "uglify-js") if @lib.nil? || !File.exists?(@lib)
-        end
-
-        raise "'uglify' node JS module has to be installed in a context of target project ('#{owner}'') " unless File.exists?(@lib)
+        REQUIRE("npm:node_modules/uglify-js").OWN
     end
 
-    def compress(infile, outfile)
-        raise 'JS Uglify failed' if Artifact.exec(File.join(@lib, 'bin', 'uglifyjs'), OPTS(), infile, '>', outfile) != 0
-    end
-
-    def what_it_does() "Uglify (nodejs) #{@name}' JS script" end
-end
-
-
-class CompressedJavaScriptFile < FileArtifact
-    REQUIRE JS
-
-    def initialize(*args)
-        super
-
-        unless @source
-            s = '.min.js'
-            i = @name.rindex(s)
-            raise "JS compressed file name '#{@name}' cannot be used to identify input file name automatically" if i.nil? || i != (@name.length - s.length)
-            @source = @name[0, i + 1] + 'js'
-        end
-    end
-
-    def expired?()
-       return !File.exists?(fullpath())
-    end
-
-    def cleanup()
-       File.delete(fullpath()) if File.exists?(fullpath())
-    end
-
-    def build()
-        fp = fullpath(@source)
-        raise "Source file '#{fp}' cannot be found" unless File.exists?(fp)
-        compress(fp, fullpath())
-    end
-
-    def compress(src, dest)
-        UglifyJavaScript.new(src)
-    end
-
-    def what_it_does() "Compress #{@name} file of '#{@source}' JS script" end
-end
-
-class CombinedJavaScript < MetaGeneratedFile
-    def build()
-        f = File.new(fullpath(), 'w')
-        f.write("(function() {\n\n")
-        @meta.list_items(true) { |n,t|
-            puts " add #{n}"
-            f.write(File.readlines(n).join())
-            f.write("\n\n")
-        }
-        f.write("\n\n})();")
-        f.close()
-    end
-
-    def cleanup()
-       File.delete(fullpath()) if File.exists?(fullpath())
-    end
-
-    def what_it_does() "Combine JavaScript files into '#{@name}'" end
-end
-
-class GenerateJavaScriptDoc < FileArtifact
-    def initialize(name)
-        super
-        @config   ||= nil
-        @template ||= nil
-        @input    ||= '.'
-        raise "Name has to be directory" if File.exists?(fullpath()) && !File.directory?(fullpath())
+    def generate(path, dest_dir, list)
+        validate_extension()
+        project.go_to_homedir
+        return Artifact.exec(@js.uglifyjs, OPTS(), list.join(' '), '-o', fullpath)
     end
 
     def expired?()
        return !File.exists?(fullpath)
     end
 
-    def cleanup
+    def clean()
+        validate_extension()
+        File.delete(fullpath()) if File.exists?(fullpath())
+    end
+
+    def list_items(rel = nil)
+        if @sources.length == 0
+            fp     = fullpath()
+            bn     = File.basename(fp)
+            suffix = '.min.js'
+            i      = bn.rindex(suffix)
+
+            raise "JS minified file '#{bn}' cannot be used to detect input JS file" if i.nil? || i != (bn.length - suffix.length)
+            bn = bn[0, i + 1] + 'js'
+            fp = File.join(File.dirname(fp), bn);
+            raise "Auto-detected input JS file '#{fp}' doesn't exists or points to directory" if !File.exists?(fp) || File.directory?(fp)
+            yield fp, File.mtime(fp).to_i, nil
+        else
+            super(rel)
+        end
+    end
+
+    def what_it_does()
+        "Uglifyjs (nodejs) #{@name}' JS script"
+    end
+
+    # to avoid name clash with JS source code
+    def validate_extension()
+        bn  = File.basename(fullpath)
+        ext = File.extname(bn)
+        return if ext.downcase != '.js'
+        bn = bn[0..(bn.length - ext.length + 1)]
+        ext = File.extname(bn)
+        raise "Minified file name '#{fullpath}' points to JS code" if ext.nil? || ext.length == 0
+    end
+end
+
+
+class CombinedJSFile < ArchiveFile
+    def generate(path, dest_dir, list)
+        f = File.new(fullpath(), 'w')
+        f.write("(function() {\n\n")
+
+        list.each { | path |
+            puts " combine with '#{path}'"
+            f.write(File.readlines(path).join())
+            f.write("\n\n")
+        }
+
+        f.write("\n\n})();")
+        f.close()
+
+        return 0;
+    end
+
+    def expired?()
+       return !File.exists?(fullpath)
+    end
+
+    def clean()
+       File.delete(fullpath()) if File.exists?(fullpath())
+    end
+
+    def what_it_does() "Combine JavaScript files into '#{@name}'" end
+end
+
+class JavaScriptDoc < FileArtifact
+    REQUIRE JS
+
+    def initialize(name)
+        super
+        @config   ||= nil
+        @template ||= nil
+        @input    ||= '.'
+        raise 'Name has to be directory' if File.exists?(fullpath) && !File.directory?(fullpath)
+
+        REQUIRE('npm:yuidocjs')
+    end
+
+    def expired?()
+       return !File.exists?(fullpath)
+    end
+
+    def clean()
         FileUtils.rmtree(fullpath()) if File.exists?(fullpath()) && File.directory?(fullpath())
     end
 
@@ -169,12 +213,12 @@ class GenerateJavaScriptDoc < FileArtifact
         p = fullpath()
         raise "Invalid artifact path '#{p}'" if File.exists?(p) && !File.directory?(p)
 
-        args = [ 'yuidoc', '-o ', p, '-n', '-C' ]
+        args = [ File.join(@js.module_home('yuidoc'), 'bin', 'yuidoc') , '-o ', p, '-n', '-C' ]
 
         unless @template.nil?
             t = fullpath(@template)
             raise "Invalid template path '#{t}'" if !File.exists?(t) || !File.directory?(t)
-            args << "-t " << t
+            args << '-t ' << t
         end
 
         unless @config.nil?
@@ -203,5 +247,9 @@ class GenerateJavaScriptDoc < FileArtifact
     def what_it_does()
         "Generate '#{@name}' JavaScript doc by '#{@input}'"
     end
+end
+
+class CompileTypeScript
+
 end
 

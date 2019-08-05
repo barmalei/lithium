@@ -34,6 +34,8 @@ class StringRunner < Artifact
 
     def build()
         raise 'Script string has not been defined' unless @script
+
+        # TODO: this notation is not supported by  Artifact.exec()
         r = Artifact.exec(*cmd()) { | stdin, stdout, stderr, thread |
             stdin << @script
             stdin.close
@@ -52,4 +54,3 @@ class StringRunner < Artifact
 
     def cmd() raise "Not implemented" end
 end
-

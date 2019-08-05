@@ -17,7 +17,7 @@ class RemoteFile < FileArtifact
     def expired?()  !File.exists?(fullpath()) || File.size(fullpath()) == 0 end
     def what_it_does() "Download '#{@name}'\nfrom '#{@url}'" end
 
-    def cleanup()
+    def clean()
         lp = fullpath()
         File.delete(lp) if File.exists?(lp)
     end

@@ -3,8 +3,18 @@ require 'fileutils'
 require 'lithium/core'
 
 
-class CLEANUP < Artifact
-    def build() Project.artifact(@name).cleanup end
+class CLEAN < Artifact
+    def build()
+        # firstly let's create tree that resolves static dependencies (for instance set environment variables)
+        name = @name
+        tree = Project.current.new_artifact {
+            ArtifactTree.new(name)
+        }
+
+        tree.build()
+        tree.root_node.art.clean
+    end
+
     def what_it_does() "Cleanup '#{@name}', #{Project.artifact(@name).class}" end
 end
 
@@ -148,7 +158,7 @@ class EXPIRED < Artifact
     def what_it_does() "List of expired items of '#{@name}' artifact" end
 end
 
-class INSPECT < Artifact
+class INFO < Artifact
     def initialize(name = '.') super end
 
     def build()

@@ -4,17 +4,16 @@ Usage:
 Predefined aliases:
   REQUIRES: - show an artifact dependencies 
   TREE:     - show artifact dependencies tree
-  CLEANUP:  - cleanup artifact
-  INSPECT:  - show info about the given artifact
+  CLEAN:    - clean artifact
+  INFO:     - show info about the given artifact
   INIT:     - initialize lithium project
   META:     - current lithium artifact configuration
  
   run:file             - generic code runner 
   compile:file|mask    - generic code compiler
-  checkstyle:file|mask - checkstyle 
+  check:file|mask      - apply checkstyle 
   mvn:path             - run maven 
   ant:                 - start ant script
-  mvn:                 - start maven
             
 Samples:
     lithium compile:src/**/*.java  

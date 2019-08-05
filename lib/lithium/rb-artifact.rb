@@ -25,7 +25,7 @@ class RUBY < EnvArtifact
 
     def rpath()
         rpath = []
-        @libs.each { |  path |
+        @libs.each { | path |
             path = File.join(homedir, path) unless Pathname.new(path).absolute?
             if File.directory?(path)
                 rpath.push("-I#{path}")

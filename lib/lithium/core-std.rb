@@ -9,7 +9,7 @@ require 'json'
 $M = $stdout
 
 $RECOGNIZERS      = {}
-$FILENAME_PATTERN = "[^\:\,\!\?\;\ \~\`\&\^\*\(\)\=\+\{\}\|\>\<\%]+"
+$FILENAME_PATTERN = "[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%]+"
 
 def STD_RECOGNIZERS(args)
     # normalize keys and values
@@ -300,6 +300,9 @@ class Std
 
         # collect artifact related recognized entities
         cur_art = $current_artifact ? $current_artifact : nil # current artifact
+
+
+
         if cur_art
             parent_class = cur_art.class
             while parent_class do

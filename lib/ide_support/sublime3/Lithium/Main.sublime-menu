@@ -19,7 +19,7 @@
                     ,{ "caption": "Check All",     "command": "li", "args": {"command":"check:{home}src/**/*"  } }
                     ,{ "caption": "PMD Check All", "command": "li", "args": {"command":"pmd:{home}/src/**/*"        } }
                     ,{ "caption": "Build", "command": "li" }
-                    ,{ "caption": "Cleanup", "command": "cleanup" }
+                    ,{ "caption": "Clean", "command": "CLEAN" }
 
                     ,{ "caption": "-" }
 

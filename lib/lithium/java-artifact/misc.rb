@@ -36,7 +36,7 @@ class GenerateJavaDoc < FileArtifact
         }
     end
 
-    def pre_build() cleanup() end
+    def pre_build() clean() end
 
     def build()
         p = @pkgs.collect() { |e| e.tr('/', '.') }
@@ -46,7 +46,7 @@ class GenerateJavaDoc < FileArtifact
         raise 'Java doc generation error' if $? != 0
     end
 
-    def cleanup() FileUtils.rm_r(fullpath()) if  File.exists?(fullpath()) end
+    def clean() FileUtils.rm_r(fullpath()) if  File.exists?(fullpath()) end
     def expired?() !File.exists?(fullpath()) end
     def what_it_does() "Generate javadoc into '#{@name}'" end
 end

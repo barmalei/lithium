@@ -65,7 +65,7 @@ class GeneratedFile < FileArtifact
         raise NotImplementedError, ''
     end
 
-    def cleanup() File.delete(fullpath) if File.exists?(fullpath) end
+    def clean() File.delete(fullpath) if File.exists?(fullpath) end
     def expired?() !File.exists?(fullpath) end
     def generate(dest, dest_dir, list) raise NotImplementedError, '' end
 end
@@ -229,7 +229,7 @@ class MetaGeneratedZipFile < MetaGeneratedFile
         return run_zip(OPTS(), "\"#{path}\"",  list.join(' '))
     end
 
-    def build_failed() cleanup() end
+    def build_failed() clean() end
     def what_it_does() "Generate ZIP file by '#{@meta.name}'" end
 end
 
@@ -241,7 +241,7 @@ end
 class MetaGeneratedDirectory < MetaGeneratedFile
     CONTENT_FN = '.dir_content'
 
-    def cleanup()
+    def clean()
         fp = fullpath
         list_items { |n, t|
             p =  File.join(fp, n)
@@ -267,7 +267,7 @@ class MetaGeneratedDirectory < MetaGeneratedFile
     end
 
     def pre_build()
-        cleanup()
+        clean()
     end
 
     def generate(dir, tmpdir, list) return 0 end
@@ -284,7 +284,7 @@ class MetaGeneratedDirectory < MetaGeneratedFile
         meta
     end
 
-    def build_failed() cleanup() end
+    def build_failed() clean() end
 
     def what_it_does() "Generate folder '#{@name}' and its content" end
 end

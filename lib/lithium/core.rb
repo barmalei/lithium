@@ -8,18 +8,18 @@ require 'open3'
 #  modified time that greater than zero it is compared to logged
 #  modified time. The most recent will be return as result.
 #
-#  Hook module replace "cleanup", "build_done", "mtime",  "expired?"
+#  Hook module replace "clean", "build_done", "mtime",  "expired?"
 #  artifact class methods with "original_<method_name>" methods.
 #  It used by LogArtifact to intercept the method calls with "method_missing"
 #  method.
 module HookMethods
-    @@hooked = [ :cleanup, :build_done, :mtime,  :expired? ]
+    @@hooked = [ :clean, :build_done, :mtime, :expired? ]
 
     def included(clazz)
         if clazz.kind_of?(Class)
             raise 'No methods for catching have been defined' if !@@hooked
 
-            clazz.instance_methods().each { |m|
+            clazz.instance_methods().each { | m |
                 m = m.intern
                 HookMethods.hook_method(clazz, m) if @@hooked.index(m)
             }
@@ -53,8 +53,8 @@ module LogArtifactState
 
     # catch target artifact methods call to manage artifact expiration state
     def method_missing(meth, *args)
-        if meth == :cleanup
-            original_cleanup()
+        if meth == :clean
+            original_clean()
             expire_logs()
         elsif meth == :build_done
             original_build_done() if self.respond_to?(:original_build_done)
@@ -118,7 +118,7 @@ module LogArtifactState
     def logs_home_dir()
         raise 'Cannot detect log directory since project home is unknown' if !homedir()
         h = File.join(homedir, '.lithium', '.logs')
-        if !File.exists?(h)
+        unless File.exists?(h)
             puts_warning "LOG directory '#{h}' cannot be found. Try to create it ..."
             Dir.mkdir(h)
         end
@@ -470,8 +470,8 @@ class ArtifactName < String
     # re-create the artifact name with new block
     def reuse(&block)
         bk = block
-        unless self[:block].nil?
-            sb = self[:block]
+        unless @block.nil?
+            sb = @block
             if block.nil?
                 bk = sb
             else
@@ -482,7 +482,7 @@ class ArtifactName < String
             end
         end
 
-        return ArtifactName.new(@artname, @clazz, &bk)
+        return ArtifactName.new(self, @clazz, &bk)
     end
 end
 
@@ -526,7 +526,7 @@ end
 #  "@shortname"
 #  "@ver"
 class Artifact
-    attr_reader :name, :shortname, :ver, :owner, :createdByMeta
+    attr_reader :name, :shortname, :ver, :owner, :createdByMeta, :done
 
     # context class is special wrapper object that redirect
     # its methods call to a wrapped (artifact object) target
@@ -591,7 +591,7 @@ class Artifact
         return @default_name
     end
 
-    # stub class to perform chainable calls
+    # stub class to perform chain-able calls
     class AssignRequiredTo
         def initialize(item) @item = item end
         def TO(an) @item[1] = an; return self end
@@ -718,9 +718,9 @@ class Artifact
     # test if the given artifact has expired and need to be built
     def expired?() true end
 
-    # cleanup method should be implemented to clean artifact related
+    # clean method should be implemented to clean artifact related
     # build stuff
-    def cleanup() end
+    def clean() end
 
     def to_s() shortname end
 
@@ -762,7 +762,6 @@ class Artifact
         args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
 
         Open3.popen3(args.join(' ')) { | stdin, stdout, stderr, thread |
-
             stdin.close
             stdout.set_encoding(Encoding::UTF_8)
             stderr.set_encoding(Encoding::UTF_8)
@@ -796,6 +795,16 @@ class Artifact
 
             return thread.value
         }
+    end
+
+    def Artifact.build(name, &block)
+        art = self.new(name, &block)
+        art.build()
+        return art
+    end
+
+    def DONE(&block)
+        @done = block
     end
 end
 
@@ -841,6 +850,7 @@ class ArtifactTree < Artifact
 
     def initialize(*args)
         @show_mtime = true
+        @show_owner = true
         super
     end
 
@@ -856,16 +866,22 @@ class ArtifactTree < Artifact
     end
 
     def build_tree(root)
+        puts "build_tree(): root = #{root.art}"
+
         root.art.requires { | dep, assignMeTo, is_own, block |
             node, parent = Node.new(dep, root, &block), root
             while parent && parent.art != node.art
                 parent = parent.parent
             end
 
-            raise "#{root.art.class}:'#{root.art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" if parent
+            puts "build_tree(): root = #{root.art}, dependecy = #{node.art},(#{is_own})->#{root.art.owner}"
+
+            raise "#{root.art.class}:'#{root.art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
             root.children << node
             build_tree(node)
+
+            node.art.owner = root.art.owner if is_own == true
 
             if !assignMeTo.nil? || node.art.class < AssignableDependecy
 
@@ -877,7 +893,6 @@ class ArtifactTree < Artifact
 
                 asn = "@#{assignMeTo.to_s}".to_sym
                 av  = root.art.instance_variable_get(asn)
-                node.art.owner = root.art.owner if is_own
                 if av.kind_of?(Array)
                     av.push(node.art)
                     root.art.instance_variable_set(asn, av)
@@ -921,7 +936,7 @@ class ArtifactTree < Artifact
     def tree2string(parent, root, shift=0)
         pshift, name = shift, root.art.to_s()
 
-        e = (root.expired ? '*' : '') +  (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') + (@show_mtime ? ": #{root.art.mtime}" : '')
+        e = (root.expired ? '*' : '') + (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') + (@show_mtime ? ":#{root.art.mtime}" : '') + (@show_owner ? " <#{root.art.owner}>" : '')
         s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name}(#{root.art.class})"  + e
         b = parent && root != parent.children.last
         if b
@@ -932,11 +947,11 @@ class ArtifactTree < Artifact
             s = "#{s}\n#{' '*k}|" if root.children.length > 0
         end
 
-        shift = shift + name.length/2 + 2
-        root.children.each { |i|
+        shift = shift + name.length / 2 + 2
+        root.children.each { | i |
             rs, s = tree2string(root, i, shift), s + "\n"
             if b
-                rs.each_line { |l|
+                rs.each_line { | l |
                     l[pshift] = '|'
                     s = s + l
                 }
@@ -1371,6 +1386,7 @@ module ArtifactContainer
         _meta.sort
     end
 
+    # return reference to an artifact meta info
     def REF(name)
         name = ArtifactName.new(name)
         meta = find_meta(name)
@@ -1387,22 +1403,17 @@ module ArtifactContainer
         return meta
     end
 
-    def REUSE(*args, &block)
+    # TODO: this method most likely should be removed
+    def REUSE(name, &block)
         raise "Project '#{self}' doesn't have parent project to re-use its artifacts" if owner.nil?
-        artname = ArtifactName.new(args[0])
-        meta    = _meta[artname]
-
-        # TODO: throws exception for containers
-        #raise "Artifact '#{artname}' is already defined with '#{self}' project" unless meta.nil?
-
-        ow = owner
-        while meta.nil? && !ow.nil?
-            meta = ow._meta[artname]
-            ow   = ow.owner
-        end
+        artname = ArtifactName.new(name)
+        meta    = _meta_from_owner(name)
         raise "Cannot find '#{artname}' in parent projects" if meta.nil?
 
-        _meta[artname] = meta.reuse(&block)
+        _meta.push(meta.reuse(&block))
+
+        # sort meta array
+        _meta.sort
     end
 
     def REMOVE(name)
@@ -1410,15 +1421,9 @@ module ArtifactContainer
     end
 end
 
-
+# mask container
 class FileMaskContainer < FileMask
     include ArtifactContainer
-
-    # def homedir()
-    #     puts "FileMaskContainer.homedir(): #{owner}"
-
-    #     return owner.homedir()
-    # end
 end
 
 

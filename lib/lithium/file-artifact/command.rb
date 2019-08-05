@@ -26,7 +26,7 @@ class CopyOfFile < FileCommand
         return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
     end
 
-    def cleanup()
+    def clean()
         File.delete(fullpath) if File.exists?(fullpath)
     end
 
