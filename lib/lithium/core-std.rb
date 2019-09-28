@@ -1,13 +1,6 @@
 require 'pathname'
 require 'json'
 
-# !!! debug field
-# Can be useful to debug lithium stdout. Using original
-# stdout stored in $M variable allows developers printing
-# debug messages with $M.puts(,,,)
-# !!!
-$M = $stdout
-
 $RECOGNIZERS      = {}
 $FILENAME_PATTERN = "[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%]+"
 
@@ -64,36 +57,16 @@ class Std
 
     # Make std singleton object
     def Std.new(*args, &block)
-        @@std.endup() if @@std
+        @@std.flush() if @@std
         @@std = super(*args, &block)
-        @@std.started() if @@std.respond_to?(:started)
+        $stdout = @@std
         @@std
     end
 
     def Std.std()         @@std                    end
-    def Std.restore_std() @@std.endup() if @@std   end
     def Std.backtrace(d)  @@backtrace_deepness = d end
 
-    class Std
-        def initialize(&block) @block = block end
-        def write(msg) @block.call(msg)  end
-
-        def puts(*args)
-            args.each { | a |
-                a = a.to_s
-                write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a)
-            }
-        end
-
-        def print(*args) args.each { | a | write(a.to_s) } end
-        def <<(*args) print(*args) end
-
-        def flush() end
-    end
-
-    #
     #  Output string recognized entity
-    #
     class Entity < String
         #  type, and the given entity location
         attr_accessor :type, :start_at, :end_at
@@ -209,12 +182,23 @@ class Std
     end
 
     def initialize(format = nil)
-        @stdout, @stderr, @ebuffer, @buffer = $stdout, $stderr, [], []
-        $stdout, $stderr, @format = Std.new() { | m | self.write(m, 0) }, Std.new() { |m| self.write(m, 2) }, format
-
+        @buffer = []
+        @format = format
     end
 
-    def <<(msg) @stdout << msg end
+    def <<(msg)
+        STDOUT << msg
+        STDOUT.flush()
+    end
+
+    def puts(*args)
+        args.each { | a |
+            a = a.to_s
+            write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a)
+        }
+    end
+
+    def print(*args) args.each { | a | write(a.to_s) } end
 
     def puts_warning(*args)
         args.each { |a|
@@ -230,7 +214,7 @@ class Std
         }
     end
 
-    def write(msg, level)
+    def write(msg, level = 0)
         msg = msg.to_s
         return if msg.length == 0
         begin
@@ -251,6 +235,7 @@ class Std
                             line = "#{@buffer.join('')}#{line}"
                             @buffer.clear()
                         end
+
                         expose(line, level)
                     end
                 }
@@ -266,9 +251,9 @@ class Std
 
     def _fatal_(e)
         # fatal error has happened in Std implementation
-        $M.puts 'Fatal error has occurred:'
-        $M.puts " #{$!.message}:"
-        e.backtrace().each { | line | $M.puts "     #{line}" }
+        STDERR.puts 'Fatal error has occurred:'
+        STDERR.puts " #{$!.message}:"
+        e.backtrace().each { | line | STDERR.puts "     #{line}" }
     end
 
     # show exception stack trace according to configured "@@backtrace_deepness"
@@ -300,8 +285,6 @@ class Std
 
         # collect artifact related recognized entities
         cur_art = $current_artifact ? $current_artifact : nil # current artifact
-
-
 
         if cur_art
             parent_class = cur_art.class
@@ -367,11 +350,6 @@ class Std
     def normalize(entities)
     end
 
-    def endup()
-        flush()
-        $stderr, $stdout = @stderr, @stdout
-    end
-
     def flush()
         if @buffer.length > 0
             expose("#{@buffer.join('')}", 0)
@@ -391,3 +369,4 @@ module StdFormater
         msg
     end
 end
+

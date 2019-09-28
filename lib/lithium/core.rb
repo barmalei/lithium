@@ -742,18 +742,6 @@ class Artifact
     # return last time the artifact has been modified
     def mtime() -1 end
 
-    def Artifact._read_std_(std, out)
-        while (rr = IO.select([ std ], nil, nil, 2)) != nil
-            next if rr.empty?
-            begin
-                l = std.readline.encode('utf-8').rstrip()
-                out.puts l if l
-            rescue IOError => e
-                break
-            end
-        end
-    end
-
     def Artifact.exec(*args, &block)
         # clone arguments
         args = args.dup
@@ -761,36 +749,31 @@ class Artifact
         # use quotas to surround process if necessary
         args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
 
-        Open3.popen3(args.join(' ')) { | stdin, stdout, stderr, thread |
+        # merged stderr and stdout
+        Open3.popen2e(args.join(' ')) { | stdin, stdout, thread |
             stdin.close
             stdout.set_encoding(Encoding::UTF_8)
-            stderr.set_encoding(Encoding::UTF_8)
-
             block.call(stdin, stdout, stderr, thread) unless block.nil?
 
             while thread.status != false && thread.status != nil
                 begin
-
-                    # thread.wakeup if !thread.alive? && thread.status != false
-
-                    # the line can block forever with "thread.value" or  "Process.waitpid(thread[:pid])"
-                    #return thread.value if Process.waitpid(thread[:pid])
-
-
-                #rescue Errno::ESRCH #Errno::ECHILD
-                #rescue Exception => e
-                rescue Errno::ECHILD
-                    begin
-                        _read_std_(stdout, $stdout)
-                        _read_std_(stderr, $stdout)
-                    rescue
+                    rr = IO.select([ stdout ], nil, nil, 2)
+                    if !rr.nil? && !rr.empty?
+                        for std in rr[0]
+                            line = std.readline.rstrip()
+                            if line
+                                $stdout.puts line
+                                $stdout.flush()
+                            end
+                        end
                     end
-
+                rescue EOFError => e
+                    $stdout.flush()
+                rescue Exception => e
+                    STDERR.puts(e)
+                    STDERR.flush()
                     return thread.value
                 end
-
-                _read_std_(stdout, $stdout)
-                _read_std_(stderr, $stdout)
             end
 
             return thread.value
@@ -865,8 +848,8 @@ class ArtifactTree < Artifact
         norm_tree_ver(@root_node)
     end
 
-    def build_tree(root)
-        puts "build_tree(): root = #{root.art}"
+    def build_tree(root, shift = '')
+        #!!!puts "#{shift}build_tree(): root = #{root.art.class}:#{root.art} owner = #{root.art.owner}"
 
         root.art.requires { | dep, assignMeTo, is_own, block |
             node, parent = Node.new(dep, root, &block), root
@@ -874,14 +857,16 @@ class ArtifactTree < Artifact
                 parent = parent.parent
             end
 
-            puts "build_tree(): root = #{root.art}, dependecy = #{node.art},(#{is_own})->#{root.art.owner}"
+            #!!!puts "#{shift + '    '}build_tree(): dependecy = #{node.art.class}:#{node.art}, (#{is_own == true}) -> #{root.art.owner}"
 
             raise "#{root.art.class}:'#{root.art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
             root.children << node
-            build_tree(node)
 
+            # has to be placed before recursove build tree method call
             node.art.owner = root.art.owner if is_own == true
+
+            build_tree(node, shift + '    ')
 
             if !assignMeTo.nil? || node.art.class < AssignableDependecy
 
@@ -981,6 +966,9 @@ class FileArtifact < Artifact
     def _contains_path?(base, path)
         base = base[0..-2] if base[-1] == '/'
         path = path[0..-2] if path[-1] == '/'
+
+        #!!!puts "FileArtifact._contains_path?(): base = #{base} path = #{path}"
+
         return true  if base == path
         return false if base.length == path.length
         i = path.index(base)
@@ -1267,7 +1255,11 @@ module ArtifactContainer
         if meta.nil?
             # meta cannot be locally found try to delegate search to owner
             # path nil or doesn't match project then delegate finding an artifact in an owner project context
-            return owner.artifact(name, &block) if !owner.nil? && !artname.env_path? && (artname.path.nil? || !match(artname.path))
+            unless owner.nil?
+                unless artname.env_path?
+                    return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
+                end
+            end
 
             meta = _meta_from_owner(name)
 

@@ -122,9 +122,11 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     puts "+#{'—'*73}+"
     puts "│ Lithium - build tool v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
     puts "+#{'—'*73}+"
+    $stdout.flush()
+
     if artifact_prefix.nil? && artifact_path.nil?
         puts 'No command or arguments have been specified'
-        File.open(File.join($lithium_code, 'lib', 'lithium.txt'), 'r') { |f|
+        File.open(File.join($lithium_code, 'lib', 'lithium.txt'), 'r') { | f |
             print while f.gets
         }
         exit(-1)

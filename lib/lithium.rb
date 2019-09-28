@@ -41,3 +41,5 @@ end
 # start lithium
 require 'lithium/core-startup'
 STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
+
+

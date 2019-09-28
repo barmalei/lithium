@@ -28,14 +28,14 @@ class RUBY < EnvArtifact
         @libs.each { | path |
             path = File.join(homedir, path) unless Pathname.new(path).absolute?
             if File.directory?(path)
-                rpath.push("-I#{path}")
+                rpath.push("-I\"#{path}\"")
             else
                 puts_warning "Ruby library path '#{path}' cannot be found"
             end
         }
 
         path  = File.join(homedir, '.lithium', 'lib')
-        rpath.push("-I#{path}")  if File.directory?(path)
+        rpath.push("-I\"#{path}\"")  if File.directory?(path)
         return rpath.join(' ')
     end
 

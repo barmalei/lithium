@@ -41,10 +41,6 @@ class JS < EnvArtifact
         return module_home
     end
 
-    def uglifyjs()
-        File.join(module_runner('uglify-js'), 'bin', 'uglifyjs')
-    end
-
     def what_it_does() "Initialize Node JS environment '#{@name}'" end
 
     def expired?
@@ -57,22 +53,33 @@ class NodejsModule < FileArtifact
     REQUIRE JS
 
     def initialize(name, &block)
-        name = File.join(project.homedir, $NODEJS_MODULES_DIR, name) unless Pathname.new(name).absolute?
+        puts "1)    ------ #{name}"
+        puts "2)    ------ #{project.homedir}"
+
+
+        unless Pathname.new(name).absolute?
+
+            bn = File.basename(File.dirname(name))
+            name = File.join($NODEJS_MODULES_DIR, name) if bn != $NODEJS_MODULES_DIR
+        end
         super(name, &block)
+
+#        puts "3)    ------ #{fullpath}"
 
         bn = File.basename(File.dirname(fullpath))
         if bn != $NODEJS_MODULES_DIR
-            raise "Invalid module '#{fullpath}' path. '[<homedir>/]node_modules/<module-name>' path module is expected"
+            raise "Invalid module '#{fullpath}' path. '[<homedir>/]node_modules/<module-name>' path is expected"
         end
     end
 
     def build()
         project.go_to_homedir
-        puts "Install module in #{Dir.pwd} hd = #{homedir} owner = #{owner}"
+        puts "Install module in #{Dir.pwd} hd = #{project.go_to_homedir}"
         raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'install', File.basename(fullpath)) != 0
     end
 
     def expired?
+        puts "---------- #{fullpath}"
         return !File.exists?(fullpath)
     end
 
@@ -85,6 +92,12 @@ class NodejsModule < FileArtifact
 
     def what_it_does()
         return "Install '#{File.basename(fullpath)}' nodejs module"
+    end
+end
+
+module NPM
+    def NPM(name)
+        return REQUIRE("NodejsModule:#{name}")
     end
 end
 
@@ -103,19 +116,18 @@ end
 
 # nodejs uglyfier
 class UglifiedJSFile < ArchiveFile
+    extend NPM
+
     REQUIRE(JS)
 
-    include OptionsSupport
+    NPM('uglify-js').OWN.TO('uglify')
 
-    def initialize(*args, &block)
-        super
-        REQUIRE("npm:node_modules/uglify-js").OWN
-    end
+    include OptionsSupport
 
     def generate(path, dest_dir, list)
         validate_extension()
         project.go_to_homedir
-        return Artifact.exec(@js.uglifyjs, OPTS(), list.join(' '), '-o', fullpath)
+        return Artifact.exec(File.join(@uglify.fullpath, 'bin', 'uglifyjs'), OPTS(), list.join(' '), '-o', fullpath)
     end
 
     def expired?()

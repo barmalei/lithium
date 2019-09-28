@@ -105,28 +105,25 @@ class RunGroovyScript < JavaFileRunner
     end
 end
 
-class RunJavaCodeTests < RunJavaCode
-    REQUIRE JAVA
-
+module RunJavaTestCase
     def build_target()
-        "Test" + super
+        st = super
+        st.sub(/(([a-zA-Z_$][a-zA-Z0-9_$]*\.)*)([a-zA-Z_$][a-zA-Z0-9_$]*)/, '\1Test\3')
     end
 
     def what_it_does()
-        "Run Java code test-cases for '#{@name}'"
+       "Run Java test-cases '#{build_target}'\n                for '#{@name}'"
     end
 end
 
-class RunJavaClassTests < RunJavaClass
+class RunJavaTestCode < RunJavaCode
     REQUIRE JAVA
+    include RunJavaTestCase
+end
 
-    def build_target()
-        "Test" + super
-    end
-
-    def what_it_does()
-        "Run Java class test-cases for '#{@name}'"
-    end
+class RunJavaTestClass < RunJavaClass
+    REQUIRE JAVA
+    include RunJavaTestCase
 end
 
 class RunKotlinCode < JavaFileRunner
@@ -161,6 +158,14 @@ class RunKotlinCode < JavaFileRunner
     end
 end
 
+class RunKotlinTestCode < RunKotlinCode
+    REQUIRE JAVA
+    REQUIRE KOTLIN
+
+    include RunJavaTestCase
+end
+
+
 class RunScalaCode < JavaFileRunner
     REQUIRE JAVA
     REQUIRE SCALA
@@ -192,3 +197,11 @@ class RunScalaCode < JavaFileRunner
         "Run Scala '#{@name}' code"
     end
 end
+
+class RunScalaTestCode < RunScalaCode
+    REQUIRE JAVA
+    REQUIRE SCALA
+
+    include RunJavaTestCase
+end
+

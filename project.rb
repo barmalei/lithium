@@ -1,7 +1,9 @@
 -> {
     ARTIFACT('touch:*', Touch)
 
-    ARTIFACT('minjs:**/*.js',      CompressJavaScript)
+    ARTIFACT('minjs:**/*.min.js',  UglifiedJSFile)
+    ARTIFACT('npm:**/node_modules/*',  NodejsModule)
+
     ARTIFACT('openhtml:**/*.html', OpenHTML)
 
     ARTIFACT('mvn:*', RunMaven)
@@ -26,11 +28,26 @@
         ARTIFACT('**/*.php',    RunPhpScript)
         ARTIFACT('**/*.sh',     RunShell)
         ARTIFACT('**/*.jar',    RunJAR)
+        ARTIFACT('**/pom.xml',  RunMaven)
         ARTIFACT('**/*.groovy', RunGroovyScript)
         ARTIFACT('**/*.kt',     RunKotlinCode)
         ARTIFACT('**/*.scala',  RunScalaCode)
         ARTIFACT('**/*.class',  RunJavaClass)
-        ARTIFACT('**/*.rb',     RunRubyScript)
+        ARTIFACT('**/*.rb',     RunRubyScript) {
+            DONE { | art |
+                Touch.build('dsdsd')
+            }
+        }
+    }
+
+    ARTIFACT("test:*") {
+        ARTIFACT('**/*.java', RunJavaTestCode)
+        ARTIFACT('**/*.class', RunJavaTestClass)
+        ARTIFACT('**/*.scala', RunScalaTestCode)
+        ARTIFACT('**/*.kt', RunKotlinTestCode)
+        ARTIFACT('**/pom.xml', RunMaven) {
+            @targets = [ 'test' ]
+        }
     }
 
     ARTIFACT("compile:*") {
@@ -42,8 +59,8 @@
         ARTIFACT('**/*.php',    ValidatePhpScript)
 
         ARTIFACT('**/*.py',    ValidatePythonScript)
-        ARTIFACT('**/*.xml',   ValidateXML)
         ARTIFACT('**/pom.xml', CompileMaven)
+        ARTIFACT('**/*.xml',   ValidateXML)
         ARTIFACT('**/*.tt',    CompileTTGrammar)
         ARTIFACT('**/*.sass',  CompileSass)
 
@@ -61,15 +78,4 @@
     ARTIFACT('grep:', GREP) {
         @grep = $lithium_args[0] if $lithium_args.length > 0
     }
-
-    ARTIFACT('inspect:*',  INSPECT)
-    ARTIFACT('tree:*',     TREE)
-    ARTIFACT('require:*',  REQUIRE)
-    ARTIFACT('cleanup:*',  CLEANUP)
-    ARTIFACT('meta:*',     META)
-
-    ARTIFACT('INSTALL:', INSTALL)
-
-
-    ARTIFACT('init:', INIT)
 }

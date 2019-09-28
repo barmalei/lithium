@@ -15,7 +15,6 @@ class ValidateXML < FileMask
     def build_item(path, mt)
         fp = fullpath(path)
         parser = REXML::Parsers::PullParser.new(File.new(fp, 'r'))
-        raise "test ex"
         begin
             parser.each { |res| }
         rescue Exception => ee
