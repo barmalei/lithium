@@ -1378,6 +1378,30 @@ module ArtifactContainer
         _meta.sort
     end
 
+    def method_missing(meth, *args, &block)
+        if meth.length > 2
+            begin
+                clazz = Module.const_get(meth)
+                return ARTIFACT(*args, clazz, &block) if clazz < Artifact
+            rescue NameError
+            end
+        end
+
+        super
+        # switched = false
+        # if  @@calls_stack.length == 0 || @@calls_stack.last.original_instance != @original_instance
+        #     @@calls_stack.push(self)
+        #     switched = true
+        # end
+
+        # begin
+        #     return @original_instance.send(meth, *args, &block)
+        # ensure
+        #     @@calls_stack.pop() if switched
+        # end
+    end
+
+
     # return reference to an artifact meta info
     def REF(name)
         name = ArtifactName.new(name)

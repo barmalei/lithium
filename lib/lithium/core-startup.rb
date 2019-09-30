@@ -50,12 +50,15 @@ STD_RECOGNIZERS({
 
     RunNodejs    => [ Std::FileLocRecognizer.new(ext: 'js')  ],
 
-    CheckStyle   => [ Std::FileLocRecognizer.new('\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?') ],
+    JavaCheckStyle => [ Std::FileLocRecognizer.new('\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?') ],
+
+    JavaScriptHint => [ Std::FileLocRecognizer.new('^(?<file>${file_pattern}\.js):\s*line\s*(?<line>[0-9]+)\s*\,\s*col\s+(?<column>[0-9]+)?') ],
 
     RunPhpScript => [ Std::FileLocRecognizer.new('\s*Parse error\:(?<file>${file_pattern}\.php)\s+in\s+on\s+line\s+(?<line>[0-9]+)')  ],
 
     RunMaven     => [
-        Std::FileLocRecognizer.new('\s*\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]')
+        Std::FileLocRecognizer.new('\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]'),
+        Std::FileLocRecognizer.new('(?<file>${file_pattern}\.[a-zA-Z_]+)\:(?<line>[0-9]+)\:(?<column>[0-9]+)')
     ],
 
     'default'    => [

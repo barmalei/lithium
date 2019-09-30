@@ -60,6 +60,7 @@ class Std
         @@std.flush() if @@std
         @@std = super(*args, &block)
         $stdout = @@std
+        $stderr = @@std
         @@std
     end
 
@@ -253,7 +254,7 @@ class Std
         # fatal error has happened in Std implementation
         STDERR.puts 'Fatal error has occurred:'
         STDERR.puts " #{$!.message}:"
-        e.backtrace().each { | line | STDERR.puts "     #{line}" }
+        e.backtrace.each { | line | STDERR.puts "     #{line}" }
     end
 
     # show exception stack trace according to configured "@@backtrace_deepness"
@@ -333,6 +334,7 @@ class Std
             end
         }
 
+        # check if an artifact has a custom formatter
         if cur_art && cur_art.kind_of?(StdFormater)
             self << cur_art.format(msg, level, entities) # print formatted message
         else

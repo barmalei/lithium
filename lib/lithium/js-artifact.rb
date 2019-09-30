@@ -261,7 +261,18 @@ class JavaScriptDoc < FileArtifact
     end
 end
 
-class CompileTypeScript
-
+class CompileTypeScript < FileMask
 end
 
+
+class JavaScriptHint < FileMask
+    REQUIRE JS
+
+    def build()
+        raise "Linting of '#{@name}' failed" if Artifact.exec('jshint', fullpath) != 0
+    end
+
+    def what_it_does()
+        return "JavaScript lint '#{@name}'"
+    end
+end

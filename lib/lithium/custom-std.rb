@@ -27,9 +27,9 @@ class HtmlStd < LithiumStd
 
     def format(msg, level, entities)
         msg = super(msg, level, entities)
-        msg = "<font color='red'>#{msg}</font>" if level == 2
+        msg = "<font color='red'>#{msg}</font>"    if level == 2
         msg = "<font color='orange'>#{msg}</font>" if level == 3
-        msg = "<font color='blue'>#{msg}</font>" if level == 1
+        msg = "<font color='blue'>#{msg}</font>"   if level == 1
         msg.gsub('  ', '&nbsp;&nbsp;')
     end
 end

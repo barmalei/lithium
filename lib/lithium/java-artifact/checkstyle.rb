@@ -4,7 +4,7 @@ require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
-class CheckStyle < FileMask
+class JavaCheckStyle < FileMask
     include OptionsSupport
 
     REQUIRE JAVA
