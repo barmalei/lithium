@@ -1,5 +1,5 @@
 -> {
-    ARTIFACT('touch:*', Touch)
+    Touch('touch:*')
 
     ARTIFACT('minjs:**/*.min.js',  UglifiedJSFile)
     ARTIFACT('npm:**/node_modules/*',  NodejsModule)
@@ -22,18 +22,18 @@
     }
 
     ARTIFACT("run:*") {
-        ARTIFACT('**/*.java',   RunJavaCode)
-        ARTIFACT('**/*.js',     RunNodejs)
-        ARTIFACT('**/*.py',     RunPythonScript)
-        ARTIFACT('**/*.php',    RunPhpScript)
-        ARTIFACT('**/*.sh',     RunShell)
-        ARTIFACT('**/*.jar',    RunJAR)
-        ARTIFACT('**/pom.xml',  RunMaven)
-        ARTIFACT('**/*.groovy', RunGroovyScript)
-        ARTIFACT('**/*.kt',     RunKotlinCode)
-        ARTIFACT('**/*.scala',  RunScalaCode)
-        ARTIFACT('**/*.class',  RunJavaClass)
-        ARTIFACT('**/*.rb',     RunRubyScript) {
+        RunJavaCode      ('**/*.java')
+        RunNodejs        ('**/*.js')
+        RunPythonScript  ('**/*.py')
+        RunPhpScript     ('**/*.php')
+        RunShell         ('**/*.sh')
+        RunJAR           ('**/*.jar')
+        RunMaven         ('**/pom.xml')
+        RunGroovyScript  ('**/*.groovy')
+        RunKotlinCode    ('**/*.kt')
+        RunScalaCode     ('**/*.scala')
+        RunJavaClass     ('**/*.class')
+        RunRubyScript    ('**/*.rb') {
             DONE { | art |
                 Touch.build('dsdsd')
             }
@@ -41,37 +41,41 @@
     }
 
     ARTIFACT("test:*") {
-        ARTIFACT('**/*.java', RunJavaTestCode)
-        ARTIFACT('**/*.class', RunJavaTestClass)
-        ARTIFACT('**/*.scala', RunScalaTestCode)
-        ARTIFACT('**/*.kt', RunKotlinTestCode)
-        ARTIFACT('**/pom.xml', RunMaven) {
-            @targets = [ 'test' ]
+        RunJavaTestCode('**/*.java')
+        RunJavaTestClass('**/*.class')
+        RunScalaTestCode('**/*.scala')
+        RunKotlinTestCode('**/*.kt')
+        RunMaven('**/pom.xml') {
+            TARGETS('test')
         }
     }
 
     ARTIFACT("compile:*") {
-        ARTIFACT('**/*.java',   JavaCompiler)  { OPT "-Xlint:deprecation" }
-        ARTIFACT('**/*.groovy', GroovyCompiler)
-        ARTIFACT('**/*.kt',     CompileKotlin)
-        ARTIFACT('**/*.scala',  CompileScala)
-        ARTIFACT('**/*.rb',     ValidateRubyScript)
-        ARTIFACT('**/*.php',    ValidatePhpScript)
+        JavaCompiler      ('**/*.java')  { OPT "-Xlint:deprecation" }
+        GroovyCompiler    ('**/*.groovy')
+        CompileKotlin     ('**/*.kt')
+        CompileScala      ('**/*.scala')
+        ValidateRubyScript('**/*.rb')
+        ValidatePhpScript ('**/*.php')
 
-        ARTIFACT('**/*.py',    ValidatePythonScript)
-        ARTIFACT('**/pom.xml', CompileMaven)
-        ARTIFACT('**/*.xml',   ValidateXML)
-        ARTIFACT('**/*.tt',    CompileTTGrammar)
-        ARTIFACT('**/*.sass',  CompileSass)
+        ValidatePythonScript('**/*.py')
+        CompileMaven        ('**/pom.xml')
+        ValidateXML         ('**/*.xml')
+        CompileTTGrammar    ('**/*.tt')
+        CompileSass         ('**/*.sass')
 
-        ARTIFACT('**/*', GroupByExtension) {
+        GroupByExtension('**/*') {
             DO { | ext |
                 BUILD_ARTIFACT("compile:#{@name}#{ext}")
             }
         }
     }
 
-    ARTIFACT('check:**/*.java', CheckStyle)
+    ARTIFACT('check:*') {
+        JavaCheckStyle('**/*.java')
+        JavaScriptHint('**/*.js')
+    }
+
     ARTIFACT('pmd:**/*.java',        PMD)
     #ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
 
