@@ -9,6 +9,7 @@ require 'lithium/core-std'
 class MVN < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
+    include OptionsSupport
 
     log_attr :mvn_home
 
@@ -175,15 +176,21 @@ class RunMaven < POMFile
         true
     end
 
+    def TARGETS(*args)
+        @targets = []
+        args.each { | target |
+            @targets.push(target)
+        }
+    end
+
     def build
         path = fullpath()
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
-
         Dir.chdir(File.dirname(path));
-        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, OPTS(),  @targets.join(' ')) != 0
+        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(),  @targets.join(' ')) != 0
     end
 
-    def what_it_does() "Run maven: '#{@name}' #{@targets.join(' ')}" end
+    def what_it_does() "Run maven: '#{@name}' #{@targets.join(' ')} OPTS=#{@mvn.OPTS()}" end
 end
 
 class CompileMaven < RunMaven

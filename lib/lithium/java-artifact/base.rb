@@ -204,7 +204,7 @@ end
 class JAVA < JVM
     include AutoRegisteredArtifact
 
-    log_attr :java_home, :java_version, :java_version_low, :java_version_high
+    log_attr :java_home, :jdk_home, :java_version, :java_version_low, :java_version_high
 
     def initialize(*args)
         super
@@ -219,8 +219,15 @@ class JAVA < JVM
                 @java_home = File.dirname(File.dirname(@java_home)) if @java_home
             end
         end
+
         raise 'Java home cannot be identified' if @java_home.nil?
         @java_home = @java_home.gsub('\\','/')
+
+        unless @jdk_home
+            @jdk_home = @java_home
+        else
+            raise "JDK '#{@jdk_home}' directory is invalid" if !File.exists?(@jdk_home) || !File.directory?(@jdk_home)
+        end
 
         @java_version_version = '?'
         @java_version_low     = '?'
@@ -259,8 +266,8 @@ class JAVA < JVM
     protected
 
     def jtool(tool)
-        path = File.join(@java_home, 'bin', tool)
-        return path if File.exists?(path) || (File::PATH_SEPARATOR && File.exists?(path + '.exe'))
+        path = File.join(@jdk_home, 'bin', tool)
+        return path if File.exists?(path) || (File::PATH_SEPARATOR == ';' && File.exists?(path + '.exe'))
         puts_warning "'#{path}' not found. Use '#{tool}' as is"
         return tool
     end

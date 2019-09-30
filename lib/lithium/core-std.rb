@@ -318,17 +318,18 @@ class Std
         entities.each_pair { | k, v | a << v }               # collect all found entities in "a" array
         a.sort!() { |aa, bb| aa.start_at <=> bb.start_at  }  # sort found entities by its location in the message
 
-
         # perform replacing found entities fragments in initial
         # string with normalized version of the entities
         a.each_index { | i |
             e = a[i]
-            msg[e.start_at .. e.end_at - 1] = e.to_s  # replace fragment in original message
-            dt = e.start_at + e.length - e.end_at
-            e.end_at = e.start_at + e.length
-            for j in (i + 1)..(a.length-1)
-                a[j].end_at = a[j].end_at + dt
-                a[j].start_at += dt
+            if e.start_at >= 0
+                msg[e.start_at .. e.end_at - 1] = e.to_s  # replace fragment in original message
+                dt = e.start_at + e.length - e.end_at
+                e.end_at = e.start_at + e.length
+                for j in (i + 1)..(a.length-1)
+                    a[j].end_at = a[j].end_at + dt
+                    a[j].start_at += dt
+                end
             end
         }
 
