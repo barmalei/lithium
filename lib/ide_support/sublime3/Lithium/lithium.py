@@ -1,27 +1,21 @@
+import sublime, sublime_plugin, subprocess, threading, functools, os, datetime, io
 
-import sublime, sublime_plugin, subprocess, threading, functools, os, datetime
+settings = {
+    'path'          : "lithium",
+    'output_panel'  : "lithium",
+    'output_font_size'  : 11,
+    'debug'         : False,
+    'std_formatter' : "SublimeStd",
+    'output_syntax' : 'Packages/Lithium/lithium.tmLanguage',
+    'place_detector': [
+        r"\[\[([^\[\]\(\)\{\}\?\!\<\>\^\,\~\`]+)\:([0-9]+)\]\][\:]*(.*)"
+    ]
+}
 
-li_debug = True
-li_active_output_view = None
-li_output_views = {}
+def li_is_debug():
+    return settings.get('debug')
 
-# reg exp to detect path to files
-# TODO: has to be corrected to use unified output provided with
-# lithium
-place_detector = [
-    r"\[\[([^\[\]\(\)\{\}\?\!\<\>\^\,\~\`]+)\:([0-9]+)\]\][\:]*(.*)",       # JAVA error and JAVA exception
-  #  r"\[WARN\]\s+([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\:\s*([0-9]+)\:\s*[0-9]+\:\s*(.*)"     # JAVA style sheet
-  #  r"\(ERR\)\s+\?\s+js\:\s*\"([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\",\s+line\s+([0-9]+)",  # JS
-  #  r"\(ERR\)\s+\?\s+([^\[\]\:\(\)\{\}\?\!\<\>\^\,\~\`]+)\:\s+([0-9]+)\:"                  # GROOVY
-]
-
-li_script_path = "ruby Z:/projects/.lithium/lib/lithium.rb"
-li_std_formatter = "SublimeStd"
-
-def  li_is_debug():
-    global li_is_debug
-    return li_debug
-
+# DEBUG: convert view to its string representation
 def  li_view_to_s(view):
     if view == None:
         return "view is [ NONE ]"
@@ -35,7 +29,7 @@ def  li_view_to_s(view):
         wid = win.id()
     return "view [ id = " + str(view.id()) + ", name = '" + view.name() + "', winid = " + str(wid) + ", path = " + name + "]"
 
-
+# detect lithium project home folder by looking lithium folder up
 def detect_li_project_home(pt):
     if pt != None and os.path.abspath(pt) and os.path.exists(pt):
         if os.path.isfile(pt):
@@ -52,7 +46,7 @@ def detect_li_project_home(pt):
     return None
 
 #
-# return array that contains list of detected files and lines if the files:
+# return array that contains list of detected files and lines in the files:
 # [ [path, lineNumber ], ...  ]
 def li_paths_by_output(view):
     if li_is_debug():
@@ -60,6 +54,7 @@ def li_paths_by_output(view):
 
     paths = []
     delim = "<!<*>!>"
+    place_detector = settings.get('place_detector')
     for r in place_detector:
         res = []
         view.find_all(r, sublime.IGNORECASE, "\\1" + delim + "\\2" + delim + "\\3", res)
@@ -108,8 +103,6 @@ def li_show_paths(view, win=None):
         if win == None:
             win = sublime.active_window()
 
-        win.run_command("show_panel", {"panel": "output.lithium"})
-
         paths = li_paths_by_output(view)
         l     = len(paths)
 
@@ -129,119 +122,150 @@ def li_show_paths(view, win=None):
             if li_is_debug():
                 print("li_show_paths() : No paths have been found")
 
+def EXEC_LI(command, handler, error_handler):
+    def WRITES(process, panel, handler, error_handler):
+        #sublime.set_timeout(lambda: self.do_write(text), 1)
+        try:
+            panel.run_command('append', { 'characters' :  "(INF) Lithium Sublime 3 plugin\n" })
+            for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
+                panel.run_command('append', { 'characters' :  line, 'force': True, 'scroll_to_end': True })
+                handler(process, panel, line)
 
-class liCommand(sublime_plugin.TextCommand):
-    def get_view(self):
-        if not hasattr(self, "current_view"):
-            self.current_view = sublime.active_window().active_view()
-        return self.current_view
+            # tell the last lkine has been handled
+            process.stdout.close()
+            handler(process, panel, None)
+        except Exception as ex:
+            print(ex)
+            error_handler(command, ex)
+            
+    panel         = LI_PANEL()
+    script_path   = settings.get("path")
+    std_formatter = settings.get("std_formatter")
 
-    def run(self, edit, **args):
+    if li_is_debug():
+        print("liCommand.run(): subprocess.Popen = " + script_path + " -std=" + std_formatter + " " + command)
+
+    process = subprocess.Popen(script_path + " -std=" + std_formatter + " " + command,
+                               shell  = True,
+                               stdin  = subprocess.PIPE,
+                               stdout = subprocess.PIPE,
+                               stderr = subprocess.STDOUT,
+                               universal_newlines = False,
+                               bufsize = 0)
+    threading.Thread(
+        target = WRITES,
+        #args   = (panel, )
+        args   = (process, panel, handler, error_handler)
+    ).start()
+
+
+    sublime.active_window().run_command("show_panel", { "panel": "output.lithium" })
+    return process
+
+def LI_PANEL():
+    name  = settings.get('output_panel')
+    panel = sublime.active_window().create_output_panel(name)
+    panel.settings().set("gutter", False)
+    panel.settings().set("font_size", settings.get('output_font_size'))
+    panel.settings().set("line_numbers", False)
+    panel.settings().set("scroll_past_end", False)
+    panel.set_name(name)
+    panel.set_scratch(True)
+    panel.set_read_only(False)
+    panel.set_syntax_file(settings.get('output_syntax'))
+    return panel
+
+class liCommand(sublime_plugin.WindowCommand):
+    #panel_lock = threading.Lock()
+    process = None
+
+    def is_enabled(self, **args):
+        return True
+        #return self.process is None
+        #sreturn self.process is not None and self.process.poll() is None
+
+    def run(self, **args):
+        if self.process is not None:
+            print("Termenating process")
+            self.process.terminate()
+            return
+
         # save current edited view if necessary
-        if self.get_view().is_dirty():
-            self.get_view().window().run_command('save')
+        active_view = sublime.active_window().active_view()
+        if active_view is not None and active_view.is_dirty():
+            active_view.window().run_command('save')
 
         if li_is_debug():
             print("liCommand.run(): self = " + str(self))
 
         # fetch command from args list
-        self.command = ""
+        command = ""
         if "command" in args:
-            self.command = args["command"]
+            command = args["command"]
 
-        view = self.get_view()
         if li_is_debug():
-            print("liCommand.run(): command = " + self.command + "," + li_view_to_s(view))
+            print("liCommand.run(): command = " + command + "," + li_view_to_s(active_view))
 
         # detect home folder
         li_home = None
-        if view.file_name() != None:
-            li_home = detect_li_project_home(view.file_name())
+        if active_view.file_name() != None:
+            li_home = detect_li_project_home(active_view.file_name())
         if li_home == None:
-            folders = self.get_view().window().folders()
+            folders = active_view.window().folders()
             if len(folders) > 0:
                 for folder in folders:
                     li_home = detect_li_project_home(folder)
                     if li_home != None:
                         break
 
+        # collect place holders values in dictionary
         placeholders = {}
-
         if li_home == None:
             if li_is_debug():
                 print("liCommand.run(): project home directory cannot be detected")
         else:
-            placeholders['home'] = li_home
+            hm = li_home
+            # wrap with quotas path that contains spaces
+            if hm != "\"" and hm.find(" ") > 0:
+                hm = "\"" + hm + "\""
+
+            placeholders['home'] = hm
             if li_is_debug():
                 print("liCommand.run(): Detected home folder " + str(li_home))
 
-        if view.file_name() != None:
-            placeholders['file'] = view.file_name()
+        if active_view.file_name() != None:
+            fn = active_view.file_name()
+            # wrap with quotas path that contains spaces
+            if fn[0] != "\"" and fn.find(" ") > 0:
+                fn = "\"" + fn + "\""
+            placeholders['file'] = fn
+
+        # apply placeholders to command line
+        try:
+            command = command.format(**placeholders)
+        except KeyError:
+            sublime.error_message("Lithium command '%s' cannot be interpolated with %s" % (command, str(placeholders)))
 
         try:
-            self.command = self.command.format(**placeholders)
-        except KeyError:
-            sublime.error_message("Lithium command '" + str(self.command) + "' cannot be interpolated with " + str(placeholders))
+            self.process = EXEC_LI(command, self.output, self.error)
+        except Exception as ex:
+            self.process = None
+            sublime.error_message("Lithium '%s' command execution has failed('%s')" % (command, str(ex)))
 
-        if li_is_debug():
-            print("liCommand.run(): subprocess.Popen = " + li_script_path + " -std=" + li_std_formatter + " " + self.command)
+    def error(self, command, err):
+        sublime.error_message("Lithium '%s' command execution failed: ('%s')" % (command, str(err)))
 
-        # run command as a subprocess
-        process = subprocess.Popen(li_script_path + " -std=" + li_std_formatter + " " + self.command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-        # read the started process output and print it in put buffer
-        while True:
-            line = process.stdout.read()
-            self.output(line, edit)
-            if process.poll() is not None:
-                return process.returncode
-
-    def output(self, value, edit, panel_name="lithium"):
-        if not hasattr(self, 'output_panel'):
-            self.output_panel = self.get_view().window().get_output_panel(panel_name)
-            if li_is_debug():
-                print("liCommand.output(): create output view: " + li_view_to_s(self.output_panel))
-        else:
-            if li_is_debug():
-                print("liCommand.output(): created view has been found: " + li_view_to_s(self.output_panel))
-
-        panel = self.output_panel
-        panel.settings().set("gutter", False)
-        panel.settings().set("font_size", 12)
-        panel.set_name("lithium")
-        panel.set_scratch(True)
-        panel.set_read_only(False)
-        panel.set_syntax_file('Packages/Lithium/lithium.tmLanguage')
-
-        if li_is_debug():
-            print("liCommand.output(): setup output view panel content: " + li_view_to_s(panel))
-
-        #edit = panel.begin_edit() // sublime 2
-        panel.erase(edit, sublime.Region(0, panel.size()))
-        panel.insert(edit, panel.size(), str(datetime.datetime.today()) + "  ")
-        panel.insert(edit, panel.size(), "'" + self.command + "'\n")
-        panel.insert(edit, panel.size(), value.decode('utf-8'))
-        #panel.end_edit(edit) //sublime 2
-
-        panel.set_read_only(True)
-        if li_is_debug():
-            print("liCommand.output(): show output view panel: " + li_view_to_s(panel))
-
-        self.get_view().window().run_command("show_panel", {"panel": "output." + panel_name})
-
-        regions = panel.find_by_selector("li.exception")
-        if len(regions) == 0:
-            regions = panel.find_by_selector("li.error")
-        if len(regions) > 0:
-            panel.show_at_center(regions[0])
-        else:
-            panel.show_at_center(panel.size())
-
-        # stick output panel to edited file window
-        global li_output_views
-        wid = self.get_view().window().id()
-        li_output_views[wid] = panel
-
+    def output(self, process, panel, line):
+        if line is None:
+            self.process = None
+        #else:
+            # regions = panel.find_by_selector("li.exception")
+            # if len(regions) == 0:
+            #     regions = panel.find_by_selector("li.error")
+            # #if len(regions) > 0:
+             #   panel.show_at_center(regions[0])
+            #else:
+                #panel.show_at_center(panel.size())
 
 class liPrintScopeCommand(sublime_plugin.TextCommand):
     def run(self, edit):
@@ -250,33 +274,14 @@ class liPrintScopeCommand(sublime_plugin.TextCommand):
         print("Scope: " + n)
 
 
-class LiEventListener(sublime_plugin.EventListener):
-    def on_close(self, view):
-        if li_is_debug():
-            print("LiEventListener.on_close() : " + li_view_to_s(view))
-
-    def on_activated(self, view):
-        if li_is_debug():
-            print("LiEventListener.on_activated() : " + li_view_to_s(view))
-        if view.name() == 'lithium':
-            global li_active_output_view
-            li_active_output_view = view
-
-    def on_deactivated(self, view):
-        if li_is_debug():
-            print("LiEventListener.on_deactivated() : " + li_view_to_s(view))
-        global li_active_output_view
-        li_active_output_view = None
-
-
 class liGoCommand(sublime_plugin.TextCommand):
     def run(self, edit):
-        global li_active_output_view
+        li_active_output_view = sublime.active_window().find_output_panel(settings.get('output_panel'))
 
         if li_is_debug():
             print("liGoCommand.run() : GO to text command : " + li_view_to_s(li_active_output_view))
 
-        if li_active_output_view != None:
+        if li_active_output_view is not None:
             if li_is_debug():
                 print("liGoCommand.run(): found active output : " + li_view_to_s(li_active_output_view))
 
@@ -296,26 +301,13 @@ class liGoCommand(sublime_plugin.TextCommand):
             # global li_output_view
             if li_is_debug():
                 print("liGoCommand.run() : No active view was found")
-            # li_show_paths(li_output_view)
-
 
 class liShowPathsCommand(sublime_plugin.TextCommand):
     def run(self, edit):
-        global li_active_output_view
+        li_active_output_view = sublime.active_window().find_output_panel(settings.get('output_panel'))
+
         if li_is_debug():
             print("liShowPathsCommand.run() : Show paths : " + li_view_to_s(li_active_output_view))
-        if li_active_output_view != None:
+
+        if li_active_output_view is not None:
             li_show_paths(li_active_output_view)
-        else:
-            if li_is_debug():
-                print("liShowPathsCommand.run() : cannot find activate 'lithium' view")
-
-            wid = sublime.active_window().id()
-            global li_output_views
-            if wid in li_output_views:
-                v = li_output_views[wid]
-                if li_is_debug():
-                    print("liShowPathsCommand.run() : Found 'lithium' " + li_view_to_s(v) + " by win id = " + str(wid))
-                li_show_paths(v, sublime.active_window())
-
-

@@ -1,61 +1,38 @@
 [
-   {
- 	   "keys": ["f11"],
- 	   "command": "li",
-	   "args": { "command":"run:"}
- 	 },
- 	 {
-  	  "keys": ["super+b"],
-  	  "command": "li",
- 	    "args": { "command":"compile:{file}"},
-      "context":
-      [
-          { "key": "selector", "operator": "not_equal", "operand" : "source.json-tmlanguage"}, 
-          { "key": "selector", "operator": "not_equal", "operand" : "GsDoc.go"}, 
-          { "key": "selector", "operator": "not_equal", "operand" : "source.haskell"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.erlang"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.d"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.makefile"}
-      ]
-   },
-   {
-      "keys": ["super+alt+b"],
-      "command": "li",
-      "args": { "command":""},
-      "context":
-      [
-          { "key": "selector", "operator": "not_equal", "operand" : "source.json-tmlanguage"}, 
-          { "key": "selector", "operator": "not_equal", "operand" : "GsDoc.go"}, 
-          { "key": "selector", "operator": "not_equal", "operand" : "source.haskell"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.erlang"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.d"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.makefile"}
-      ]
-   },
-   {
-      "keys": ["super+enter"],
-      "command": "li",
-      "args": { "command":"run:{file}"},
-      "context":
-      [
-          { "key": "selector", "operator": "not_equal", "operand" : "source.json-tmlanguage"}, 
-          { "key": "selector", "operator": "not_equal", "operand" : "GsDoc.go"}, 
-          { "key": "selector", "operator": "not_equal", "operand" : "source.haskell"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.erlang"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.d"},
-          { "key": "selector", "operator": "not_equal", "operand" : "source.makefile"}
-      ]
-   },
-   {
-      "keys": ["super+shift+b"],
-      "command": "li_show_paths"
-   },
- 	 {
-  	   "keys": ["f10"],
-  	   "command": "li_go",
- 	     "context":
-	   	 [
-			    { "key": "selector", "operator": "equal", "operand": "source.lithium" }
-		   ]
-  	}
+    {
+        "keys": ["f11"],
+        "command": "li",
+        "args": { "command":"run:"}
+    },
+    {
+        "keys": ["super+b"],
+        "command": "li",
+        "args": { "command":"compile:{file}"}
+    },
+    {
+        "keys": ["super+alt+b"],
+        "command": "li",
+        "args": { "command":""}
+    },
+    {
+        "keys": ["super+enter"],
+        "command": "li",
+        "args": { "command":"run:{file}"}
+    },
+    {
+        "keys": ["super+shift+enter"],
+        "command": "li",
+        "args": { "command":"test:{file}"}
+    },
+    {
+        "keys": ["super+shift+b"],
+        "command": "li_show_paths"
+    },
+    {
+        "keys": [ "f10" ],
+        "command": "li_go",
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.lithium" }
+        ]
+    }
 ]
