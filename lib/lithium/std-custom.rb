@@ -1,4 +1,4 @@
-require 'lithium/core-std'
+require 'lithium/std-core'
 require 'pathname'
 
 
@@ -35,27 +35,30 @@ class HtmlStd < LithiumStd
 end
 
 class SublimeStd < LithiumStd
-    def normalize(entities)
-        fe = entities['file']
-        yield fe.clone("[[#{fe}:#{entities['line']}]]") if fe
-
-        le = entities['line']
-        yield le.empty if le
-
-        ce = entities['column']
-        yield ce.empty if ce
+    def format(msg, level, transformer)
+        unless transformer.nil?
+            transformer.convert?(:location) {
+                '[[%{file}:%{line}]]'
+            }
+            msg = transformer.to_s
+        end
+        super(msg, level, transformer)
     end
 end
 
 class VSCodeStd < LithiumStd
+    def format(msg, level, transformer)
+        unless transformer.nil?
+            transformer.convert(:location) { | location |
+                'file://%{file}#%{line}'
+            }
+            msg = transformer.to_s
+        end
+        super(msg, level, transformer)
+    end
+
     def normalize(entities)
         fe = entities['file']
-        yield fe.clone("file://#{fe}##{entities['line']}") if fe
-
-        le = entities['line']
-        yield le.empty if le
-
-        ce = entities['column']
-        yield ce.empty if ce
+        yield fe.clone() if fe
     end
 end

@@ -2,8 +2,9 @@ require 'date'
 
 require 'lithium/core'
 require 'lithium/core-command'
-require 'lithium/core-std'
-require 'lithium/custom-std'
+require 'lithium/std-core-pattern'
+require 'lithium/std-core'
+require 'lithium/std-custom'
 
 require 'lithium/java-artifact/compiler'
 require 'lithium/java-artifact/runner'
@@ -24,46 +25,94 @@ require 'lithium/web-artifact'
 
 require 'lithium/misc-artifact'
 
-# specify how deep an exception has to be shown
-Std.backtrace(0)
+# Proposed pattern definition syntacsis
+#  -> {
+#     PATTERN(JavaExceptionLocPattern.new).TO(JavaFileRunner)
+
+#     PATTERN {
+#         any('^\s*File\s+'); group(:location) { dquotes { file('py') }; any(',\s*line\s+'); line; }
+#     }.TO(ValidatePythonScript, RunPythonScript)
+# }
 
 # STD recognizers
-STD_RECOGNIZERS({
+PATTERNS ({
     JavaFileRunner => [
-       Std::FileLocRecognizer.new('\s+at\s+(?<class>[a-zA-Z_$][\-0-9a-zA-Z_$.]*)\s*\((?<file>${file_pattern}\.(java|kt|scala))\:(?<line>[0-9]+)\)')
+       # '\s+at\s+(?<class>[a-zA-Z_$][\-0-9a-zA-Z_$.]*)\s*\((?<file>${file_pattern}\.(java|kt|scala))\:(?<line>[0-9]+)\)'
+       JavaExceptionLocPattern.new()
     ],
 
     [ JavaCompiler, PMD ] => [
-        Std::FileLocRecognizer.new(),
-        Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile')
+        # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
+
+        JavaCompileErrorPattern.new()
     ],
 
     [ ValidatePythonScript, RunPythonScript ] => [
-        Std::FileLocRecognizer.new('\s*File\s+\"(?<file>${file_pattern}\.py)\"\,\s*line\s+(?<line>[0-9]+)')
+        # '\s*File\s+\"(?<file>${file_pattern}\.py)\"\,\s*line\s+(?<line>[0-9]+)')
+        StdPattern.new {
+            any('^\s*File\s+'); group(:location) { dquotes { file('py') }; any(',\s*line\s+'); line; }
+        }
     ],
 
     [ ValidateRubyScript, RunRubyScript ] => [
 
     ],
 
-    ValidateXML  => [ Std::FileLocRecognizer.new(ext: 'xml') ],
-
-    RunNodejs    => [ Std::FileLocRecognizer.new(ext: 'js')  ],
-
-    JavaCheckStyle => [ Std::FileLocRecognizer.new('\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?') ],
-
-    JavaScriptHint => [ Std::FileLocRecognizer.new('^(?<file>${file_pattern}\.js):\s*line\s*(?<line>[0-9]+)\s*\,\s*col\s+(?<column>[0-9]+)?') ],
-
-    RunPhpScript => [ Std::FileLocRecognizer.new('\s*Parse error\:(?<file>${file_pattern}\.php)\s+in\s+on\s+line\s+(?<line>[0-9]+)')  ],
-
-    RunMaven     => [
-        Std::FileLocRecognizer.new('\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]'),
-        Std::FileLocRecognizer.new('(?<file>${file_pattern}\.[a-zA-Z_]+)\:(?<line>[0-9]+)\:(?<column>[0-9]+)')
+    ValidateXML  => [
+        FileLocPattern.new('xml')
     ],
 
-    'default'    => [
-        /.*(?<url>\b(http|https|ftp|ftps|sftp)\:\/\/[^ \t]*)/, # URL recognizer
-        Std::FileLocRecognizer.new(ext: 'rb')                  # catch unexpected ruby exception
+    RunNodejs => [
+        FileLocPattern.new('js')
+    ],
+
+    JavaCheckStyle => [
+        # '\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?'
+        StdPattern.new {
+            brackets { identifier(:level) }; spaces; location('java')
+        }
+    ],
+
+    JavaScriptHint => [
+        # '^(?<file>${file_pattern}\.js):\s*line\s*(?<line>[0-9]+)\s*\,\s*col\s+(?<column>[0-9]+)?'
+        StdPattern.new {
+            any('^\s*')
+            group(:location) {
+                file('js'); colon; line; any('\s*col\s+'); column?
+                column
+            }
+        }
+    ],
+
+    RunPhpScript => [
+        # '\s*Parse error\:(?<file>${file_pattern}\.php)\s+in\s+on\s+line\s+(?<line>[0-9]+)'
+        StdPattern.new {
+            any('\s*Parse error\:'); group(:location) { file('php'); any('\s+in\s+on\s+'); line }
+        }
+    ],
+
+    RunMaven => [
+        # '\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]'
+        StdPattern.new {
+            any('\[ERROR\]\s+'); group(:location) { file; colon; brackets { line; any('\s*,\s*'); column? }; }
+        },
+
+        # '(?<file>${file_pattern}\.[a-zA-Z_]+)\:(?<line>[0-9]+)\:(?<column>[0-9]+)'
+        StdPattern.new {
+           location
+        }
+    ],
+
+    Artifact => [
+        # .*(?<url>\b(http|https|ftp|ftps|sftp)\:\/\/[^ \t]*)
+        StdPattern.new {
+            any('\b')
+            group(:url) {
+                group(:scheme, '(http|https|ftp|ftps|sftp)'); any('\:\/\/'); group(:path, '[^ \t]*')
+            }
+        },
+
+        FileLocPattern.new()
     ]
 })
 
@@ -77,8 +126,7 @@ def BUILD_ARTIFACT(name, &block)
 
     tree.build()
     tree.norm_tree()
-    BUILD_ARTIFACT_TREE(tree.root_node)
-    return tree.root_node.art
+    return BUILD_ARTIFACT_TREE(tree.root_node)
 end
 
 def BUILD_ARTIFACT_TREE(root, level = 0)
@@ -103,14 +151,18 @@ def BUILD_ARTIFACT_TREE(root, level = 0)
             art.build_done()
         rescue
             art.build_failed()
-            raise
+            level = $lithium_options.key?('verbosity') ? $lithium_options['verbosity'].to_i : 0
+            puts_exception($!, 0) if level == 0
+            puts_exception($!, 3) if level == 1
+            raise if level == 2
+            return false
         ensure
             $current_artifact = nil
         end
     else
         puts_warning "'#{art.name}' does not declare build() method"
     end
-    true
+    return true
 end
 
 #
@@ -175,42 +227,43 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         $litium_entities_count  = 0
         File.delete($litium_entities_file) if File.exist?($litium_entities_file)
         File.open($litium_entities_file, 'a') { | f | f.puts '[' }
-        def std_i.entities_detected(msg, entities)
-            $litium_entities_buffer.push(entities)
-            if $litium_entities_buffer.length  > 100
-                File.open($litium_entities_file, 'a') { | f |
-                    $litium_entities_buffer.each { | entity |
-                        entity.each_pair {  | k, v |
-                            entity[k] = nil if !v.nil? && v == ''
-                        }
 
-                        f.puts ',' if $litium_entities_count > 0
-                        f.print "    #{entity.to_json}"
-                        $litium_entities_count += 1
-                    }
-                }
-                $litium_entities_buffer = []
-            end
-        end
+        # def std_i.entities_detected(msg, entities)
+        #     $litium_entities_buffer.push(entities)
+        #     if $litium_entities_buffer.length  > 100
+        #         File.open($litium_entities_file, 'a') { | f |
+        #             $litium_entities_buffer.each { | entity |
+        #                 entity.each_pair {  | k, v |
+        #                     entity[k] = nil if !v.nil? && v == ''
+        #                 }
 
-        at_exit {
-            # flush detected entities buffer
-            File.open($litium_entities_file, 'a') { | f |
-                $litium_entities_buffer.each { | entity |
-                    entity.each_pair {  | k, v |
-                        entity[k] = nil if !v.nil? && v == ''
-                    }
+        #                 f.puts ',' if $litium_entities_count > 0
+        #                 f.print "    #{entity.to_json}"
+        #                 $litium_entities_count += 1
+        #             }
+        #         }
+        #         $litium_entities_buffer = []
+        #     end
+        # end
 
-                    f.puts ',' if $litium_entities_count > 0
-                    f.print "    #{entity.to_json}"
-                    $litium_entities_count += 1
-                }
-                f.puts "\n]"
-            }
+        # at_exit {
+        #     # flush detected entities buffer
+        #     File.open($litium_entities_file, 'a') { | f |
+        #         $litium_entities_buffer.each { | entity |
+        #             entity.each_pair {  | k, v |
+        #                 entity[k] = nil if !v.nil? && v == ''
+        #             }
 
-            $litium_entities_buffer = []
-            std_i.flush()
-        }
+        #             f.puts ',' if $litium_entities_count > 0
+        #             f.print "    #{entity.to_json}"
+        #             $litium_entities_count += 1
+        #         }
+        #         f.puts "\n]"
+        #     }
+
+        #     $litium_entities_buffer = []
+        #     std_i.flush()
+        # }
     end
 
     # load projects hiararchy artifacts
@@ -227,6 +280,9 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
 
     puts "TARGET artifact: '#{target_artifact}'"
-    BUILD_ARTIFACT(target_artifact)
-    puts "#{DateTime.now.strftime('%H:%M:%S.%L')} '#{artifact}' has been built successfully"
+    if BUILD_ARTIFACT(target_artifact)
+        puts "#{DateTime.now.strftime('%H:%M:%S.%L')} '#{artifact}' has been built successfully"
+    else
+        puts_error "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact} has failed"
+    end
 end

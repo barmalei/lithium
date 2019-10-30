@@ -4,7 +4,7 @@ require 'fileutils'
 require 'pathname'
 require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
-require 'lithium/core-std'
+require 'lithium/std-core'
 
 class MVN < EnvArtifact
     include LogArtifactState
