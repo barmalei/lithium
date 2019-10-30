@@ -1,23 +1,23 @@
 -> {
     Touch('touch:*')
 
-    ARTIFACT('minjs:**/*.min.js',  UglifiedJSFile)
-    ARTIFACT('npm:**/node_modules/*',  NodejsModule)
+    UglifiedJSFile('minjs:**/*.min.js')
+    NodejsModule('npm:**/node_modules/*')
 
-    ARTIFACT('openhtml:**/*.html', OpenHTML)
+    OpenHTML('openhtml:**/*.html')
 
-    ARTIFACT('mvn:*', RunMaven)
-    ARTIFACT('buildsass:**/*.sass', BuildVaadinSass)
+    RunMaven('mvn:*')
+    BuildVaadinSass('buildsass:**/*.sass')
 
-    ARTIFACT('runpystr:', RunPythonString)  {
+    RunPythonString('runpystr:')  {
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
-    ARTIFACT('runrbstr:', RunRubyString) {
+    RunRubyString('runrbstr:') {
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
-    ARTIFACT(".lithium/lib/test.jar", CopyOfFile) {
+    CopyOfFile(".lithium/lib/test.jar") {
         @source = "jnc-easy/jnc-easy-1.1.1/test.jar"
     }
 
@@ -74,12 +74,18 @@
     ARTIFACT('check:*') {
         JavaCheckStyle('**/*.java')
         JavaScriptHint('**/*.js')
+
+        GroupByExtension('**/*') {
+            DO { | ext |
+                BUILD_ARTIFACT("check:#{@name}#{ext}")
+            }
+        }
     }
 
-    ARTIFACT('pmd:**/*.java',        PMD)
-    #ARTIFACT('mavenjar:**/*.jar', MavenJarFile)
+    PMD('pmd:**/*.java')
+    #MavenJarFile('mavenjar:**/*.jar')
 
-    ARTIFACT('grep:', GREP) {
+    GREP('grep:') {
         @grep = $lithium_args[0] if $lithium_args.length > 0
     }
 }
