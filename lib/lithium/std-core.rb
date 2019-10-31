@@ -51,8 +51,6 @@ end
 class Std
     @@std = nil  # singleton object static variable
 
-    @@signs_map = { 0 => [ 'INF', 'Z'], 1 => [ 'WAR', '!'], 2 => [ 'ERR', '?'], 3 => [ 'EXC', '?'] }
-
     # Make std singleton object
     def Std.new(*args, &block)
         @@std.flush() if @@std
@@ -64,9 +62,8 @@ class Std
 
     def Std.std() @@std end
 
-    def initialize(format = nil)
+    def initialize()
         @buffer = []
-        @format = format
     end
 
     def <<(msg)
@@ -139,8 +136,8 @@ class Std
     #  It triggers calling format method for incoming message that does entity
     #  recognition and normalization
     #
-    def expose(msg, level)
-        result = nil  # init result
+    def expose(msg, level = 0)
+        pattern = match = nil  # init result
 
         # collect artifact related recognized entities
         cur_art = $current_artifact ? $current_artifact : nil # current artifact
@@ -151,9 +148,13 @@ class Std
                 patterns = $PATTERNS[parent_class.name]
 
                 if !patterns.nil? && patterns.length > 0
-                    patterns.each { | pattern |
-                        result = pattern.match(msg)
-                        break unless result.nil?
+                    patterns.each { | pt |
+                        match = pt.match(msg)
+                        unless match.nil?
+                            pattern = pt
+                            pattern_matched(msg, pt, match)
+                            break
+                        end
                     }
                     break
                 end
@@ -161,18 +162,21 @@ class Std
             end
         end
 
+        level = pattern.level unless match.nil?
+
         # check if an artifact has a custom formatter
         if cur_art && cur_art.kind_of?(StdFormater)
-            self << cur_art.format(msg, level, result) # print formatted message
+            self << cur_art.format(msg, level, match) # print formatted message
         else
-            self << format(msg, level, result) # print formatted message
+            self << format(msg, level, match) # print formatted message
         end
     end
 
-    def format(msg, level, result)
-        return msg if @format.nil?
-        level, sign = @@signs_map[level]
-        eval "\"#{@format}\""
+    def pattern_matched(msg, pattern, match)
+    end
+
+    def format(msg, level, match)
+        msg
     end
 
     def flush()
@@ -186,7 +190,7 @@ class Std
 end
 
 module StdFormater
-    def format(msg, level, entities = {})
+    def format(msg, level, match)
         msg
     end
 end

@@ -2,9 +2,9 @@ require 'pathname'
 require 'json'
 
 class StdPattern
-    FILENAME_PATTERN = "[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%]+"
+    FILENAME_PATTERN = '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%]+'
 
-    class Result
+    class StdMatch
         def initialize(msg, groups)
             @msg, @groups, @variables = msg, [], {}
             groups.each_index { | i |
@@ -56,6 +56,7 @@ class StdPattern
         end
 
         def _convert(name, group_should_exist = true,  &block)
+            return self if @groups.length == 0 && group_should_exist == false
             raise 'Conversion block is expected' if block.nil?
 
             group = @groups.detect { | g | g[:name] == name }
@@ -84,7 +85,27 @@ class StdPattern
                 end
             end
 
-            return self
+            self
+        end
+
+        def group(name)
+            gr = @groups.detect { | gr | gr[:name] == name }
+            return gr.dup unless gr.nil?
+            nil
+        end
+
+        def has_groups?
+            @groups.length > 0
+        end
+
+        def has_group?(name)
+            @groups.detect { | gr | gr[:name] == name } != nil
+        end
+
+        def groups_names()
+            @groups.map { | gr |
+                gr[:name]
+            }
         end
 
         def to_s()
@@ -92,7 +113,8 @@ class StdPattern
         end
     end
 
-    def initialize(&block)
+    def initialize(level = 0, &block)
+        @level = level
         flush()
         instance_eval(&block) unless block.nil?
     end
@@ -120,7 +142,6 @@ class StdPattern
         return self
     end
 
-    # identifier() / identifier(group)
     def identifier(name = nil, &block)
         _append('[a-zA-Z_$][0-9a-zA-Z_$]*', name, &block)
     end
@@ -131,7 +152,6 @@ class StdPattern
         return self
     end
 
-    # num() / num(group) / num(group) { | num | return "<>" }
     def num(name = nil, &block)
         _append('[0-9]+', name, &block)
     end
@@ -188,7 +208,6 @@ class StdPattern
         return self
     end
 
-    # group(name, pattern) / group(name) { ... }
     def group(name, pattern = nil, &block)
         raise 'Group name cannot be nil' if name.nil?
         raise 'Block has to be defined'  if pattern.nil? && block.nil?
@@ -213,7 +232,6 @@ class StdPattern
         return self
     end
 
-    # cut(pattern) / cut() { ... }
     def cut(pattern = nil, &block)
         replace('', pattern, &block)
     end
@@ -229,7 +247,7 @@ class StdPattern
         ext = args
         ext = [ '[a-zA-Z]+' ] if args.length == 0
         ext = "(?<extension>#{ext.join('|')})"
-        @re_parts.push("(?<file>#{$FILENAME_PATTERN}\.#{ext})")
+        @re_parts.push("(?<file>#{FILENAME_PATTERN}\.#{ext})")
         _add_group('file', &block)
         _add_group('extension')
         return self
@@ -265,11 +283,7 @@ class StdPattern
 
     def location(*args, &block)
         group(:location) {
-            file(*args, &block)
-            colon
-            line
-            colon?
-            column?
+            file(*args, &block); colon; line; colon?; column?
         }
     end
 
@@ -277,6 +291,10 @@ class StdPattern
         location(*args, &block)
         @re_parts.push('?')
         return self
+    end
+
+    def level()
+        @level
     end
 
     def flush()
@@ -287,9 +305,7 @@ class StdPattern
         @re = Regexp.new(@re_parts.join()) if @re.nil?
 
         m = @re.match(msg)
-        return nil if m.nil?
-
-        if m.length > 1
+        if !m.nil? && m.length > 1 && @groups.length > 0
             dt, variables = 0, {}
 
             # collect all groups values
@@ -315,80 +331,84 @@ class StdPattern
                     else
                         group[:start] = 0
                     end
-                    next
-                end
-
-                group[:start] = start_pos + dt
-                if name == :_replace
-                    if value.length > 0
-                        variables[:current] = m[i + 1]
-                        begin
-                            value = value % variables
-                        rescue KeyError => e
-                            puts_warning("Placeholder cannot be detected: '#{e}'")
-                        end
-                    end
-
-                    # replace
-                    msg[start_pos + dt .. end_pos + dt - 1] = value
-                    group[:start] = start_pos + dt
-                    dt = dt + start_pos - end_pos + value.length
                 else
-                    # fetch group text
-                    value = m[i + 1]
+                    group[:start] = start_pos + dt
+                    if name == :_replace
+                        if value.length > 0
+                            variables[:current] = m[i + 1]
+                            begin
+                                value = value % variables
+                            rescue KeyError => e
+                                puts_warning("Placeholder cannot be detected: '#{e}'")
+                            end
+                        end
 
-                    # if block is defined call it to transform group text
-                    unless block.nil?
-                        new_value = instance_exec(value, &block)
-                        if !new_value.nil? && new_value != value
-                            msg[start_pos + dt .. end_pos + dt - 1] = new_value
-                            dt = dt + new_value.length - value.length
+                        # replace
+                        msg[start_pos + dt .. end_pos + dt - 1] = value
+                        group[:start] = start_pos + dt
+                        dt = dt + start_pos - end_pos + value.length
+                    else
+                        # fetch group text
+                        value = m[i + 1]
 
-                            # modify group placeholder with new transformed value
-                            group[:value] = variables[name.to_sym] = new_value
+                        # if block is defined call it to transform group text
+                        unless block.nil?
+                            new_value = instance_exec(value, &block)
+                            if !new_value.nil? && new_value != value
+                                msg[start_pos + dt .. end_pos + dt - 1] = new_value
+                                dt = dt + new_value.length - value.length
+
+                                # modify group placeholder with new transformed value
+                                group[:value] = variables[name.to_sym] = new_value
+                            else
+                                group[:value] = value
+                            end
                         else
                             group[:value] = value
                         end
-                    else
-                        group[:value] = value
                     end
                 end
             }
+            return StdMatch.new(msg, @groups)
+        else
+            return nil
         end
-        return Result.new(msg, @groups)
+    end
+end
+
+module ExpandFileLocation
+    def file(*args, &block)
+        raise 'File block cannot be consumed' unless block.nil?
+        super(*args) { | path |
+            expand_path(path)
+        }
+    end
+
+    def expand_path(path)
+        if File.exists?(path)
+            return File.expand_path(path)
+        elsif !Pathname.new(path).absolute? && !Artifact.last_caller.nil? && !Artifact.last_caller.owner.nil?
+            home  = Artifact.last_caller.owner.homedir
+            npath = File.join(home, path)
+            if File.exists?(npath)
+                return npath
+            else
+                npath = File.join(home, 'src', path)
+                return npath if File.exists?(npath)
+
+                # TODO: can consume time if src exists and contains tons of sources
+                found = Dir.glob(File.join(home, 'src', '**', path))
+                return found[0] if found && found.length > 0
+            end
+        end
     end
 end
 
 class FileLocPattern < StdPattern
     def initialize(*args)
-        super() {
-            location(*args) {
-                # TODO: move to pattern
-                # def normalize(entities)
-                #     if entities.has_key?('file')
-                #         path = entities['file']
-
-                #         if File.exists?(path)
-                #             yield path.clone(File.expand_path(path.to_s))
-                #         elsif !Pathname.new(path.to_s).absolute? && !Artifact.last_caller.nil? && !Artifact.last_caller.owner.nil?
-                #             home  = Artifact.last_caller.owner.homedir
-                #             npath = File.join(home, path.to_s)
-                #             if File.exists?(npath)
-                #                 yield path.clone(npath)
-                #             else
-                #                 npath = File.join(home, 'src', path.to_s)
-                #                 if File.exists?(npath)
-                #                     yield path.clone(npath)
-                #                 else
-                #                     # TODO: can consume time if src exists and contains tons of sources
-                #                     found = Dir.glob(File.join(home, 'src', '**', path.to_s))
-                #                     yield path.clone(found[0]) if found && found.length > 0
-                #                 end
-                #             end
-                #         end
-                #     end
-                # end
-            }
+        @expand_path = false # expand_path
+        super(level) {
+            location(*(args))
         }
     end
 end
@@ -400,8 +420,10 @@ class JavaPattern < StdPattern
 end
 
 class JavaExceptionLocPattern < JavaPattern
+    include ExpandFileLocation
+
     def initialize()
-        super {
+        super(3) {
             any('^\s+at\s*'); class_name; dot; identifier(:method)
             rbrackets {
                 location('java', 'scala', 'kt', 'groovy')
@@ -416,16 +438,19 @@ end
 
 class JavaCompileErrorPattern < JavaPattern
     def initialize()
-        super {
-            any('^'); location('java'); any('\s+error:\s+'); group(:message, '.*$')
+        super(2) {
+            location('java'); any('\s+error:\s+'); group(:message, '.*$')
         }
     end
 end
 
 
+
 # msg = "/Users/brigadir/projects/wildfly/standalone/deployments/cfs.war/src/core/CFS.java:49: error: <identifier> expected"
 # pattern = JavaCompileErrorPattern.new()
 # tr = pattern.match(msg)
+
+# puts tr
 
 # tr.convert?(:dsd) { | location |
 #     "[[%{file}:%{line}:%{:column}]]"
@@ -433,5 +458,4 @@ end
 
 
 # STDOUT.puts "MSG = #{tr}"
-
 

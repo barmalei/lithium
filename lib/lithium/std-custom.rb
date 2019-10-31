@@ -1,10 +1,12 @@
 require 'lithium/std-core'
 require 'pathname'
 
-
 class LithiumStd < Std
-    def initialize(format = '(#{level})  #{sign}  #{msg}')
-       super
+    @@signs_map = { 0 => [ 'INF', 'Z'], 1 => [ 'WAR', '!'], 2 => [ 'ERR', '?'], 3 => [ 'EXC', '?'] }
+
+    def format(msg, level, match)
+        level, sign = @@signs_map[level]
+        "(#{level})  #{sign} #{msg}"
     end
 end
 
@@ -35,30 +37,15 @@ class HtmlStd < LithiumStd
 end
 
 class SublimeStd < LithiumStd
-    def format(msg, level, transformer)
-        unless transformer.nil?
-            transformer.convert?(:location) {
-                '[[%{file}:%{line}]]'
-            }
-            msg = transformer.to_s
-        end
-        super(msg, level, transformer)
+    def format(msg, level, match)
+        match.replace?(:location, '[[%{file}:%{line}]]') unless match.nil?
+        super(msg, level, match)
     end
 end
 
 class VSCodeStd < LithiumStd
-    def format(msg, level, transformer)
-        unless transformer.nil?
-            transformer.convert(:location) { | location |
-                'file://%{file}#%{line}'
-            }
-            msg = transformer.to_s
-        end
-        super(msg, level, transformer)
-    end
-
-    def normalize(entities)
-        fe = entities['file']
-        yield fe.clone() if fe
+    def format(msg, level, match)
+        match.replace?(:location, 'file://%{file}#%{line}') unless match.nil?
+        super(msg, level, match)
     end
 end

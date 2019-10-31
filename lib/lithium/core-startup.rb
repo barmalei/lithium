@@ -217,53 +217,55 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     end
 
     if std_clazz
-        std_f = $lithium_options['stdformat']
-        std_i = std_f ? std_clazz.new(std_f) : std_clazz.new()
+        std_i = std_clazz.new()
         raise 'Output handler class has to inherit Std class' unless std_i.kind_of?(Std)
 
         # save detected in output entities in JSON format
         $litium_entities_file   = File.join(prjs_stack[prjs_stack.length - 1], '.lithium', 'std-out-entities.json')
         $litium_entities_buffer = []
-        $litium_entities_count  = 0
+
         File.delete($litium_entities_file) if File.exist?($litium_entities_file)
-        File.open($litium_entities_file, 'a') { | f | f.puts '[' }
 
-        # def std_i.entities_detected(msg, entities)
-        #     $litium_entities_buffer.push(entities)
-        #     if $litium_entities_buffer.length  > 100
-        #         File.open($litium_entities_file, 'a') { | f |
-        #             $litium_entities_buffer.each { | entity |
-        #                 entity.each_pair {  | k, v |
-        #                     entity[k] = nil if !v.nil? && v == ''
-        #                 }
+        def std_i.pattern_matched(msg, pattern, match)
+            if match.has_group?(:location)
+                $litium_entities_buffer.push({
+                    :path     =>  match.group(:file)[:value],
+                    :line     =>  match.group(:line)[:value],
+                    :pattern  =>  pattern.class.name,
+                    :artifact =>  $current_artifact.nil? ? nil : $current_artifact.class.name,
+                    :level    =>  pattern.level
+                })
+            end
 
-        #                 f.puts ',' if $litium_entities_count > 0
-        #                 f.print "    #{entity.to_json}"
-        #                 $litium_entities_count += 1
-        #             }
-        #         }
-        #         $litium_entities_buffer = []
-        #     end
-        # end
+            if $litium_entities_buffer.length  > 100
+                File.open($litium_entities_file, 'a') { | f |
+                    $litium_entities_buffer.each { | entity |
+                        entity.each_pair {  | k, v |
+                            entity[k] = nil if !v.nil? && v == ''
+                        }
 
-        # at_exit {
-        #     # flush detected entities buffer
-        #     File.open($litium_entities_file, 'a') { | f |
-        #         $litium_entities_buffer.each { | entity |
-        #             entity.each_pair {  | k, v |
-        #                 entity[k] = nil if !v.nil? && v == ''
-        #             }
+                        f.puts entity.to_json
+                    }
+                }
+                $litium_entities_buffer = []
+            end
+        end
 
-        #             f.puts ',' if $litium_entities_count > 0
-        #             f.print "    #{entity.to_json}"
-        #             $litium_entities_count += 1
-        #         }
-        #         f.puts "\n]"
-        #     }
+        at_exit {
+            # flush detected entities buffer
+            File.open($litium_entities_file, 'a') { | f |
+                $litium_entities_buffer.each { | entity |
+                    entity.each_pair {  | k, v |
+                        entity[k] = nil if !v.nil? && v == ''
+                    }
 
-        #     $litium_entities_buffer = []
-        #     std_i.flush()
-        # }
+                    f.puts entity.to_json
+                }
+            }
+
+            $litium_entities_buffer = []
+            std_i.flush()
+        }
     end
 
     # load projects hiararchy artifacts
