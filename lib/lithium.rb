@@ -1,7 +1,7 @@
 require 'pathname'
 
-$lithium_version    = '3.3.1'
-$lithium_date       = 'Oct 2019'
+$lithium_version    = '3.4.0'
+$lithium_date       = 'Nov 2019'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 artifact            = ARGV[ $lithium_options.length ]
@@ -41,5 +41,3 @@ end
 # start lithium
 require 'lithium/core-startup'
 STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
-
-

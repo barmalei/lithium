@@ -2,50 +2,82 @@ require 'lithium/std-core'
 require 'pathname'
 
 class LithiumStd < Std
-    @@signs_map = { 0 => [ 'INF', 'Z'], 1 => [ 'WAR', '!'], 2 => [ 'ERR', '?'], 3 => [ 'EXC', '?'] }
+    @@signs_map = [ [ 'INF', 'Z'], [ 'WAR', '!'], [ 'ERR', '?'], [ 'EXC', '?'] ]
 
-    def format(msg, level, match)
+    def initialize(prj_home = nil)
+        super()
+        @log_io, @log_file, @prj_home = nil, nil, prj_home
+        unless @prj_home.nil?
+            @log_file = File.join(@prj_home, '.lithium', 'std-out-entities.json')
+            File.delete(@log_file) if File.exist?(@log_file)
+
+            at_exit {
+                finalize()
+            }
+        end
+    end
+
+    def finalize()
+        unless @log_io.nil?
+            @log_io.puts ']'
+            @log_io.close
+        end
+    end
+
+    def format(msg, level)
         level, sign = @@signs_map[level]
         "(#{level})  #{sign} #{msg}"
     end
-end
 
-class HtmlStd < LithiumStd
-    def initialize(format = '<div><b>(#{level})</b>&nbsp;&nbsp;#{sign}&nbsp;&nbsp;#{msg}</div>')
-        super
+    def pattern_matched(msg, pattern, match)
+        log_match(msg, pattern, match)
+        return msg
     end
 
-    def normalize(entities)
-        fe = entities['file']
-        if fe
-            ln, bn, dr = entities['line'], File.basename(fe), File.dirname(fe)
-            bn = File.join(File.basename(dr), bn) if dr
-            yield fe.clone("<a href='txmt://open?url=file://#{fe}&line=#{ln}'>#{bn}</a>")
+    def log_match(msg, pattern, match)
+        unless @log_file.nil?
+            comma = ','
+            if @log_io.nil?
+                @log_io = File.open(@log_file, 'a')
+                @log_io.puts '['
+                comma = ''
+            end
+
+            entry = {
+                :patternClass  =>  pattern.class.name,
+                :artifactClass =>  $current_artifact.nil? ? nil : $current_artifact.class.name,
+                :errorLevel    =>  pattern.level
+            }
+
+            match.groups_names.each { | name |
+                entry[name] = match[name][:value]
+            }
+
+            @log_io.puts comma + entry.to_json
         end
-
-        ue = entities['url']
-        yield ue.clone("<a href=\"javascript:TextMate.system('open #{ue}')\">#{ue}</a>") if ue
-    end
-
-    def format(msg, level, entities)
-        msg = super(msg, level, entities)
-        msg = "<font color='red'>#{msg}</font>"    if level == 2
-        msg = "<font color='orange'>#{msg}</font>" if level == 3
-        msg = "<font color='blue'>#{msg}</font>"   if level == 1
-        msg.gsub('  ', '&nbsp;&nbsp;')
     end
 end
 
 class SublimeStd < LithiumStd
-    def format(msg, level, match)
-        match.replace?(:location, '[[%{file}:%{line}]]') unless match.nil?
-        super(msg, level, match)
+    def pattern_matched(msg, pattern, match)
+        msg = super
+
+        if match.has_group?(:location)
+            path = match[:file][:value]
+            return match.replace(:location, "[[#{path}:%{line}]]").to_s if !path.nil? && File.exist?(path)
+        end
+
+        return msg
     end
 end
 
 class VSCodeStd < LithiumStd
-    def format(msg, level, match)
-        match.replace?(:location, 'file://%{file}#%{line}') unless match.nil?
-        super(msg, level, match)
+    def pattern_matched(msg, pattern, match)
+        msg = super
+        if match.has_group?(:location)
+            return match.replace?(:location, 'file://%{file}#%{line}').to_s if match.has_group?(:location)
+        end
+        return msg
     end
 end
+

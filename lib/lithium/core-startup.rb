@@ -2,7 +2,7 @@ require 'date'
 
 require 'lithium/core'
 require 'lithium/core-command'
-require 'lithium/std-core-pattern'
+require 'lithium/std-pattern'
 require 'lithium/std-core'
 require 'lithium/std-custom'
 
@@ -43,7 +43,6 @@ PATTERNS ({
 
     [ JavaCompiler, PMD ] => [
         # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
-
         JavaCompileErrorPattern.new()
     ],
 
@@ -94,25 +93,20 @@ PATTERNS ({
     RunMaven => [
         # '\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]'
         StdPattern.new {
-            any('\[ERROR\]\s+'); group(:location) { file; colon; brackets { line; any('\s*,\s*'); column? }; }
+            any('^\[ERROR\]\s+'); group(:location) { file; colon; brackets { line; any('\s*,\s*'); column? }; }
         },
 
         # '(?<file>${file_pattern}\.[a-zA-Z_]+)\:(?<line>[0-9]+)\:(?<column>[0-9]+)'
         StdPattern.new {
-           location
-        }
+           any('^(\[INFO\]|\[WARNING\]|\[ERORR\])\s*'); location;
+        },
+
+        JavaExceptionLocPattern.new()
     ],
 
     Artifact => [
-        # .*(?<url>\b(http|https|ftp|ftps|sftp)\:\/\/[^ \t]*)
-        StdPattern.new {
-            any('\b')
-            group(:url) {
-                group(:scheme, '(http|https|ftp|ftps|sftp)'); any('\:\/\/'); group(:path, '[^ \t]*')
-            }
-        },
-
-        FileLocPattern.new()
+        URLPattern.new,
+        FileLocPattern.new
     ]
 })
 
@@ -191,7 +185,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     prjs_stack = []
     path       = basedir
     prj        = nil
-    while !path.nil?  do
+    while !path.nil? do
         path = FileArtifact.look_directory_up(path, '.lithium')
         unless path.nil?
             path = File.dirname(path)
@@ -201,74 +195,25 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     end
 
     # add lithium if there is no project home has been identified
-    if prjs_stack.length == 0
-        prjs_stack.push(File.dirname($lithium_code))
-    end
+    prjs_stack.push(File.dirname($lithium_code)) if prjs_stack.length == 0
 
-    # initialize stdout/stderr handler
+    # initialize stdout / stderr handler
     std_clazz = LithiumStd
     if $lithium_options['std']
         std_s = $lithium_options['std'].strip()
         begin
             std_clazz = std_s == 'null' ? nil : Module.const_get(std_s)
         rescue NameError
-            raise "Unknown stdout/stderr formatter class name '#{std_s}'"
+            raise "Unknown stdout / stderr class name '#{std_s}'"
         end
     end
 
     if std_clazz
-        std_i = std_clazz.new()
+        std_i = std_clazz.new(prjs_stack.last)
         raise 'Output handler class has to inherit Std class' unless std_i.kind_of?(Std)
-
-        # save detected in output entities in JSON format
-        $litium_entities_file   = File.join(prjs_stack[prjs_stack.length - 1], '.lithium', 'std-out-entities.json')
-        $litium_entities_buffer = []
-
-        File.delete($litium_entities_file) if File.exist?($litium_entities_file)
-
-        def std_i.pattern_matched(msg, pattern, match)
-            if match.has_group?(:location)
-                $litium_entities_buffer.push({
-                    :path     =>  match.group(:file)[:value],
-                    :line     =>  match.group(:line)[:value],
-                    :pattern  =>  pattern.class.name,
-                    :artifact =>  $current_artifact.nil? ? nil : $current_artifact.class.name,
-                    :level    =>  pattern.level
-                })
-            end
-
-            if $litium_entities_buffer.length  > 100
-                File.open($litium_entities_file, 'a') { | f |
-                    $litium_entities_buffer.each { | entity |
-                        entity.each_pair {  | k, v |
-                            entity[k] = nil if !v.nil? && v == ''
-                        }
-
-                        f.puts entity.to_json
-                    }
-                }
-                $litium_entities_buffer = []
-            end
-        end
-
-        at_exit {
-            # flush detected entities buffer
-            File.open($litium_entities_file, 'a') { | f |
-                $litium_entities_buffer.each { | entity |
-                    entity.each_pair {  | k, v |
-                        entity[k] = nil if !v.nil? && v == ''
-                    }
-
-                    f.puts entity.to_json
-                }
-            }
-
-            $litium_entities_buffer = []
-            std_i.flush()
-        }
     end
 
-    # load projects hiararchy artifacts
+    # load projects hierarchy artifacts
     prjs_stack.each { | prj_home | prj = Project.create(prj_home, prj) }
 
     # reg self registered artifact in lithium project if they have not been defined yet
@@ -288,3 +233,4 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         puts_error "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact} has failed"
     end
 end
+

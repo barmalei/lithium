@@ -1,8 +1,10 @@
 require 'pathname'
 require 'json'
 
+require 'lithium/core'
+
 class StdPattern
-    FILENAME_PATTERN = '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%]+'
+    FILENAME_PATTERN = '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%\[\]]+'
 
     class StdMatch
         def initialize(msg, groups)
@@ -11,6 +13,12 @@ class StdPattern
                 group       = groups[i]
                 name, value = group[:name], group[:value]
                 @groups[i] = group.dup()
+
+                # parent has to point to cloned instance of group element instead of
+                # pointing to original (what we have got from pattern) parent group
+                # let's correct it
+                @groups[i][:parent] = @groups[i - 1] unless @groups[i][:parent].nil?
+
                 @variables[name] = value if name[0] != '_' && !@variables.has_key?(name)
             }
         end
@@ -64,8 +72,11 @@ class StdPattern
 
             unless group.nil?
                 value, start_pos, name = group[:value], group[:start], group[:name]
+
+                # apply conversion block to get new group value
                 new_value = instance_exec(value, &block)
 
+                # resolve placeholders
                 begin
                     new_value = new_value % @variables
                 rescue KeyError => e
@@ -73,9 +84,21 @@ class StdPattern
                 end
 
                 if !new_value.nil? && new_value != value
+                    # transform message with the new value
                     @msg[start_pos, value.length] = new_value
 
+                    # calculate correction delta for groups offsets that
+                    # follow by the group
                     dt = new_value.length - value.length
+
+                    # correct parent value according to applied changes
+                    pg = group
+                    while pg[:parent] != nil
+                        pg = pg[:parent]
+                        pg[:value] = @msg[pg[:start], pg[:value].length + new_value.length - value.length]
+                    end
+
+                    # update group value
                     group[:value] = @variables[name] = new_value
 
                     for i in (group[:index] + 1 .. @groups.length - 1)
@@ -88,7 +111,7 @@ class StdPattern
             self
         end
 
-        def group(name)
+        def [](name)
             gr = @groups.detect { | gr | gr[:name] == name }
             return gr.dup unless gr.nil?
             nil
@@ -114,7 +137,8 @@ class StdPattern
     end
 
     def initialize(level = 0, &block)
-        @level = level
+        raise "Invalid level" if level.nil?
+        @level, @stack = level, []
         flush()
         instance_eval(&block) unless block.nil?
     end
@@ -126,8 +150,10 @@ class StdPattern
             :start => -1,
             :value => '',
             :index => @groups.length,
-            :exists => true
+            :exists => true,
+            :parent => @stack.last
         })
+        @groups.last
     end
 
     def _append(pattern, name = nil, &block)
@@ -180,6 +206,10 @@ class StdPattern
         any('\.')
     end
 
+    def comma()
+        any('\,')
+    end
+
     def spaces()
         any('\s+')
     end
@@ -213,10 +243,13 @@ class StdPattern
         raise 'Block has to be defined'  if pattern.nil? && block.nil?
 
         if pattern.nil?
-            _add_group(name)
+            @stack.push(_add_group(name))
+
             @re_parts.push("(?<#{name}>")
             instance_eval(&block)
             @re_parts.push(')')
+
+            @stack.pop
         else
             @re_parts.push("(?<#{name}>#{pattern})")
             _add_group(name, &block)
@@ -247,7 +280,7 @@ class StdPattern
         ext = args
         ext = [ '[a-zA-Z]+' ] if args.length == 0
         ext = "(?<extension>#{ext.join('|')})"
-        @re_parts.push("(?<file>#{FILENAME_PATTERN}\.#{ext})")
+        @re_parts.push("(?<file>#{FILENAME_PATTERN}\\.#{ext})")
         _add_group('file', &block)
         _add_group('extension')
         return self
@@ -299,6 +332,16 @@ class StdPattern
 
     def flush()
         @re_parts, @groups, @re = [], [], nil
+    end
+
+    def BLOCK(name, &block)
+        group = @groups.detect { | gr | name.to_sym == gr[:name]}
+        group[:block] = block
+        self
+    end
+
+    def re
+        @re
     end
 
     def match(msg)
@@ -358,6 +401,14 @@ class StdPattern
                                 msg[start_pos + dt .. end_pos + dt - 1] = new_value
                                 dt = dt + new_value.length - value.length
 
+                                # parent group values have to be corected according to the changes
+                                # child group does
+                                pg = group
+                                while pg[:parent] != nil
+                                    pg = group[:parent]
+                                    pg[:value] = msg[pg[:start], pg[:value].length + new_value.length - value.length ]
+                                end
+
                                 # modify group placeholder with new transformed value
                                 group[:value] = variables[name.to_sym] = new_value
                             else
@@ -376,38 +427,9 @@ class StdPattern
     end
 end
 
-module ExpandFileLocation
-    def file(*args, &block)
-        raise 'File block cannot be consumed' unless block.nil?
-        super(*args) { | path |
-            expand_path(path)
-        }
-    end
-
-    def expand_path(path)
-        if File.exists?(path)
-            return File.expand_path(path)
-        elsif !Pathname.new(path).absolute? && !Artifact.last_caller.nil? && !Artifact.last_caller.owner.nil?
-            home  = Artifact.last_caller.owner.homedir
-            npath = File.join(home, path)
-            if File.exists?(npath)
-                return npath
-            else
-                npath = File.join(home, 'src', path)
-                return npath if File.exists?(npath)
-
-                # TODO: can consume time if src exists and contains tons of sources
-                found = Dir.glob(File.join(home, 'src', '**', path))
-                return found[0] if found && found.length > 0
-            end
-        end
-    end
-end
-
 class FileLocPattern < StdPattern
     def initialize(*args)
-        @expand_path = false # expand_path
-        super(level) {
+        super(0) {
             location(*(args))
         }
     end
@@ -420,14 +442,16 @@ class JavaPattern < StdPattern
 end
 
 class JavaExceptionLocPattern < JavaPattern
-    include ExpandFileLocation
-
     def initialize()
         super(3) {
             any('^\s+at\s*'); class_name; dot; identifier(:method)
             rbrackets {
                 location('java', 'scala', 'kt', 'groovy')
             }
+        }
+
+        BLOCK(:file) { | path |
+            FileArtifact.search(path)[0]
         }
     end
 
@@ -444,18 +468,30 @@ class JavaCompileErrorPattern < JavaPattern
     end
 end
 
+class URLPattern < StdPattern
+    def initialize(level = 0)
+        super(level) {
+            group(:url) {
+                scheme; any('\:\/\/'); host; port?; path
+            }
+        }
+    end
 
+    def path()
+        group(:path, '[^ \t]*')
+    end
 
-# msg = "/Users/brigadir/projects/wildfly/standalone/deployments/cfs.war/src/core/CFS.java:49: error: <identifier> expected"
-# pattern = JavaCompileErrorPattern.new()
-# tr = pattern.match(msg)
+    def host()
+        group(:host, '([0-9]+{1,3}\.[0-9]+{1,3}\.[0-9]+{1,3})|[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)')
+    end
 
-# puts tr
+    def port?()
+        group(:port, '\:[0-9]+{2,6}')
+        @re_parts.push('?')
+        self
+    end
 
-# tr.convert?(:dsd) { | location |
-#     "[[%{file}:%{line}:%{:column}]]"
-# }
-
-
-# STDOUT.puts "MSG = #{tr}"
-
+    def scheme()
+        group(:scheme, '(http|https|ftp|ftps|sftp)')
+    end
+end

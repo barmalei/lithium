@@ -763,7 +763,7 @@ class Artifact
                             line = std.readline.rstrip()
                             if line
                                 $stdout.puts line
-                                $stdout.flush()
+                                $stdout.flush
                             end
                         end
                     end
@@ -1074,6 +1074,10 @@ class FileArtifact < Artifact
         return File.exists?(f) ? File.mtime(f).to_i() : -1
     end
 
+    def search(path)
+        return FileArtifact.search(path, self)
+    end
+
     def assert_existence()
         if @is_permanent
             fp = fullpath()
@@ -1137,6 +1141,30 @@ class FileArtifact < Artifact
         end
 
         return nil
+    end
+
+    @search_cache = {}
+
+    def self.search(path, art = $current_artifact)
+        return [ File.expand_path(path) ] if File.exists?(path)
+
+        art = Project.current if art.nil? || !art.kind_of?(FileArtifact)
+        return [] if art.nil?
+
+        fp = art.fullpath
+        fp = File.dirname(fp) unless File.directory?(fp)
+        if File.exists?(fp)
+            path = Pathname.new(path).cleanpath.to_s
+            return [] if @search_cache[fp] && @search_cache[fp][path]
+
+            res = Dir.glob(File.join(fp, '**', path))
+            return res if res.length > 0
+
+            @search_cache[fp] = {} unless @search_cache[fp]
+            @search_cache[fp][path] = true
+        end
+
+        return art.kind_of?(Project) ? [] : FileArtifact.search(path, art.project)
     end
 
     def self.grep(file, pattern)

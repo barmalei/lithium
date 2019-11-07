@@ -1,6 +1,6 @@
 require 'pathname'
 require 'json'
-require 'lithium/std-core-pattern'
+require 'lithium/std-pattern'
 
 $PATTERNS = {}
 
@@ -137,45 +137,40 @@ class Std
     #  recognition and normalization
     #
     def expose(msg, level = 0)
-        pattern = match = nil  # init result
-
         # collect artifact related recognized entities
-        cur_art = $current_artifact ? $current_artifact : nil # current artifact
+        cur_art = $current_artifact  # current artifact
 
-        if cur_art
-            parent_class = cur_art.class
-            while parent_class do
-                patterns = $PATTERNS[parent_class.name]
+        parent_class = cur_art.nil? ? Artifact : cur_art.class
+        while parent_class do
+            patterns = $PATTERNS[parent_class.name]
 
-                if !patterns.nil? && patterns.length > 0
-                    patterns.each { | pt |
-                        match = pt.match(msg)
-                        unless match.nil?
-                            pattern = pt
-                            pattern_matched(msg, pt, match)
-                            break
-                        end
-                    }
-                    break
-                end
-                parent_class = parent_class.superclass
+            if !patterns.nil? && patterns.length > 0
+                patterns.each { | pt |
+                    mt = pt.match(msg)
+
+                    unless mt.nil?
+                        msg   = pattern_matched(msg, pt, mt)
+                        level = pt.level if pt.level > level
+                    end
+                }
+                break
             end
+            parent_class = parent_class.superclass
         end
 
-        level = pattern.level unless match.nil?
-
         # check if an artifact has a custom formatter
-        if cur_art && cur_art.kind_of?(StdFormater)
-            self << cur_art.format(msg, level, match) # print formatted message
+        if !cur_art.nil? && cur_art.kind_of?(StdFormater)
+            self << cur_art.format(msg, level) # print formatted message
         else
-            self << format(msg, level, match) # print formatted message
+            self << format(msg, level) # print formatted message
         end
     end
 
     def pattern_matched(msg, pattern, match)
+        msg
     end
 
-    def format(msg, level, match)
+    def format(msg, level)
         msg
     end
 
@@ -190,7 +185,7 @@ class Std
 end
 
 module StdFormater
-    def format(msg, level, match)
+    def format(msg, level)
         msg
     end
 end
