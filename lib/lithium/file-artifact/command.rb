@@ -15,6 +15,10 @@ class Touch < FileCommand
             puts_warning "File '#{path}' cannot be found to be touched"
         end
     end
+
+    def what_id_does()
+        "Touch '#{fullpath}'"
+    end
 end
 
 #  Copy of a file artifact
@@ -72,31 +76,83 @@ end
 
 
 class GREP < FileMask
+    attr_reader :grep, :matched
+
     def initialize(*args)
         super
         @grep ||= $lithium_args.length > 0 ? $lithium_args[0] : 'TODO'
-
-        pref = 'regexp:'
-        @grep = Regexp.new(@grep[pref.length, @grep.length - pref.length]) if @grep.start_with?(pref)
+        @match_all = true if @match_all.nil?
     end
 
-    def build_item(n, t)
-        line_num = 0
-        File.readlines(n).each { | line |
-            line_num += 1
-            line = line.chomp.strip()
-            next if line.length == 0
+    def MATCHED(&block)
+        @matched = block
+    end
 
-            $~ = nil
-            if line.index(@grep)
-                if $~
-                    puts "    #{n}:#{line_num}:#{line}"
-                else
-                    puts "    #{n}:#{line_num}:#{line}"
-                end
+    def build_item(fp, t)
+        line_num = 0
+        File.readlines(fp).each { | line |
+            line_num += 1
+            line = line.chomp.strip
+            next if line.length == 0
+            value = match_line(line_num, line)
+            unless value.nil?
+                puts_matched_line(fp, line_num, line, value)
+                @matched.call(fp, line_num, line, value) unless @matched.nil?
+                break unless @match_all
             end
         }
     end
 
-    def what_it_does() "Looking for '#{@grep}' in '#{@name}'" end
+    def puts_matched_line(fp, line_num, line, value)
+        puts "    #{fp}:#{line_num}:#{value}"
+    end
+
+    def match_line(line_num, line)
+        i = line.index(@grep)
+        if i.nil?
+            return nil
+        else
+            return line[i, @grep.length]
+        end
+    end
+
+    def what_it_does() "Match '#{@grep}'\n   in '#{@name}'" end
 end
+
+class REGREP < GREP
+    def initialize(*args)
+        super
+        @grep = Regexp.new(@grep) unless @grep.kind_of?(Regexp)
+    end
+
+    def match_line(line_num, line)
+        m = @grep.match(line)
+        if m.nil?
+            return nil
+        elsif m.length > 1
+            res = ''
+            for i in (1 .. m.length - 1)
+                res = res + m[i]
+            end
+            return res
+        else
+            return m[0]
+        end
+    end
+end
+
+class FIND < FileCommand
+    def initialize(*args)
+        super
+        @file ||= $lithium_args.length > 0 ? $lithium_args[0] : 'TODO'
+    end
+
+    def build()
+        Dir.glob(File.join(fullpath, '**', @file)).each  { | path |
+            puts "    Found file: #{path}"
+        }
+    end
+
+    def what_it_does() "Looking for '#{@file} in '#{@name}'" end
+end
+

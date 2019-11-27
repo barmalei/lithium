@@ -1,26 +1,26 @@
-require 'lithium/file-artifact/command'
-require 'lithium/java-artifact/base'
+require 'lithium/java-artifact/runner'
 
 
-class BuildVaadinSass < FileCommand
+class BuildVaadinSass < JavaFileRunner
     REQUIRE JAVA
 
     def initialize(*args)
         super
+
+        @inputFile  = fullpath()
+        @outputFile = @inputFile.dup
+        @outputFile[/[.]scss$/] = '' if @outputFile.end_with?('scss')
+        @outputFile = @outputFile + '.css'
+
+        @arguments.push("'#{@inputFile}'", "'#{@outputFile}'")
     end
 
-    def build()
-        fp = fullpath()
-        on = "#{File.basename(fp, 'scss')}css"
-
-        r = Artifact.exec(@java.java, '-cp ', "\"#{fullpath(File.join('WEB-INF', 'lib', '*'))}\"",
-                          'com.vaadin.sass.SassCompiler',
-                          fp,
-                          File.join(File.dirname(fp), on))
-
-        raise 'SASS error' if r != 0
+    def build_target()
+        'com.vaadin.sass.SassCompiler'
     end
 
-    def what_it_does() "Generate '#{@name}' CSS" end
+    def what_it_does()
+        "Generate CSS:\n    from '#{@outputFile}'\n    to   '#{@inputFile}'"
+    end
 end
 

@@ -1,76 +1,87 @@
 require 'lithium/core'
 require 'lithium/java-artifact/base'
 
-class GenerateJavaDoc < FileArtifact
-    include LogArtifactState
+class JavaDoc < FileCommand
+    #include LogArtifactState
     REQUIRE JAVA
 
     def initialize(*args)
+        @sources = []
         super
-        @sources ||= File.join('src', 'java')
-        raise "Source dir '#{@sources}' cannot be found" if !File.directory?(fullpath(@sources))
-
-        if !@pkgs
-            puts_warning 'Package list has not been specified. Build it automatically'
-            @pkgs = []
-
-            Dir.chdir(fullpath(@sources))
-            Dir[File.join('**', '*')].each { | n |
-                next if n =~ /CVS$/ || n =~ /[.].*/
-                @pkgs << n if File.directory?(n)
-            }
-        end
-
-        raise 'Packages have not been identified' if @pkgs.length == 0
-
-        @pkgs.each { |p|
-            p = fullpath(File.join(@sources, p.tr('.', '/')))
-            raise "Package '#{p}' cannot be found" if !File.exists?(p)
-        }
+        @sources = $lithium_args.dup if @sources.length == 0 && $lithium_args.length > 0
     end
-
-    def list_items()
-        go_to_homedir()
-        Dir[File.join(@sources, '**', '*.java')].each { | n |
-            yield n, File.mtime(n).to_i
-        }
-    end
-
-    def pre_build() clean() end
 
     def build()
-        p = @pkgs.collect() { |e| e.tr('/', '.') }
-        puts ['Packages:'] << p
+        pkgs  = []
+        files = []
 
-        system "#{@java.javadoc} -classpath '#{@java.classpath}' -d '#{fullpath()}' -sourcepath '#{fullpath(@sources)}' #{p.join(' ')}"
-        raise 'Java doc generation error' if $? != 0
+        fp = fullpath()
+        raise "Javadoc destination cannot point to a directory '#{fp}'" if File.exists?(fp) || File.file?(fp)
+
+        @sources.each  { | source |
+            fp = fullpath(source)
+            raise "Source path '#{fp}' doesn't exists"   unless File.exists?(fp)
+            raise "Source path '#{fp}' points to a file" unless File.directory?(fp)
+
+            FileArtifact.grep(File.join(source, '**', '*.java'), /^package\s+([a-zA-Z._0-9]+)\s*;/, true) { | path, line_num, line, matched_part |
+                pkgs.push(matched_part) unless pkgs.include?(matched_part)
+                files.push(path)
+            }
+        }
+
+        if files.length > 0
+            puts "Detected packages: #{pkgs.join(', ')}"
+
+            FileArtifact.tmpfile(files) { | tmp_file |
+                r = Artifact.exec(@java.javadoc,
+                                  "-classpath '#{@java.classpath}'",
+                                  "-d '#{fullpath()}'",
+                                  "@#{tmp_file.path}" )
+                raise 'Javadoc generation has failed' if r != 0
+            }
+        else
+            puts_warning 'No a source file has been found'
+        end
     end
 
     def clean() FileUtils.rm_r(fullpath()) if  File.exists?(fullpath()) end
-    def expired?() !File.exists?(fullpath()) end
-    def what_it_does() "Generate javadoc into '#{@name}'" end
+    #def expired?() !File.exists?(fullpath()) end
+    def what_it_does() "Generate javadoc to '#{@name}' folder" end
 end
 
 
-class FindClassAction < Artifact
-    def build_()
+class Introspect < Artifact
+    REQUIRE JAVA
+
+    def build()
+        Artifact.exec()
+    end
+end
+
+class FindJavaClass < FileCommand
+    REQUIRE JAVA
+
+    def build()
         result = []
-        path   = @target.name.gsub('.', '/') + '.class'
+        clname   = @name.gsub('.', '/')
+        clname   = clname + '.class' unless clname.end_with?('.class')
 
-        msg "Looking for '#{path}' class."
+        #puts "CLNAME = #{clname}"
 
-        @java.classpath.split(File::PATH_SEPARATOR).each { |i|
-            if File.directory?(i)
-                Dir[File.join(i, path)].each { |file|
-                    next if File.directory?(file)
-                    result << file
+        @java.classpath.split(File::PATH_SEPARATOR).each { | path |
+            if File.directory?(path)
+                FileArtifact.dir(File.join(path, clname)) { | item |
+                    result << file unless File.directory?(file)
                 }
-                result = result + JAR.find(i, @target.name)
+            elsif path.end_with?('.jar')
+                zip = FindInZip.new(path)
+                zip.find_width_jar(path, clname)
             else
-                wmsg "File '#{i}' doesn't exist" if !File.exists?(i)
+                wmsg "File '#{path}' doesn't exist" unless File.exists?(path)
             end
         }
-        wmsg "Class #{@target.name} not found" if result.length == 0
+
+        puts_warning "Class #{@target.name} not found" if result.length == 0
         return result
-  end
+    end
 end

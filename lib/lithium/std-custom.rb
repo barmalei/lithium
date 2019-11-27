@@ -21,6 +21,7 @@ class LithiumStd < Std
         unless @log_io.nil?
             @log_io.puts ']'
             @log_io.close
+            @log_file = nil
         end
     end
 

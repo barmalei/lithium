@@ -26,7 +26,7 @@ class CompileSass < FileMask
 end
 
 
-class OpenHTML < FileCommand
+class RunHtml < FileCommand
     def build()
         `open #{fullpath()}`
     end

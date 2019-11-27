@@ -1,5 +1,5 @@
 Usage:
- "lithium [classifier:]*artifact [arg]*"
+ "lithium [-option=value ...] [classifier:]*artifact [arg]*"
 
 Predefined aliases:
   REQUIRES: - show an artifact dependencies 
@@ -15,6 +15,10 @@ Predefined aliases:
   mvn:path             - run maven 
   ant:                 - start ant script
             
+Options:
+  -std=[none|sublime]
+  -verbosity=[0,1,2] 
+
 Samples:
     lithium compile:src/**/*.java  
     lithium run:lib/test.py 

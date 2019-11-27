@@ -1167,13 +1167,110 @@ class FileArtifact < Artifact
         return art.kind_of?(Project) ? [] : FileArtifact.search(path, art.project)
     end
 
-    def self.grep(file, pattern)
+    def self.grep_file(path, pattern, match_all = false, &block)
         raise 'Pattern cannot be nil' if pattern.nil?
         pattern = Regexp.new(pattern) if pattern.kind_of?(String)
-        File.readlines(file).each { |l|
-            return Regexp.last_match if l =~ pattern
+
+        raise "File '#{path}' cannot be found"     unless File.exists?(path)
+        raise "File '#{path}' points to directory" unless File.file?(path)
+
+        list = []
+        line_num = 0
+        File.readlines(path).each { | line |
+            line_num += 1
+            line = line.chomp.strip
+            next if line.length == 0
+            mt = pattern.match(line)
+            unless mt.nil?
+                matched_part = mt[0]
+                if mt.length > 1
+                    matched_part = ''
+                    for i in (1 .. mt.length - 1)
+                        matched_part = matched_part + mt[i]
+                    end
+                end
+
+                if block.nil?
+                    list.push({
+                        :path         => path,
+                        :line_num     => line_num,
+                        :line         => line,
+                        :matched_part => matched_part
+                    })
+                else
+                    block.call(path, line_num, line, matched_part)
+                end
+
+                break unless match_all
+            end
         }
-        nil
+
+        return block.nil? ? list : nil
+    end
+
+    def self.grep(path, pattern, match_all = false, &block)
+        raise 'Pattern cannot be nil' if pattern.nil?
+        pattern = Regexp.new(pattern) if pattern.kind_of?(String)
+
+        is_not_mask = path.index(/[\[\]\?\*\{\}]/).nil?
+        raise "File '#{path}' cannot be found" if !File.exists?(path) && is_not_mask
+
+        list = []
+        if File.directory?(path) || !is_not_mask
+            FileArtifact.dir(path, true) { | item |
+                res = FileArtifact.grep_file(item, pattern, match_all, &block)
+                list.concat(res) unless res.nil?
+            }
+        else
+            list = FileArtifact.grep_file(path, pattern, match_all, &block)
+        end
+
+        return block.nil? ? list : nil
+    end
+
+    def self.dir(path, ignore_dirs = true, &block)
+        raise 'Path cannot be nil'            if path.nil?
+
+        is_not_mask = path.index(/[\[\]\?\*\{\}]/).nil?
+        raise "Path '#{path}' points to file" if File.file?(path)
+        raise "Path '#{path}' doesn't exist"  if !File.exists?(path) && is_not_mask
+
+        list = []
+        Dir[path].each { | item |
+            next if ignore_dirs && File.directory?(item)
+            if block.nil?
+                list.push(item)
+            else
+                block.call(item)
+            end
+        }
+
+        return block.nil? ? list : nil
+    end
+
+    def self.tmpfile(data = nil, &block)
+        raise 'Unknown passed block' if block.nil?
+
+        tmp_file = Tempfile.new('tmp_file')
+        begin
+            unless data.nil?
+                if data.kind_of?(String)
+                    tmp_file.puts(data)
+                elsif data.kind_of?(Array)
+                    data.each { | line |
+                        tmp_file.puts(line)
+                    }
+                else
+                    tmp_file.puts(data.to_s)
+                end
+                tmp_file.close()
+            end
+
+            block.call(tmp_file)
+        ensure
+            tmp_file.close()
+            tmp_file.unlink()
+        end
     end
 end
 

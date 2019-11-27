@@ -202,7 +202,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     if $lithium_options['std']
         std_s = $lithium_options['std'].strip()
         begin
-            std_clazz = std_s == 'null' ? nil : Module.const_get(std_s)
+            std_clazz = std_s == 'none' ? nil : Module.const_get(std_s)
         rescue NameError
             raise "Unknown stdout / stderr class name '#{std_s}'"
         end

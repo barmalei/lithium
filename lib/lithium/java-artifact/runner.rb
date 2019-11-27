@@ -6,6 +6,11 @@ class JavaFileRunner < FileCommand
 
     REQUIRE JAVA
 
+    def initialize(*args)
+        super
+        @arguments ||= []
+    end
+
     def build()
         go_to_homedir()
         raise "Running '#{@name}' failed" if Artifact.exec(*cmd()) != 0
@@ -13,13 +18,11 @@ class JavaFileRunner < FileCommand
 
     def cmd()
         clpath = build_classpath()
-        target = build_target()
-        runner = build_runner()
-        if clpath
-            return [runner, '-classpath', "\"#{clpath}\"", OPTS(), target]
-        else
-            return [runner, OPTS(), target]
-        end
+
+        cmd = [ build_runner() ]
+        cmd.push('-classpath', "\"#{clpath}\"") unless clpath.nil?
+        cmd.push(OPTS(), build_target(), @arguments.join(' '))
+        return cmd
     end
 
     def build_target()
@@ -33,6 +36,19 @@ class JavaFileRunner < FileCommand
     def build_runner()
         @java.java
     end
+
+    def grep_package(pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*;/)
+        res = FileArtifact.grep_file(fullpath, pattern)
+
+        if res.length == 0
+            puts_warning 'Package name is empty'
+            return nil
+        elsif res.length > 1
+            raise "Ambiguous package detection '#{res}'"
+        else
+            return res[0][:matched_part]
+        end
+    end
 end
 
 class RunJavaClass < JavaFileRunner
@@ -40,7 +56,7 @@ class RunJavaClass < JavaFileRunner
 
     def build_target()
         n = @name.dup
-        n[/[.]class/] = ''
+        n[/[.]class$/] = '' if n.end_with?('.class')
         n
     end
 
@@ -57,16 +73,13 @@ class RunJavaCode < JavaFileRunner
     end
 
     def build_target()
-        file = fullpath()
-        pkgname = FileArtifact.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*;/)
-        clname  = File.basename(file)
-        clname[/\.java$/] = ''
+        pkgname = grep_package()
 
+        clname  = File.basename(fullpath)
+        clname[/\.java$/] = '' if clname.end_with?('.java')
         raise 'Class name cannot be identified' if clname.nil?
-        puts_warning 'Package name is empty' if pkgname.nil?
 
-        pkgname = pkgname[1] if pkgname
-        return (pkgname ? "#{pkgname}.#{clname}": clname)
+        return pkgname.nil? ? clname : "#{pkgname}.#{clname}"
     end
 
     def what_it_does() "Run JAVA '#{@name}' code" end
@@ -140,17 +153,16 @@ class RunKotlinCode < JavaFileRunner
     end
 
     def build_target()
-        file = fullpath()
+        fp = fullpath()
 
-        pkg    = FileArtifact.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
-        ext    = File.extname(file)
-        name   = File.basename(file, ext)
-        clname = name[0].upcase() + name[1..name.length-1]
-        clname = clname + ext[1].upcase() + ext[2..ext.length-1] if ext
+        pkg  = grep_package()
+        ext  = File.extname(fp)
+        name = File.basename(fp, ext)
 
-        puts_warning 'Package name is empty.' if pkg.nil?
+        clname = name[0].upcase() + name[1..name.length - 1]
+        clname = clname + ext[1].upcase() + ext[2..ext.length - 1] unless ext.nil?
 
-        return pkg ? "#{pkg[1]}.#{clname}" : clname
+        return pkg.nil? ? clname : "#{pkg[1]}.#{clname}"
     end
 
     def what_it_does()
@@ -180,13 +192,19 @@ class RunScalaCode < JavaFileRunner
     end
 
     def build_target()
-        file = fullpath()
+        pkg = grep_package()
+        cln = nil
+        res = FileArtifact.grep_file(fullpath, /^object[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
 
-        pkg    = FileArtifact.grep(file, /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
-        cln    = FileArtifact.grep(file, /^object[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
-        puts_warning 'Package name is empty.' if pkg.nil?
+        if res.length > 1
+            raise "Ambiguous class name detection '#{res}'"
+        elsif res.length == 1
+            cln = res[0][:matched_part]
+        else
+            raise 'Class name cannot be detected'
+        end
 
-        return pkg ? "#{pkg[1]}.#{cln[-1]}" : cln[-1]
+        return pkg.nil? ? cln[-1] : "#{pkg[1]}.#{cln[-1]}"
     end
 
     def build_runner()
@@ -204,4 +222,3 @@ class RunScalaTestCode < RunScalaCode
 
     include RunJavaTestCase
 end
-
