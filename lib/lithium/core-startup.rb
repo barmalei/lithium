@@ -128,43 +128,41 @@ def BUILD_ARTIFACT(name, &block)
 
     tree.build()
     tree.norm_tree()
-    return BUILD_ARTIFACT_TREE(tree.root_node)
+    BUILD_ARTIFACT_TREE(tree.root_node)
+    return tree.root_node.art
 end
 
 def BUILD_ARTIFACT_TREE(root, level = 0)
     raise 'Nil artifact cannot be built' if root.nil?
     unless root.expired
-        puts "'#{root.art.name}' : #{root.art.class} is not expired", 'There is nothing to be done!' if level == 0
-        return false
-    end
-
-    art = root.art
-    root.children.each { | node | BUILD_ARTIFACT_TREE(node, level + 1) }
-    if art.respond_to?(:build)
-        begin
-            $current_artifact = art
-            wid = art.what_it_does()
-            puts wid unless wid.nil?
-            art.pre_build()
-
-            art.build()
-            art.instance_eval(&art.done) unless art.done.nil?
-
-            art.build_done()
-        rescue
-            art.build_failed()
-            level = $lithium_options.key?('verbosity') ? $lithium_options['verbosity'].to_i : 0
-            puts_exception($!, 0) if level == 0
-            puts_exception($!, 3) if level == 1
-            raise if level == 2
-            return false
-        ensure
-            $current_artifact = nil
-        end
+        puts_warning "'#{root.art.name}' : #{root.art.class} is not expired", 'There is nothing to be done!' if level == 0
     else
-        puts_warning "'#{art.name}' does not declare build() method"
+        art = root.art
+        root.children.each { | node | BUILD_ARTIFACT_TREE(node, level + 1) }
+        if art.respond_to?(:build)
+            begin
+                $current_artifact = art
+                wid = art.what_it_does()
+                puts wid unless wid.nil?
+                art.pre_build()
+
+                art.build()
+                art.instance_eval(&art.done) unless art.done.nil?
+
+                art.build_done()
+            rescue
+                art.build_failed()
+                level = $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
+                puts_exception($!, 0) if level == 0
+                puts_exception($!, 3) if level == 1
+                raise if level == 2
+            ensure
+                $current_artifact = nil
+            end
+        else
+            puts_warning "'#{art.name}' does not declare build() method"
+        end
     end
-    return true
 end
 
 #
@@ -235,10 +233,22 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
 
     puts "TARGET artifact: '#{target_artifact}'"
-    if BUILD_ARTIFACT(target_artifact)
-        puts "#{DateTime.now.strftime('%H:%M:%S.%L')} '#{artifact}' has been built successfully"
-    else
-        puts_error "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact} has failed"
+    built_art = BUILD_ARTIFACT(target_artifact)
+    INFO.info(built_art) if $lithium_options.key?('i')
+    if $lithium_options.key?('i:m')
+        methods = $lithium_options['i:m'].split(',')
+        methods.each { | method |
+            puts "    #{method}() => #{built_art.send(method.to_sym)}"
+        }
     end
+
+    if $lithium_options.key?('i:p')
+        props = $lithium_options['i:p'].split(',')
+        props.each { | prop |
+            puts "    @#{prop} = #{built_art.instance_variable_get(('@' + prop).to_sym)}"
+        }
+    end
+
+    puts "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact}' has been done"
 end
 

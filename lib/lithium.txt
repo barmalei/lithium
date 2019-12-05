@@ -17,7 +17,7 @@ Predefined aliases:
             
 Options:
   -std=[none|sublime]
-  -verbosity=[0,1,2] 
+  -v=[0,1,2] - verbosity level 
 
 Samples:
     lithium compile:src/**/*.java  

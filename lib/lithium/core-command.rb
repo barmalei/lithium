@@ -159,10 +159,9 @@ class EXPIRED < Artifact
 end
 
 class INFO < Artifact
-    def initialize(name = '.') super end
+    def self.info(art)
+        art  = Project.artifact(art) unless art.kind_of?(Artifact)
 
-    def build()
-        art       = Project.artifact(@name)
         variables = art.instance_variables
 
         is_tracked_art_sign = 'untracked'
@@ -176,21 +175,27 @@ class INFO < Artifact
         end
 
         puts "Artifact (#{is_tracked_art_sign}) #{art.class}:'#{art}' {"
-        puts "    (-) project() = '#{project}'"
-        puts "    (-) homedir() = '#{homedir}'"
-        puts "    (-) expired?  = #{expired?}"
+        puts "    (M) project() = '#{art.project}'"
+        puts "    (M) homedir() = '#{art.homedir}'"
+        puts "    (M) expired?  = #{art.expired?}"
         variables.each { | var_name |
             is_tracked_sign = tracked_attrs.include?(var_name[2, var_name.length - 2]) ? 'T' : ' '
-            puts "    (#{is_tracked_sign}) #{var_name} = #{format_val(art.instance_variable_get(var_name))}" if var_name != '@name'
+            puts "    (#{is_tracked_sign}) #{var_name} = #{INFO.format_val(art.instance_variable_get(var_name))}" if var_name != '@name'
         }
         puts '}'
+    end
+
+    def initialize(name = '.') super end
+
+    def build()
+        INFO.info(@name)
     end
 
     def what_it_does() "Inspect artifact '#{@name}'" end
 
     protected
 
-    def format_val(val)
+    def self.format_val(val)
         return 'nil' if val.nil?
         val = val.kind_of?(Array) || val.kind_of?(Hash) || val.kind_of?(String) ? val.inspect : val.to_s
         val = val[0 .. 128] + " [more ..] " if val.length > 128

@@ -84,7 +84,7 @@ class POMFile < PermanentFile
     def initialize(*args, &block)
         name = args.length > 0 && !args[0].nil? ? args[0] : homedir
         pom = FileArtifact.look_file_up(fullpath(name), 'pom.xml', homedir)
-        raise "POM file cannot be detected by '#{fullpath(name)}'" if pom.nil?
+        raise "POM '#{fullpath(name)}' not found" if pom.nil?
         super(pom, &block)
     end
 

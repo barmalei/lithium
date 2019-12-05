@@ -9,7 +9,6 @@ class JavaClasspath < Artifact
     include LogArtifactState
 
     log_attr :paths
-    attr_reader :classpath
 
     # join class paths and normalize it
     def JavaClasspath.join(*parts)
@@ -57,7 +56,6 @@ class JavaClasspath < Artifact
     def initialize(*args, &block)
         @paths = []
         super
-        @classpath = build_classpath()
     end
 
     # add JARs to classpath
@@ -90,24 +88,18 @@ class JavaClasspath < Artifact
     end
 
     # keep it to track the artifact logged expiration state
-    # def expired?
-    #     false
-    # end
-
-    def build()
-        puts ">>>>>>>>>>>>>>>>>> !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    def expired?
+        false
     end
 
-    def build_classpath()
-        return nil if @paths.length == 0
+    def build()
+    end
 
+    def classpath()
         hd        = project.homedir
         classpath = []
         @paths.each { | entry |
             path = entry[:path]
-
-            puts " --- #{path}"
-
             path = File.join(hd, path) unless (Pathname.new path).absolute?
             classpath.concat(JavaClasspath.expand_classpath_dir(path)) if entry[:expand] == true
             classpath.push(path)
@@ -115,9 +107,13 @@ class JavaClasspath < Artifact
 
         return classpath.join(File::PATH_SEPARATOR)
     end
+
+    def what_it_does()
+        "Build '#{name}' class path "
+    end
 end
 
-class JavaDefaultClasspath < JavaClasspath
+class DefaultClasspath < JavaClasspath
     def initialize(*args, &block)
         super
 
@@ -131,64 +127,32 @@ class JavaDefaultClasspath < JavaClasspath
 end
 
 class WarClasspath < JavaClasspath
-    def initialize(name, &block)
-        super(name) {
-            hd = project.homedir
-            base_lib = File.join(hd, 'WEB-INF')
-            PATH(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
-            PATH(File.join('WEB-INF', 'lib'), true) if File.exists?(File.join(base_lib, 'lib'))
-        }
-        self.instance_eval &block unless block.nil?
-    end
-end
-
-class InFileClasspath < FileArtifact
-    include AssignableDependency
-    include LogArtifactState
-
-    def Initialize(name, &block)
-        name = '.classpath' if name.nil?
+    def initialize(*args, &block)
         super
-    end
 
-    def assign_me_to()
-        'classpaths'
-    end
-
-    def expired?()
-        !File.exists?(fullpath)
-    end
-
-    def build()
-        super
-        fp = fullpath
-        raise "Classpath file '#{fp}' doesn't exist"       unless File.exists?(fp)
-        raise "Classpath file points to directory '#{fp}'" if File.directory?(fp)
-    end
-
-    def classpath()
-        return File.exists?(fullpath) ? JavaClasspath.norm_classpath(File.read(fullpath))
-                                      : nil
+        hd = project.homedir
+        base_lib = File.join(hd, 'WEB-INF')
+        PATH(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
+        PATH(File.join('WEB-INF', 'lib'), true) if File.exists?(File.join(base_lib, 'lib'))
     end
 end
 
 class WildflyWarClasspath < WarClasspath
     attr_reader :modules_path
 
-    def initialize(name, &block)
+    def initialize(*args, &block)
+        super
+
         @modules_path = FileArtifact.look_directory_up(project.homedir, 'modules')
         raise "Invalid Wildfly module path '#{@modules_path}'" unless File.directory?(@modules_path)
-        super(name) {
-            libs = javax_modules('servlet')
-            libs.concat(javax_modules('security'))
-            JARS(*libs)
-            JARS(*detect_deployment_modules())
-        }
 
-        self.instance_eval &block unless block.nil?
+        libs = javax_modules('servlet')
+        libs.concat(javax_modules('security'))
+        JARS(*libs)
+        JARS(*detect_deployment_modules())
     end
 
-    # TODO: not completed methof to lookup WF modules
+    # TODO: not completed method to lookup WF modules
     def detect_deployment_modules()
         dep_xml = File.join(project.homedir, 'WEB-INF', 'jboss-deployment-structure.xml')
         jars    = []
@@ -224,32 +188,66 @@ class WildflyWarClasspath < WarClasspath
     end
 end
 
-
-class InDirectoryClasspath < FileMask
+class InFileClasspath < FileArtifact
     include AssignableDependency
     include LogArtifactState
+
+    def initialize(name, &block)
+        name = '.classpath' if name.nil?
+        super
+        @read_as_lines ||= false
+    end
 
     def assign_me_to()
         'classpaths'
     end
 
-    def expired?()
-        false
+    def build()
+        super
+        fp = fullpath
+        raise "Classpath file/directory '#{fp}' doesn't exist" unless File.exists?(fp)
+    end
+
+    def list_items()
+        fp = fullpath
+        if File.directory?(fp)
+            FileArtifact.dir(File.join(fp, '/*')) { | path |
+                yield path, File.mtime(path).to_i
+            }
+        else
+            super
+        end
     end
 
     def classpath()
-        cp_path = fullpath
+        fp = fullpath
+        return nil unless File.exists?(fp)
 
-        list = []
-        list_items { | it, m |
-            list.push(it)
+        cp = nil
+        if File.directory?(fp)
+            cp = []
+            FileArtifact.dir(File.join(fp, '/*')) { | path |
+                cp.push(read_classpath_file(path))
+            }
+            cp = cp.join(File::PATH_SEPARATOR)
+        else
+            cp = read_classpath_file(fp)
+        end
+
+        return cp if cp.nil?
+        return JavaClasspath.norm_classpath(cp)
+    end
+
+    def read_classpath_file(path)
+        return File.read(path).strip unless @read_as_lines
+
+        cp = []
+        File.readlines(path).each { | line |
+            line = line.strip
+            next if line.length == 0 || line[0] == '#'
+            cp.push(line)
         }
-
-        cp = list.map { | item |
-            File.size(item) > 0 ? File.read(item).strip : nil
-        }.select { | item | !item.nil? && item.length > 0 }.join(File::PATH_SEPARATOR)
-
-        return cp.nil? || cp.strip.length == 0 ? nil : cp
+        return cp.join(File::PATH_SEPARATOR)
     end
 end
 
@@ -258,11 +256,16 @@ class JVM < EnvArtifact
     include LogArtifactState
 
     def initialize(*args, &block)
-        super
         @classpaths = []
+        super
     end
 
-    def REMOVE_CLASSPATH(clazz)
+    def CLASSPATH(clazz, &block)
+        res = @classpaths.select { | item | item.class == clazz }
+        raise "Class path cannot be found by '#{clazz}'" if res.nil? || res.length == 0
+        raise "Ambiguous classpath reference '#{clazz}'" if res.length > 1
+        res[0].instance_eval &block
+        return res[0]
     end
 
     def classpath()
@@ -277,9 +280,9 @@ class JAVA < JVM
     log_attr :java_home, :jdk_home, :java_version, :java_version_low, :java_version_high
 
     def initialize(*args)
-        super
+        REQUIRE(DefaultClasspath)
 
-        REQUIRE(JavaDefaultClasspath)
+        super
 
         # identify Java Home
         unless @java_home
@@ -391,13 +394,6 @@ class KOTLIN < JVM
             JARS(File.join(lib, 'kotlin-stdlib.jar' ),
                  File.join(lib, 'kotlin-reflect.jar'))
         }
-    end
-
-    def classpath()
-        puts "Korlin.CLASSPATHS = #{@classpaths.map { | a | a.class }}"
-
-        cl = super
-        return cl
     end
 
     def what_it_does() "Initialize Kotlin environment '#{@name}' " end

@@ -615,7 +615,7 @@ class Artifact
             ln2 = @requires.length
         end
 
-        raise "'#{art}' DEPENDENCY cannot be removed" if ln2 == ln1
+        raise "'#{art}' Class DEPENDENCY cannot be removed" if ln2 == ln1
     end
 
     def Artifact.requires_as_array()
@@ -756,7 +756,7 @@ class Artifact
             ln2 = @requires.length
         end
 
-        raise "'#{art}' DEPENDENCY cannot be removed" if ln2 == ln1
+        raise "'#{art}' Instance DEPENDENCY cannot be removed" if ln2 == ln1
     end
 
     # Overload "eq" operation of two artifact instances.
@@ -1105,6 +1105,15 @@ class FileArtifact < Artifact
         assert_existence()
         f = fullpath()
         return File.exists?(f) ? File.mtime(f).to_i() : -1
+    end
+
+    def list_items()
+        fp = fullpath
+        if File.exists?(fp)
+            yield fp, File.mtime(fp).to_i
+        else
+            yield fp, -1
+        end
     end
 
     def search(path)
