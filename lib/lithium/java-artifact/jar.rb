@@ -50,12 +50,12 @@ class FindInZip < FileMask
         list_items { | path, m |
             fp = fullpath(path)
             unless zi.nil?
-                find_with_zipinfo(zi, fp, mt) { | found |
+                FindInZip.find_with_zipinfo(zi, fp, mt) { | found |
                     puts "    #{Pathname.new(fp).relative_path_from(Pathname.new(hd))} : #{found}"
                     c += 1
                 }
             else
-                find_with_jar(fp, mt) { | found |
+                FindInZip.find_with_jar(@java.jar, fp, mt) { | found |
                     puts "    #{Pathname.new(fp).relative_path_from(Pathname.new(hd))} : #{found}"
                     c += 1
                 }
@@ -64,14 +64,14 @@ class FindInZip < FileMask
         puts_warning "No a class whose name matches '#{@pattern}' was found" if c == 0
     end
 
-    def find_width_jar(jar, match)
-        `#{@java.jar} -ft '#{jar}'`.each_line { |item|
+    def FindInZip.find_width_jar(jar, jar_path, match)
+        `#{jar} -ft '#{jar_path}'`.each_line { |item|
             yield item.chomp unless item.chomp.index(match).nil?
         }
     end
 
-    def find_with_zipinfo(zi, jar, match)
-        IO.popen([zi, '-1',  jar, :err=>[:child, :out]]) { | stdout |
+    def FindInZip.find_with_zipinfo(zi, jar_path, match)
+        IO.popen([zi, '-1',  jar_path, :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
                     yield line.chomp unless line.chomp.index(match).nil?

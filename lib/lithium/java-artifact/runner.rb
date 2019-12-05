@@ -18,7 +18,6 @@ class JavaFileRunner < FileCommand
 
     def cmd()
         clpath = build_classpath()
-
         cmd = [ build_runner() ]
         cmd.push('-classpath', "\"#{clpath}\"") unless clpath.nil?
         cmd.push(OPTS(), build_target(), @arguments.join(' '))
@@ -37,7 +36,7 @@ class JavaFileRunner < FileCommand
         @java.java
     end
 
-    def grep_package(pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*;/)
+    def grep_package(pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
         res = FileArtifact.grep_file(fullpath, pattern)
 
         if res.length == 0
@@ -162,7 +161,7 @@ class RunKotlinCode < JavaFileRunner
         clname = name[0].upcase() + name[1..name.length - 1]
         clname = clname + ext[1].upcase() + ext[2..ext.length - 1] unless ext.nil?
 
-        return pkg.nil? ? clname : "#{pkg[1]}.#{clname}"
+        return pkg.nil? ? clname : "#{pkg}.#{clname}"
     end
 
     def what_it_does()
@@ -204,7 +203,7 @@ class RunScalaCode < JavaFileRunner
             raise 'Class name cannot be detected'
         end
 
-        return pkg.nil? ? cln[-1] : "#{pkg[1]}.#{cln[-1]}"
+        return pkg.nil? ? cln[-1] : "#{pkg}.#{cln[-1]}"
     end
 
     def build_runner()

@@ -19,30 +19,43 @@ class JavaCompiler < FileMask
 
         super
 
-        hd = homedir()
-
-        if @destination.nil?
-            @destination = File.join(hd, 'classes')
-            @destination = File.join(hd, 'WEB-INF', 'classes')  unless File.exists?(@destination)
-
-            pp = project.project
-            @destination = File.join(pp.homedir, 'classes')  if !File.exists?(@destination) && !pp.nil?
-            puts_warning "Destination has not been specified. Use '#{@destination}' as a default one"
-        else
-            @destination = File.join(hd, @destination) unless Pathname.new(@destination).absolute?
+        unless @destination.nil?
+            @destination = File.join(homedir, @destination) unless Pathname.new(@destination).absolute?
             if !File.exists?(@destination) && @create_destination
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
             end
+        else
+            puts_warning 'Destination has not been specified, it will be auto-detected'
         end
     end
 
-    def assert_destination()
-        raise "Destination folder '#{@destination}' doesn't exist"      if !File.exists?(@destination)
-        raise "Destination folder '#{@destination}' is not a directory" if !File.directory?(@destination)
+    def expired?() false end
+
+    def detect_destination()
+        hd = homedir
+        pp = project.project
+
+        destinations = [
+            File.join(hd, 'classes'),
+            File.join(hd, 'WEB-INF', 'classes')
+        ]
+
+        destinations.push(File.join(pp.homedir, 'classes')) unless pp.nil?
+
+        destinations.each { | path |
+            return path if File.exists?(path)
+        }
+
+        str = destinations.map { | path |  "    '" + path + "'\n" }
+        str = str.join('') + "\n"
+        raise "Destination folder detection has failed\n#{str}"
     end
 
-    def expired?() false end
+    def destination()
+        return detect_destination() if @destination.nil?
+        return @destination
+    end
 
     def build_compiler()
         @java.javac
@@ -79,8 +92,6 @@ class JavaCompiler < FileMask
     def build()
         super
 
-        assert_destination()
-
         list = build_target_list()
         if list.nil? || list.length == 0
             puts_warning "Nothing to be compiled"
@@ -88,7 +99,7 @@ class JavaCompiler < FileMask
             target = nil
             begin
                 target = build_target(list)
-                cmd    = build_cmd(list, target.kind_of?(File) ? "@#{target.path}" : target, @destination)
+                cmd    = build_cmd(list, target.kind_of?(File) ? "@#{target.path}" : target, destination())
                 go_to_homedir()
                 raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
                 puts "#{list.length} source files have been compiled"
@@ -98,7 +109,7 @@ class JavaCompiler < FileMask
         end
     end
 
-    def what_it_does() "Compile (#{@description})\n    from: '#{@name}'\n    to:   '#{@destination}'" end
+    def what_it_does() "Compile (#{@description})\n    from: '#{@name}'\n    to:   '#{destination()}'" end
 end
 
 #
@@ -129,7 +140,7 @@ end
 #
 # Kotlin compiler
 #
-class CompileKotlin < JavaCompiler
+class KotlinCompiler < JavaCompiler
     REQUIRE JAVA
     REQUIRE KOTLIN
 
@@ -143,14 +154,16 @@ class CompileKotlin < JavaCompiler
     end
 
     def build_classpath()
+        #return @kotlin.classpath
         JavaClasspath::join(@kotlin.classpath, @java.classpath)
     end
 
-    def build_destination()
-        dest = fullpath(@destination)
-        return dest if File.extname(File.basename(dest)) == '.jar'
-        return super
-    end
+    # TODO: not clear what it is
+    # def build_destination()
+    #     dest = fullpath(destination())
+    #     return dest if File.extname(File.basename(dest)) == '.jar'
+    #     return super
+    # end
 
     def what_it_does()
         "Compile Kotlin '#{@name}' code"
@@ -160,7 +173,7 @@ end
 #
 # Scala compiler
 #
-class CompileScala < JavaCompiler
+class ScalaCompiler < JavaCompiler
     REQUIRE JAVA
     REQUIRE SCALA
 

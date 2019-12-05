@@ -316,7 +316,7 @@ class StdPattern
 
     def location(*args, &block)
         group(:location) {
-            file(*args, &block); colon; line; colon?; column?
+            file(*args, &block); colon; spaces?; line; colon?; column?; colon?
         }
     end
 
@@ -439,6 +439,23 @@ class JavaPattern < StdPattern
     def class_name
         _append('[a-zA-Z$_][a-zA-Z0-9$_]*(\.[a-zA-Z$_][a-zA-Z0-9$_]*)*', :class)
     end
+
+    def enable_path_detection()
+        BLOCK(:file) { | path |
+            break path if Pathname.new(path).absolute?
+            if $current_artifact.kind_of?(FileArtifact)
+                fp = $current_artifact.fullpath
+                if fp.end_with?(path)
+                    next fp
+                else
+                    hd = $current_artifact.homedir
+                    fp = File.join(hd, path)
+                    next fp if File.exists?(fp)
+                end
+            end
+            next FileArtifact.search(path)[0]
+        }
+    end
 end
 
 class JavaExceptionLocPattern < JavaPattern
@@ -450,9 +467,7 @@ class JavaExceptionLocPattern < JavaPattern
             }
         }
 
-        BLOCK(:file) { | path |
-            FileArtifact.search(path)[0]
-        }
+        enable_path_detection()
     end
 
     def method_ref
@@ -463,7 +478,25 @@ end
 class JavaCompileErrorPattern < JavaPattern
     def initialize()
         super(2) {
-            location('java'); any('\s+error:\s+'); group(:message, '.*$')
+            location('java', 'scala'); any('\s+error:\s+'); group(:message, '.*$')
+        }
+    end
+end
+
+class KotlinCompileErrorPattern < JavaPattern
+    def initialize()
+        super(2) {
+            location('kt'); any('\s+error:\s+'); group(:message, '.*$')
+        }
+
+        enable_path_detection()
+    end
+end
+
+class GroovyCompileErrorPattern < JavaPattern
+    def initialize()
+        super(2) {
+            location('groovy'); spaces?; group(:message, '.*$')
         }
     end
 end

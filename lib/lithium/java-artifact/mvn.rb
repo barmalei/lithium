@@ -77,7 +77,7 @@ end
 class POMFile < PermanentFile
     include LogArtifactState
     include StdFormater
-    include AssignableDependecy
+    include AssignableDependency
 
     REQUIRE MVN
 
@@ -99,14 +99,12 @@ class POMFile < PermanentFile
 end
 
 
-class MavenClasspath < JavaClasspathFile
+class MavenClasspath < InFileClasspath
     REQUIRE MVN
 
     include StdFormater
 
     log_attr :excludeGroupIds, :excludeTransitive
-
-    default_name(JavaClasspath::classpath_path('mvn_classpath'))
 
     def initialize(*args, &block)
         @excludeTransitive = false

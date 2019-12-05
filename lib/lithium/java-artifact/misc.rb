@@ -49,39 +49,99 @@ class JavaDoc < FileCommand
     def what_it_does() "Generate javadoc to '#{@name}' folder" end
 end
 
-
-class Introspect < Artifact
+# TODO: most likely it should be removed
+class SuggestClassname < JavaFileRunner
     REQUIRE JAVA
 
-    def build()
-        Artifact.exec()
+    def initialize(*args)
+        super
+        @arguments = [ $lithium_args[0] ]
+    end
+
+    def build_classpath()
+        File.join($lithium_code, 'classes') + File::PATH_SEPARATOR + @java.classpath
+    end
+
+    def build_target()
+        'test.ClassMethods'
     end
 end
 
-class FindJavaClass < FileCommand
+class FindInClasspath < FileCommand
     REQUIRE JAVA
 
+    def initialize(*args)
+        super
+        @target ||= $lithium_args[0]
+        @use_zipinfo = false
+        @use_zipinfo = true unless FileArtifact.which('zipinfo').nil?
+    end
+
     def build()
-        result = []
-        clname   = @name.gsub('.', '/')
-        clname   = clname + '.class' unless clname.end_with?('.class')
+        unless @java.classpath.nil?
+            count = 0
+            FindInClasspath.find(@use_zipinfo, @java.classpath, @target) { | path, item |
+                item_found(path, item)
+                count = count + 1
+            }
 
-        #puts "CLNAME = #{clname}"
+            puts_warning "No item for '#{@target}' has been found" if count == 0
+        else
+            puts_warning 'Classpath is not defined'
+        end
+    end
 
-        @java.classpath.split(File::PATH_SEPARATOR).each { | path |
+    def item_found(path, item)
+        puts "    [#{path} => #{item}]"
+    end
+
+    def FindInClasspath.find(use_zipinfo, classpath, target)
+        classpath.split(File::PATH_SEPARATOR).each { | path |
             if File.directory?(path)
-                FileArtifact.dir(File.join(path, clname)) { | item |
-                    result << file unless File.directory?(file)
+                Dir.glob(File.join(path, '**', target)).each  { | item |
+                    yield path, item
                 }
-            elsif path.end_with?('.jar')
-                zip = FindInZip.new(path)
-                zip.find_width_jar(path, clname)
+            elsif path.end_with?('.jar') || path.end_with?('.zip')
+                if use_zipinfo
+                    FindInZip.find_with_zipinfo('zipinfo', path, "/" + target) { | item |
+                        yield path, item
+                    }
+                else
+                    FindInZip.find_with_jar('jar', path, "/" + target) { | item |
+                        yield path, item
+                    }
+                end
             else
                 wmsg "File '#{path}' doesn't exist" unless File.exists?(path)
             end
         }
+    end
 
-        puts_warning "Class #{@target.name} not found" if result.length == 0
-        return result
+    def what_it_does() "Looking for '#{@target}' in classpath" end
+end
+
+class FindClassInClasspath < FindInClasspath
+    REQUIRE JAVA
+
+    def initialize(*args)
+        super
+        @target = @target + '.class' unless @target.end_with?('.class')
+    end
+
+    def build()
+        Artifact.exec(@java.java, '-classpath',
+                      "\"#{File.join($lithium_code, 'classes')}\"",
+                      'lithium.DiscoverSystemClass',
+                      @target ) { | stdin, stdout, thread |
+            # if thread.value != 0
+            #     puts_warning "System class detection has failed"
+            # else
+                Artifact.read_exec_output(stdin, stdout, thread) { | line |
+                    puts line
+                }
+           # end
+        }
+
+        super
     end
 end

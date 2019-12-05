@@ -46,6 +46,14 @@ PATTERNS ({
         JavaCompileErrorPattern.new()
     ],
 
+    [ KotlinCompiler ] => [
+        KotlinCompileErrorPattern.new()
+    ],
+
+    [ GroovyCompiler ] => [
+        GroovyCompileErrorPattern.new()
+    ],
+
     [ ValidatePythonScript, RunPythonScript ] => [
         # '\s*File\s+\"(?<file>${file_pattern}\.py)\"\,\s*line\s+(?<line>[0-9]+)')
         StdPattern.new {

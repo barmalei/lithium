@@ -585,9 +585,10 @@ class Artifact
 
     @default_name = nil
 
+    # set or get default artifact name
     def Artifact.default_name(*args)
         @default_name = args[0] if args.length > 0
-        @default_name ||= nil
+        @default_name = File.join('.env', self.name) if @default_name.nil?
         return @default_name
     end
 
@@ -603,6 +604,18 @@ class Artifact
         @requires ||= []
         @requires.push([art, nil, nil, block])
         return AssignRequiredTo.new(@requires[-1])
+    end
+
+    def Artifact.DISMISS(art)
+        raise 'No dependencies have been specified' if art.nil?
+        ln1 = ln2 = 0
+        if @requires && @requires.length > 0
+            ln1 = @requires.length
+            @requires.delete_if { | el | el[0] == art }
+            ln2 = @requires.length
+        end
+
+        raise "'#{art}' DEPENDENCY cannot be removed" if ln2 == ln1
     end
 
     def Artifact.requires_as_array()
@@ -734,6 +747,18 @@ class Artifact
         return AssignRequiredTo.new(@requires[-1])
     end
 
+    def DISMISS(art)
+        raise 'No dependencies have been specified' if art.nil?
+        ln1 = ln2 = 0
+        if @requires && @requires.length > 0
+            ln1 = @requires.length
+            @requires.delete_if { | el | el[0] == art }
+            ln2 = @requires.length
+        end
+
+        raise "'#{art}' DEPENDENCY cannot be removed" if ln2 == ln1
+    end
+
     # Overload "eq" operation of two artifact instances.
     def ==(art)
         art && self.class == art.class && @name == art.name && @ver == art.ver && owner == art.owner
@@ -741,6 +766,28 @@ class Artifact
 
     # return last time the artifact has been modified
     def mtime() -1 end
+
+    def Artifact.read_exec_output(stdin, stdout, thread)
+        while thread.status != false && thread.status != nil
+            begin
+                rr = IO.select([ stdout ], nil, nil, 2)
+                if !rr.nil? && !rr.empty?
+                    for std in rr[0]
+                        line = std.readline.rstrip()
+                        if line
+                            yield line
+                        end
+                    end
+                end
+            rescue EOFError => e
+                $stdout.flush()
+            rescue Exception => e
+                STDERR.puts(e)
+                STDERR.flush()
+                return thread.value
+            end
+        end
+    end
 
     def Artifact.exec(*args, &block)
         # clone arguments
@@ -753,29 +800,14 @@ class Artifact
         Open3.popen2e(args.join(' ')) { | stdin, stdout, thread |
             stdin.close
             stdout.set_encoding(Encoding::UTF_8)
-            block.call(stdin, stdout, stderr, thread) unless block.nil?
-
-            while thread.status != false && thread.status != nil
-                begin
-                    rr = IO.select([ stdout ], nil, nil, 2)
-                    if !rr.nil? && !rr.empty?
-                        for std in rr[0]
-                            line = std.readline.rstrip()
-                            if line
-                                $stdout.puts line
-                                $stdout.flush
-                            end
-                        end
-                    end
-                rescue EOFError => e
-                    $stdout.flush()
-                rescue Exception => e
-                    STDERR.puts(e)
-                    STDERR.flush()
-                    return thread.value
-                end
+            if  block.nil?
+                Artifact.read_exec_output(stdin, stdout, thread) { | line |
+                    $stdout.puts line
+                    $stdout.flush
+                }
+            else
+                block.call(stdin, stdout, thread)
             end
-
             return thread.value
         }
     end
@@ -868,10 +900,11 @@ class ArtifactTree < Artifact
 
             build_tree(node, shift + '    ')
 
-            if !assignMeTo.nil? || node.art.class < AssignableDependecy
+            if node.art.class < AssignableDependency
 
-                # if an attribute name the dependency has to be assigned has not bee defined
-                # that means we have get using AssignableDependecy API
+                # call special method that is declared with AssignableDependency module
+                # to resolve host artifact property name the given depndency artigact has
+                # to be stored
                 assignMeTo = node.art.assign_me_to if assignMeTo.nil?
 
                 raise "Invalid attribute name 'node.art' artifact has to be assigned" if assignMeTo.nil?
@@ -1624,8 +1657,8 @@ class Project < Directory
 end
 
 # an artifact has to include the module to be assigned to an attribute of an artifact
-# that requires the AssignableDependecy artifact
-module AssignableDependecy
+# that requires the AssignableDependency artifact
+module AssignableDependency
     #  an attribute name the dependency artifact has to be assigned
     def assign_me_to()
         self.class.name.downcase
@@ -1663,7 +1696,7 @@ end
 
 # Environment artifact
 class EnvArtifact < Artifact
-    include AssignableDependecy
+    include AssignableDependency
 
     def self.default_name(*args)
         @default_name ||= nil

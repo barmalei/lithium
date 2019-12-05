@@ -35,7 +35,7 @@ class StringRunner < Artifact
         raise 'Script string has not been defined' unless @script
 
         # TODO: this notation is not supported by  Artifact.exec()
-        r = Artifact.exec(*cmd()) { | stdin, stdout, stderr, thread |
+        r = Artifact.exec(*cmd()) { | stdin, stdout, thread |
             stdin << @script
             stdin.close
         }
