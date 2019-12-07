@@ -98,7 +98,6 @@ class POMFile < PermanentFile
     end
 end
 
-
 class MavenClasspath < InFileClasspath
     REQUIRE MVN
 
@@ -114,13 +113,13 @@ class MavenClasspath < InFileClasspath
     end
 
     def build()
-        super
         Dir.chdir(File.dirname(@pom.fullpath))
         raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(@mvn.mvn,
                                                                        "dependency:build-classpath",
                                                                        "-DexcludeTransitive=#{@excludeTransitive}",
                                                                        @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
                                                                        "-Dmdep.outputFile=#{fullpath}")
+        super
     end
 
     def what_it_does()

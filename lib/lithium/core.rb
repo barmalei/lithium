@@ -219,8 +219,17 @@ module LogArtifactState
     def list_expired_items(&block)
         return unless self.class.method_defined?(:list_items)
         e = load_items_log()
+
         list_items { |n, t|
+            raise "Duplicated listed item '#{n}'" if e[n] == -2
             block.call(n, e[n] ? e[n] : -1) if t == -1 || e[n].nil? || e[n].to_i == -1 || e[n].to_i < t
+
+            e[n] = -2 unless e[n].nil? # mark as passed the given item
+        }
+
+        # detect deleted items
+        e.each_pair { | f, t |
+            block.call(f, -2) if t != -2
         }
     end
 

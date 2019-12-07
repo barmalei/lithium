@@ -141,19 +141,16 @@ class WildflyWarClasspath < WarClasspath
     attr_reader :modules_path
 
     def initialize(*args, &block)
+        @modules_path = FileArtifact.look_directory_up(project.homedir, 'modules')
+        raise "Invalid WildFly module path '#{@modules_path}'" unless File.directory?(@modules_path)
+
         super
 
-        @modules_path = FileArtifact.look_directory_up(project.homedir, 'modules')
-        raise "Invalid Wildfly module path '#{@modules_path}'" unless File.directory?(@modules_path)
-
-        libs = javax_modules('servlet')
-        libs.concat(javax_modules('security'))
-        JARS(*libs)
-        JARS(*detect_deployment_modules())
+        SYSTEM_MODULES('javax/servlet', 'javax/security', 'javax/ws')
     end
 
     # TODO: not completed method to lookup WF modules
-    def detect_deployment_modules()
+    def DEPLOYMENT()
         dep_xml = File.join(project.homedir, 'WEB-INF', 'jboss-deployment-structure.xml')
         jars    = []
         if File.exists?(dep_xml)
@@ -161,15 +158,10 @@ class WildflyWarClasspath < WarClasspath
             xmldoc.elements.each('jboss-deployment-structure/deployment/dependencies/module') { | el |
                 if el.attributes['export'] == 'true'
                     name = el.attributes['name']
-                    FileArtifact.grep(File.join(@modules_path, "**", "*.xml"), "\"#{name}\"") { | found_xml |
-                        found_xml_doc = REXML::Document.new(File.new(found_xml))
-
-                        if found_xml_doc.root.attributes['name'] == name
-                            Dir[File.join(File.dirname(found_xml), '*.jar')].each { | jar_path |
-                                jars.push(jar_path)
-                            }
-                            break
-                        end
+                    name = name.gsub('.', '/')
+                    root = File.join(_addon_module_root, '**', name, 'main', '*.jar')
+                    FileArtifact.dir(root) { | jar |
+                        JARS(jar)
                     }
                 end
             }
@@ -178,13 +170,49 @@ class WildflyWarClasspath < WarClasspath
         return jars
     end
 
-    def javax_modules(path)
+    def SYSTEM_MODULES(*paths)
+        paths.each { | path |
+            SYSTEM_MODULE(path)
+        }
+    end
+
+    def SYSTEM_MODULE(path)
+        JARS(*_MODULE(_system_module_root, path))
+    end
+
+    def ADDON_MODULES(*paths)
+        paths.each { | path |
+            ADDON_MODULE(path)
+        }
+    end
+
+    def ADDON_MODULE(path)
+        JARS(*_MODULE(_addon_module_root, path))
+    end
+
+    def _MODULE(root, path)
+        raise 'Empty WildFly module path'                   if     path.nil? || path.length == 0
+        raise "Absolute WildFly module '#{path}' detected"  if     Pathname.new(path).absolute?
+        raise "Modules root path '#{root}' is invalid"      unless Pathname.new(root).directory?
+
+        path = File.join(root, path)
+        raise "WildFly module path '#{path}' is invalid" unless File.exists?(path)
+        path = File.join(path, '**', '*.jar')
+
         libs = []
-        path = File.join(@modules_path, 'system', 'layers', 'base', 'javax', path, '**', '*.jar')
         Dir[path].each { | jar_path |
             libs.push(jar_path)
         }
+
         return libs
+    end
+
+    def _system_module_root()
+        File.join(@modules_path, 'system', 'layers', 'base')
+    end
+
+    def _addon_module_root()
+        File.join(@modules_path, 'system', 'add-ons')
     end
 end
 
@@ -251,21 +279,12 @@ class InFileClasspath < FileArtifact
     end
 end
 
-
 class JVM < EnvArtifact
     include LogArtifactState
 
     def initialize(*args, &block)
         @classpaths = []
         super
-    end
-
-    def CLASSPATH(clazz, &block)
-        res = @classpaths.select { | item | item.class == clazz }
-        raise "Class path cannot be found by '#{clazz}'" if res.nil? || res.length == 0
-        raise "Ambiguous classpath reference '#{clazz}'" if res.length > 1
-        res[0].instance_eval &block
-        return res[0]
     end
 
     def classpath()
@@ -371,7 +390,15 @@ end
 
 
 class KotlinClasspath < JavaClasspath
+    def initialize(*args, &block)
+        super
+        raise 'Kotlin home is not defined' if @kotlin_home.nil?
+        raise "Kotlin home '#{@kotlin_home}' is invalid" unless File.directory?(@kotlin_home)
 
+        lib = File.join(@kotlin_home, 'lib')
+        JARS(File.join(lib, 'kotlin-stdlib.jar' ),
+             File.join(lib, 'kotlin-reflect.jar'))
+    end
 end
 
 # Kotlin environment
@@ -382,17 +409,17 @@ class KOTLIN < JVM
 
     def initialize(*args)
         super
-
+        kotlinc_path = @kotlin_home
         unless @kotlin_home
             kotlinc_path = FileArtifact.which('kotlinc')
-            @kotlin_home = File.dirname(File.dirname(kotlinc_path)) if kotlinc_path
+            kotlinc_path = File.dirname(File.dirname(kotlinc_path)) if kotlinc_path
+            @kotlin_home = kotlinc_path
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
 
         lib = File.join(@kotlin_home, 'lib')
         REQUIRE(KotlinClasspath) {
-            JARS(File.join(lib, 'kotlin-stdlib.jar' ),
-                 File.join(lib, 'kotlin-reflect.jar'))
+            @kotlin_home = kotlinc_path
         }
     end
 
