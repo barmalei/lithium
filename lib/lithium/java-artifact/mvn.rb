@@ -190,7 +190,7 @@ class RunMaven < PomFile
     def what_it_does() "Run maven: '#{@name}' #{@targets.join(' ')} OPTS=#{@mvn.OPTS()}" end
 end
 
-class CompileMaven < RunMaven
+class MavenCompiler < RunMaven
     REQUIRE MVN
 
     def initialize(*args)

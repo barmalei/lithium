@@ -4,24 +4,35 @@
     UglifiedJSFile('minjs:**/*.min.js')
     NodejsModule('npm:**/node_modules/*')
 
-    OpenHTML('openhtml:**/*.html')
-
     RunMaven('mvn:*')
-    BuildVaadinSass('buildsass:**/*.sass')
 
+    # TODO: ?
     RunPythonString('runpystr:')  {
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
+    # TODO: ?
     RunRubyString('runrbstr:') {
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
+    # TODO: should be removed
     CopyOfFile(".lithium/lib/test.jar") {
         @source = "jnc-easy/jnc-easy-1.1.1/test.jar"
     }
 
+    ARTIFACT(".lithium/**/*.java") {
+
+    }
+
     ARTIFACT("run:*") {
+        ARTIFACT('.lithium/**/*.java') {
+            JavaClasspath {
+                @libs = '.lithium/classes'
+            }
+            RunJavaCode('**/*.java')
+        }
+
         RunJavaCode      ('**/*.java')
         RunNodejs        ('**/*.js')
         RunPythonScript  ('**/*.py')
@@ -33,6 +44,7 @@
         RunKotlinCode    ('**/*.kt')
         RunScalaCode     ('**/*.scala')
         RunJavaClass     ('**/*.class')
+        RunHtml          ('**/*.html')
         RunRubyScript    ('**/*.rb') {
             DONE { | art |
                 Touch.build('dsdsd')
@@ -51,18 +63,24 @@
     }
 
     ARTIFACT("compile:*") {
-        JavaCompiler      ('**/*.java')  { OPT "-Xlint:deprecation" }
+        JavaCompiler('.lithium/**/*.java') {
+            @destination = '.lithium/classes'
+        }
+
+        JavaCompiler('**/*.java')  { OPT "-Xlint:deprecation" }
+
         GroovyCompiler    ('**/*.groovy')
-        CompileKotlin     ('**/*.kt')
-        CompileScala      ('**/*.scala')
+        KotlinCompiler    ('**/*.kt')
+        ScalaCompiler     ('**/*.scala')
         ValidateRubyScript('**/*.rb')
         ValidatePhpScript ('**/*.php')
 
         ValidatePythonScript('**/*.py')
-        CompileMaven        ('**/pom.xml')
+        MavenCompiler       ('**/pom.xml')
         ValidateXML         ('**/*.xml')
         CompileTTGrammar    ('**/*.tt')
         CompileSass         ('**/*.sass')
+        BuildVaadinSass     ('VAADIN/**/*.scss')
 
         GroupByExtension('**/*') {
             DO { | ext |
@@ -85,6 +103,7 @@
     PMD('pmd:**/*.java')
     #MavenJarFile('mavenjar:**/*.jar')
 
+    # TODO: grep class already fetch lithium arguments
     GREP('grep:') {
         @grep = $lithium_args[0] if $lithium_args.length > 0
     }
