@@ -27,7 +27,6 @@ public class ShowClassMethods {
             System.exit(1);
         }
 
-        Class
 
         int count = 0;
         for (Class clazz : classByShortName(args[0])) {

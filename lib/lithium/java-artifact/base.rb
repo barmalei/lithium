@@ -291,6 +291,17 @@ class JVM < EnvArtifact
         classpath = @classpaths.map { | art | art.classpath }.select { | cp | !cp.nil? && cp.length > 0 }.join(File::PATH_SEPARATOR)
         return classpath.nil? || classpath.length == 0 ? nil : JavaClasspath.norm_classpath(classpath)
     end
+
+    def list_classpaths()
+        return 'None' if @classpaths.length == 0
+        @classpaths.map { | clz |
+            clz.name
+        }.join(',')
+    end
+
+    def what_it_does()
+        "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
+    end
 end
 
 class JAVA < JVM
@@ -354,8 +365,6 @@ class JAVA < JVM
     def javadoc() jtool('javadoc') end
     def java()    jtool('java')    end
     def jar()     jtool('jar')     end
-
-    def what_it_does() "Initialize Java environment #{@java_version} '#{@name}' " end
 
     protected
 
@@ -423,8 +432,6 @@ class KOTLIN < JVM
         }
     end
 
-    def what_it_does() "Initialize Kotlin environment '#{@name}' " end
-
     def kotlinc() File.join(@kotlin_home, 'bin', 'kotlinc') end
 end
 
@@ -445,8 +452,6 @@ class SCALA < JVM
         raise "Scala home '#{@scala_home}' cannot be found" if @scala_home.nil? || !File.exist?(@scala_home)
         puts "Scala home: '#{@scala_home}'"
     end
-
-    def what_it_does() "Initialize Scala environment '#{@name}'" end
 
     def scalac() File.join(@scala_home, 'bin', 'scalac') end
 

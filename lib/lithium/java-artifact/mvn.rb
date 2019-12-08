@@ -74,7 +74,7 @@ class MavenArtifact < CopyOfFile
     end
 end
 
-class POMFile < PermanentFile
+class PomFile < PermanentFile
     include LogArtifactState
     include StdFormater
     include AssignableDependency
@@ -108,7 +108,7 @@ class MavenClasspath < InFileClasspath
     def initialize(*args, &block)
         @excludeTransitive = false
         super(*args, &block)
-        REQUIRE(POMFile.new(homedir))
+        REQUIRE(PomFile.new(homedir))
         @excludeGroupIds ||= []
     end
 
@@ -123,7 +123,7 @@ class MavenClasspath < InFileClasspath
     end
 
     def what_it_does()
-        "Build maven classpath by #{@pom.fullpath}"
+        "Build maven classpath by '#{@pom.fullpath}' in '#{fp}'"
     end
 end
 
@@ -140,7 +140,7 @@ class MavenDependenciesDir < FileArtifact
         fp = fullpath()
         raise "POMDependencies should point to file #{fp}" if File.exists?(fp) && !File.directory?(fp)
 
-        REQUIRE(POMFile.new(@name))
+        REQUIRE(PomFile.new(@name))
         @excludeGroupIds   ||= [ ]
     end
 
@@ -159,7 +159,7 @@ class MavenDependenciesDir < FileArtifact
 end
 
 
-class RunMaven < POMFile
+class RunMaven < PomFile
     include OptionsSupport
 
     REQUIRE MVN
@@ -203,7 +203,7 @@ class CompileMaven < RunMaven
     end
 
     def list_items()
-        dir = File.join(File.dirname(fullpath()), 'src', '**', '*')
+        dir = File.join(File.dirname(fullpath), 'src', '**', '*')
         FileMask.new(dir).list_items { |f, t|
             yield f, t
         }
