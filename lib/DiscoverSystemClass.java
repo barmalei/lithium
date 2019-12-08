@@ -26,7 +26,6 @@ public class DiscoverSystemClass {
         for (String pkg :  packages) {
             try {
                 String fullClassName = String.format("%s.%s", pkg, name);
-                System.out.println(">>>>> " + fullClassName);
                 Class clz = Class.forName(fullClassName);
                 res.add(clz);
             } catch (Exception e) {

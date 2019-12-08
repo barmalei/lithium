@@ -18,12 +18,14 @@
                     ,{ "caption": "Compile All",   "command": "li", "args": {"command":"compile:{home}/src/**/*"    } }
                     ,{ "caption": "Check All",     "command": "li", "args": {"command":"check:{home}/src/**/*"  } }
                     ,{ "caption": "PMD Check All", "command": "li", "args": {"command":"pmd:{home}/src/**/*"        } }
-                    ,{ "caption": "Build", "command": "li" }
                     ,{ "caption": "Clean", "command": "CLEAN" }
 
                     ,{ "caption": "-" }
 
                     ,{ "caption": "Show errors", "command": "li_show_paths" }
+                    ,{ "caption": "Show doc",    "command": "li_show_doc" }
+                    ,{ "caption": "Show classes","command": "li_show_classes" }
+
                     ,{ "caption": "Show scope", "command": "li_print_scope" }
                 ]
             }

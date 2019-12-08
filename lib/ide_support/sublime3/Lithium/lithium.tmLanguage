@@ -14,15 +14,16 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>\(INF\)[ ]+Z</string>
+			<string>^(\(INF\)[ ]+Z)|(\[INFO\][ ]*)</string>
 			<key>name</key>
 			<string>li.info</string>
 		</dict>
+
 		<dict>
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>\(WAR\)[ ]+\!</string>
+			<string>^\(WAR\)[ ]+\!|(\[WARNING\][ ]*)</string>
 			<key>name</key>
 			<string>li.warning</string>
 		</dict>
@@ -30,7 +31,7 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>\(EXC\)[ ]+\?</string>
+			<string>^\(EXC\)[ ]+\?</string>
 			<key>name</key>
 			<string>li.exception</string>
 		</dict>
@@ -38,7 +39,7 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>\(ERR\)[ ]+\?</string>
+			<string>^\(ERR\)[ ]+\?|(\[ERROR\][ ]*)</string>
 			<key>name</key>
 			<string>li.error</string>
 		</dict>

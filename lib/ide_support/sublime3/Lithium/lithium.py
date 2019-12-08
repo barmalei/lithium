@@ -1,7 +1,16 @@
-import sublime, sublime_plugin, subprocess, threading, functools, os, datetime, io
+import sublime, sublime_plugin
 
+import subprocess, threading
+import os, io, platform, json, re
+import webbrowser
+
+from   urllib.request import urlopen
+from   urllib.parse   import quote
+
+# in-line settings
 settings = {
     'path'          : "lithium",
+    'li_opts'       : "-verbosity=2",
     'output_panel'  : "lithium",
     'output_font_size'  : 11,
     'debug'         : False,
@@ -9,7 +18,109 @@ settings = {
     'output_syntax' : 'Packages/Lithium/lithium.tmLanguage',
     'place_detector': [
         r"\[\[([^\[\]\(\)\{\}\?\!\<\>\^\,\~\`]+)\:([0-9]+)\]\][\:]*(.*)"
-    ]
+    ],
+
+    'doc_servers' : {
+        'dash': {
+            '*' : {
+                'url': 'dash-plugin://keys=%s&query=%s'
+            },
+
+            # copied from Dash plug-in
+            "keys_map": {
+              "ActionScript"          : ["actionscript"],
+              "Boo"                   : ["unity3d"],
+              "C"                     : ["c", "glib", "gl2", "gl3", "gl4", "manpages"],
+              "C99"                   : ["c", "glib", "gl2", "gl3", "gl4", "manpages"],
+              "C++"                   : ["cpp", "net", "boost", "qt", "cvcpp", "cocos2dx", "c", "manpages"],
+              "C++11"                 : ["cpp", "net", "boost", "qt", "cvcpp", "cocos2dx", "c", "manpages"],
+              "Clojure"               : ["clojure"],
+              "CoffeeScript"          : ["coffee"],
+              "ColdFusion"            : ["cf"],
+              "CSS"                   : ["css", "bootstrap", "foundation", "less", "awesome", "cordova", "phonegap"],
+              "Dart"                  : ["dartlang", "polymerdart", "angulardart"],
+              "Elixir"                : ["elixir"],
+              "Erlang"                : ["erlang"],
+              "Go"                    : ["go", "godoc"],
+              "GoSublime"             : ["go", "godoc"],
+              "GoSublime-Go"          : ["go", "godoc"],
+              "Groovy"                : ["groovy"],
+              "Haskell"               : ["haskell"],
+              "Haskell-SublimeHaskell": ["haskell"],
+              "Literate Haskell"      : ["haskell"],
+              "HTML"                  : ["html", "svg", "css", "bootstrap", "foundation", "awesome", "statamic", "javascript", "jquery", "jqueryui", "jquerym", "angularjs", "backbone", "marionette", "meteor", "moo", "prototype", "ember", "lodash", "underscore", "sencha", "extjs", "knockout", "zepto", "cordova", "phonegap", "yui"],
+              "Jade"                  : ["jade"],
+              "Java"                  : ["java", "javafx", "grails", "groovy", "playjava", "spring", "cvj", "processing", "javadoc"],
+              "JavaScript"            : ["javascript", "jquery", "jqueryui", "jquerym", "angularjs", "backbone", "marionette", "meteor", "sproutcore", "moo", "prototype", "bootstrap", "foundation", "lodash", "underscore", "ember", "sencha", "extjs", "knockout", "zepto", "yui", "d3", "svg", "dojo", "coffee", "nodejs", "express", "mongoose", "moment", "require", "awsjs", "jasmine", "sinon", "grunt", "chai", "html", "css", "cordova", "phonegap", "unity3d", "titanium"],
+              "Kotlin"                : ["kotlin"],
+              "Less"                  : ["less"],
+              "Lisp"                  : ["lisp"],
+              "Lua"                   : ["lua", "corona"],
+              "Markdown"              : ["markdown"],
+              "MultiMarkdown"         : ["markdown"],
+              "Objective-C"           : ["iphoneos", "macosx", "appledoc", "cocos2d", "cocos3d", "kobold2d", "sparrow", "cocoapods", "c", "manpages"],
+              "Objective-C++"         : ["cpp", "iphoneos", "macosx", "appledoc", "cocos2d", "cocos2dx", "cocos3d", "kobold2d", "sparrow", "cocoapods", "c", "manpages"],
+              "Objective-J"           : ["cappucino"],
+              "OCaml"                 : ["ocaml"],
+              "Perl"                  : ["perl", "manpages"],
+              "PHP"                   : ["php", "wordpress", "drupal", "zend", "laravel", "yii", "joomla", "ee", "codeigniter", "cakephp", "phpunit", "symfony", "typo3", "twig", "smarty", "phpp", "html", "statamic", "mysql", "sqlite", "mongodb", "psql", "redis"],
+              "Processing"            : ["processing"],
+              "Puppet"                : ["puppet"],
+              "Python"                : ["python", "django", "twisted", "sphinx", "flask", "tornado", "sqlalchemy", "numpy", "scipy", "salt", "cvp"],
+              "R"                     : ["r"],
+              "Ruby"                  : ["ruby", "rubygems", "rails"],
+              "Ruby on Rails"         : ["ruby", "rubygems", "rails"],
+              "(HTML) Rails"          : ["ruby", "rubygems", "rails", "html", "svg", "css", "bootstrap", "foundation", "awesome", "statamic", "javascript", "jquery", "jqueryui", "jquerym", "angularjs", "backbone", "marionette", "meteor", "moo", "prototype", "ember", "lodash", "underscore", "sencha", "extjs", "knockout", "zepto", "cordova", "phonegap", "yui"],
+              "(JavaScript) Rails"    : ["ruby", "rubygems", "rails", "javascript", "jquery", "jqueryui", "jquerym", "angularjs", "backbone", "marionette", "meteor", "sproutcore", "moo", "prototype", "bootstrap", "foundation", "lodash", "underscore", "ember", "sencha", "extjs", "knockout", "zepto", "yui", "d3", "svg", "dojo", "coffee", "nodejs", "express", "mongoose", "moment", "require", "awsjs", "jasmine", "sinon", "grunt", "chai", "html", "css", "cordova", "phonegap", "unity3d"],
+              "(SQL) Rails"           : ["ruby", "rubygems", "rails"],
+              "Ruby Haml"             : ["haml"],
+              "Rust"                  : ["rust"],
+              "Sass"                  : ["sass", "compass", "bourbon", "neat", "css"],
+              "Scala"                 : ["scala", "akka", "playscala", "scaladoc"],
+              "Shell-Unix-Generic"    : ["bash", "manpages"],
+              "SQL"                   : ["mysql", "sqlite", "psql"],
+              "TCL"                   : ["tcl"],
+              "TSS"                   : ["titanium"],
+              "TypeScript"            : ["typescript", "javascript", "react", "nodejs", "jquery", "jqueryui", "jquerym", "angularjs", "backbone", "marionette", "meteor", "sproutcore", "moo", "prototype", "bootstrap", "foundation", "lodash", "underscore", "ember", "sencha", "extjs", "knockout", "zepto", "yui", "d3", "svg", "dojo", "express", "mongoose", "moment", "require", "awsjs", "jasmine", "sinon", "grunt", "chai", "html", "css", "cordova", "phonegap", "unity3d", "titanium"],
+              "YAML"                  : ["yaml"],
+              "XML"                   : ["xml", "titanium"]
+            }
+        },
+
+        'solr':  {
+            'Java' : {
+                'url' : 'http://localhost:8983/solr/{core}/select?q=id:*/{word}*'
+            },
+
+            'Python' : {
+                'url' : 'http://localhost:8983/solr/{core}/select?q={word}%20AND%20id:*.html'
+            },
+
+            'Ruby' : {
+                'url' : 'http://localhost:8983/solr/{core}/select?q=id:*/{word}.html'
+            },
+
+            'JavaScript' : {
+                'url' : 'http://localhost:8983/solr/{core}/select?q=id:*/{word}*'
+            },
+
+            'html_template' : """
+            <style>
+            body {
+                margin: 4px;
+            }
+            div {
+                width: 400px;
+            }
+            </style>
+            <body>
+            <div>
+            %s
+            </div>
+            </body>
+            """
+        }
+    }
 }
 
 def li_is_debug():
@@ -122,22 +233,23 @@ def li_show_paths(view, win=None):
             if li_is_debug():
                 print("li_show_paths() : No paths have been found")
 
-def EXEC_LI(command, handler, error_handler):
-    def WRITES(process, panel, handler, error_handler):
-        #sublime.set_timeout(lambda: self.do_write(text), 1)
-        try:
-            panel.run_command('append', { 'characters' :  "(INF) Lithium Sublime 3 plugin\n" })
-            for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
-                panel.run_command('append', { 'characters' :  line, 'force': True, 'scroll_to_end': True })
-                handler(process, panel, line)
+def LI_HOME():
+    active_view = sublime.active_window().active_view()
 
-            # tell the last lkine has been handled
-            process.stdout.close()
-            handler(process, panel, None)
-        except Exception as ex:
-            print(ex)
-            error_handler(command, ex)
-            
+    li_home = None
+    if active_view.file_name() != None:
+        li_home = detect_li_project_home(active_view.file_name())
+    if li_home == None:
+        folders = active_view.window().folders()
+        if len(folders) > 0:
+            for folder in folders:
+                li_home = detect_li_project_home(folder)
+                if li_home != None:
+                    break
+    return li_home
+
+
+def EXEC_LI(command, handler, error_handler, async = True):
     panel         = LI_PANEL()
     script_path   = settings.get("path")
     std_formatter = settings.get("std_formatter")
@@ -145,22 +257,59 @@ def EXEC_LI(command, handler, error_handler):
     if li_is_debug():
         print("liCommand.run(): subprocess.Popen = " + script_path + " -std=" + std_formatter + " " + command)
 
-    process = subprocess.Popen(script_path + " -std=" + std_formatter + " " + command,
+    process = subprocess.Popen(script_path + " -std=" + std_formatter + " " + settings.get("li_opts") + " " + command,
                                shell  = True,
                                stdin  = subprocess.PIPE,
                                stdout = subprocess.PIPE,
                                stderr = subprocess.STDOUT,
                                universal_newlines = False,
                                bufsize = 0)
-    threading.Thread(
-        target = WRITES,
-        #args   = (panel, )
-        args   = (process, panel, handler, error_handler)
-    ).start()
 
-
+    # show lithium output panel
     sublime.active_window().run_command("show_panel", { "panel": "output.lithium" })
+
+    if async:
+        def WRITES(process, panel, handler, error_handler):
+            try:
+                for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
+                    panel.run_command('append', { 'characters' :  line, 'force': True, 'scroll_to_end': True })
+                    handler(process, panel, line)
+
+                # tell the last line has been handled
+                process.stdout.close()
+                handler(process, panel, None)
+            except Exception as ex:
+                print(ex)
+                error_handler(command, ex)
+
+
+        threading.Thread(
+            target = WRITES,
+            args   = (process, panel, handler, error_handler)
+        ).start()
+    else:
+        while True:
+            data = process.stdout.read().decode('utf-8')
+            try:
+                panel.run_command('append', { 'characters' :  data, 'force': True, 'scroll_to_end': True })
+
+                for line in data.split("\n"):
+                    handler(process, panel, line)
+
+                if process.poll() is not None:
+                    # notify the process has been completed
+                    handler(process, panel, None)
+                    break
+            except Exception as ex:
+                print(ex)
+                try:
+                    error_handler(command, ex)
+                except Exception as ex2:
+                    print(ex2)
+                break
+
     return process
+
 
 def LI_PANEL():
     name  = settings.get('output_panel')
@@ -182,11 +331,11 @@ class liCommand(sublime_plugin.WindowCommand):
     def is_enabled(self, **args):
         return True
         #return self.process is None
-        #sreturn self.process is not None and self.process.poll() is None
+        #return self.process is not None and self.process.poll() is None
 
     def run(self, **args):
         if self.process is not None:
-            print("Termenating process")
+            print("Terminating process")
             self.process.terminate()
             return
 
@@ -207,16 +356,7 @@ class liCommand(sublime_plugin.WindowCommand):
             print("liCommand.run(): command = " + command + "," + li_view_to_s(active_view))
 
         # detect home folder
-        li_home = None
-        if active_view.file_name() != None:
-            li_home = detect_li_project_home(active_view.file_name())
-        if li_home == None:
-            folders = active_view.window().folders()
-            if len(folders) > 0:
-                for folder in folders:
-                    li_home = detect_li_project_home(folder)
-                    if li_home != None:
-                        break
+        li_home = LI_HOME()
 
         # collect place holders values in dictionary
         placeholders = {}
@@ -273,6 +413,184 @@ class liPrintScopeCommand(sublime_plugin.TextCommand):
         n = v.scope_name(v.sel()[0].a)
         print("Scope: " + n)
 
+
+class liShowClassesCommand(sublime_plugin.TextCommand):
+    found_items = []
+    edit        = None
+    region      = None
+
+    def is_enabled(self):
+        syntax = self.syntax()
+        return syntax == 'kotlin' or syntax == 'java' or syntax == 'scala' or syntax == 'groovy'
+
+    def syntax(self):
+        syntax = os.path.basename(self.view.settings().get('syntax'))
+        syntax = os.path.splitext(syntax)[0]
+        syntax = syntax.lower()
+        return syntax
+
+    def run(self, edit, **args):
+
+        regions = self.view.sel()
+        if regions is not None and len(regions) == 1:
+            word = None
+            for region in regions:
+                self.region = self.view.word(region) # get extended to the current word region
+                word = self.view.substr(self.region)
+
+            if word is not None and len(word.strip()) > 1:
+                # detect home folder
+                li_home = LI_HOME()
+
+                self.pattern = "%s"
+                if 'pattern' in args:
+                    self.pattern = args['pattern']
+
+                self.auto_apply = False
+                if 'auto_apply' in args:
+                    self.auto_apply = args['auto_apply']
+
+                # if word is not None and word != '':
+                try:
+                    self.found_items = []
+                    self.edit        = edit
+                    self.process     = EXEC_LI("FindClassInClasspath:\"%s\" %s.class" % (li_home, word), self.output, self.error, False)
+                except Exception as ex:
+                    self.process = None
+                    sublime.error_message("Lithium command execution has failed('%s')" % ((ex),))
+
+    def output(self, process, panel, line):
+        # None means end of LI process
+        if line is not None:
+            rx = r"\[(.*)\s*=>\s*(.*)\]"
+            m = re.search(rx, line)
+            if m is not None:
+                class_name = m.group(2)
+                class_name = class_name.replace('/', '.')
+                class_name = re.sub('\.class$', '', class_name)
+                self.found_items.append(class_name)
+        else:
+            l = len(self.found_items)
+            if l > 20:
+                sublime.message_dialog("To many variants (more than 20) have been found ")
+            elif l > 0:
+                if l == 1 and self.auto_apply:
+                    #print("Scope name: " + self.region.)
+                    self.class_name_selected(0)
+                else:
+                    self.found_items.sort(),
+                    self.view.show_popup_menu(
+                        self.found_items,
+                        self.class_name_selected)
+
+    def class_name_selected(self, index):
+        if index >= 0:
+            item = self.found_items[index]
+
+            sn = self.view.scope_name(self.region.begin())
+            sn = sn.strip()
+            scopes = sn.split(" ")
+
+            syntax = self.syntax()
+
+            print("SYN = " + syntax)
+            if syntax == 'java':
+                if len(scopes) == 2 and scopes.index('source.java') >= 0 and scopes.index('support.class.java') >= 0:
+                    item = 'import %s;' % item
+            elif syntax == 'kotlin':
+                if len(scopes) == 1 and scopes.index('source.Kotlin') >= 0:
+                    item = 'import %s' % item
+            elif syntax == 'scala':
+                if len(scopes) == 2 and scopes.index('source.scala') >= 0 and scopes.index('support.constant.scala') >= 0:
+                    item = 'import %s' % item
+            elif syntax == 'groovy':
+                if len(scopes) == 1 and scopes.index('source.groovy') >= 0:
+                    item = 'import %s' % item
+
+            self.view.replace(self.edit, self.region, item)
+
+    def error(self, command, err):
+        sublime.error_message("Lithium class detection has failed: ('%s')" % (str(err), ))
+
+# Pattern  InputStream
+class liShowDocCommand(sublime_plugin.TextCommand):
+    def run(self, edit, **args):
+        file_name, extension = os.path.splitext(self.view.file_name())
+        word                 = None
+        syntax               = os.path.basename(self.view.settings().get('syntax'))
+        syntax               = os.path.splitext(syntax)[0]
+
+        for region in self.view.sel():
+            word = self.view.substr(self.view.word(region))
+            break
+
+        if word is not None and word != '':
+            type = args['type']
+            show_immediate = args['show_immediate'] if 'show_immediate' in args else False
+
+            if type == 'solr':
+                self.open_solr_doc(syntax, word, show_immediate)
+            else:
+                self.open_dash_doc(syntax, word)
+
+    def open_link(self, link):
+        webbrowser.open(link)
+
+    def open_dash_doc(self, syntax, word):
+        dash_settings = settings.get('doc_servers')['dash']
+        keys_map      = settings.get('doc_servers')['dash']['keys_map']
+        keys          = keys_map[syntax] if syntax in keys_map else None
+        query         = dash_settings.get(syntax)['url'] if syntax in dash_settings else dash_settings['*']['url']
+        query         = query % (','.join(keys), quote(word))
+
+        if platform.system() == 'Windows':
+            subprocess.call(['start', query], shell=True)
+        elif platform.system() == 'Linux':
+            subprocess.call([ '/usr/bin/xdg-open', query ])
+        else:
+            print("Call dash %s" % query)
+            subprocess.call([ '/usr/bin/open', '-g', query ])
+
+    # fetch list of available links to an api doc for the given word  InputStream
+    def open_solr_doc(self, syntax, word, show_immediate):
+        self.view.set_status('apidoc', '')
+
+        if syntax is not None:
+            result = []
+            data   = None
+            query  = settings['doc_servers']['solr'][syntax]['url'].format(core = syntax, word = word)
+
+            try:
+                with urlopen(query) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+            except Exception as ex:
+                sublime.error_message("Cannot find %s:'%s'(%s)" % (syntax, word, str(ex)))
+                return
+
+            for doc in data['response']['docs']:
+                path     = os.path.realpath(doc['resourcename'][0])
+                basename = os.path.basename(path)
+                dirname  = os.path.dirname(path)
+                title    = os.path.basename(dirname) + "/" + basename
+                result.append("<a style='display:block;' href='file://{path}'>{title}</a>".format(path = path, title = title))
+
+            if len(result) > 0:
+                self.view.set_status('apidoc', "'%s' search for '%s'" % (syntax, quote(word)))
+
+                if show_immediate == True:
+                    self.open_link("file://" + os.path.realpath(data['response']['docs'][0]['resourcename'][0]))
+                else:
+                    content = "".join(result)
+                    html    = settings['doc_servers']['solr']['html_template']
+                    self.view.show_popup(
+                        html % (content,),
+                        sublime.HIDE_ON_MOUSE_MOVE_AWAY,
+                        max_width  = 400,
+                        max_height = 200,
+                        on_navigate = self.open_link)
+
+        else:
+            self.view.set_status('apidoc', '%s search criteria is empty' % syntax)
 
 class liGoCommand(sublime_plugin.TextCommand):
     def run(self, edit):

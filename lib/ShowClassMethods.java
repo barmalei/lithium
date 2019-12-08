@@ -27,11 +27,6 @@ public class ShowClassMethods {
             System.exit(1);
         }
 
-
-        int count = 0;
-        for (Class clazz : classByShortName(args[0])) {
-            count++;
-            System.out.println("[JAVA/rt.jar => " + clazz.getName() + "]");
-        }
+        printMethods(Class.forName(args[0]));
     }
 }
