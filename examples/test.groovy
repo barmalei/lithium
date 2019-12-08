@@ -1,5 +1,4 @@
 
-import groovy.sql.Sql
 
 sql = Sql.newInstance(
     'jdbc:h2:~/test',

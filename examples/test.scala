@@ -1,5 +1,7 @@
 package examples
 
+import java.util.Map
+
 object Persons {
 
   /** A list of persons. To create a list, we use Predef.List
