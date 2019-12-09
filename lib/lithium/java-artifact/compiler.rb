@@ -3,7 +3,7 @@ require 'tempfile'
 
 require 'lithium/java-artifact/base'
 
-#  Java compiler
+#  Java compile_with
 class JavaCompiler < FileMask
     include LogArtifactState
     include OptionsSupport
@@ -14,8 +14,9 @@ class JavaCompiler < FileMask
 
     def initialize(*args)
         @create_destination = false
-        @description        = 'JAVA compiler'
+        @description        = 'JAVA compile_with'
         @list_expired       = false
+        @source_as_file     = false
 
         super
 
@@ -32,7 +33,9 @@ class JavaCompiler < FileMask
 
     def expired?() false end
 
-    def detect_destination()
+    def destination()
+        return @destination unless @destination.nil?
+
         hd = homedir
         pp = project.project
 
@@ -42,69 +45,81 @@ class JavaCompiler < FileMask
         ]
 
         destinations.push(File.join(pp.homedir, 'classes')) unless pp.nil?
-
         destinations.each { | path |
             return path if File.exists?(path)
         }
 
         str = destinations.map { | path |  "    '" + path + "'\n" }
-        str = str.join('') + "\n"
-        raise "Destination folder detection has failed\n#{str}"
+        raise "Destination folder detection has failed\n#{str.join('')}\n"
     end
 
-    def destination()
-        return detect_destination() if @destination.nil?
-        return @destination
-    end
-
-    def build_compiler()
+    def compile_with()
         @java.javac
     end
 
-    def build_classpath()
+    def classpath()
         @java.classpath
     end
 
-    def build_target_list()
-        list = []
+    def list_source_items()
         if @list_expired
-            list_expired() { | n, t |  list << "#{n}" }
+            list_expired { | n, t |  yield "\"#{n}\"" }
         else
-            list_items()   { | n, t |  list << "#{n}" }
+            list_items   { | n, t |  yield "\"#{n}\"" }
         end
-        list
     end
 
-    def build_target(list)
-        return Tempfile.open('lithium') { | f | f << list.join("\n") }
-    end
+    def source()
+        if @source_as_file
+            f = Tempfile.open('lithium')
+            c = 0
+            begin
+                list_source_items { | path |
+                    f.puts(path)
+                    c = c + 1
+                }
+            ensure
+               f.close
+            end
 
-    def build_cmd(list, target, dest)
-        cp       = build_classpath()
-        compiler = build_compiler()
-        if cp
-            [ compiler, '-classpath', "\"#{cp}\"", OPTS(), '-d', dest, target ]
+            if f.length == 0
+                f.unlink
+                return nil
+            else
+                return f, c
+            end
         else
-            [ compiler, OPTS(), '-d', dest, target ]
+            list = []
+            list_source_items { | path |
+                list.push(path)
+            }
+            return list.length == 0 ? nil : list, list.length
+        end
+    end
+
+    def cmd(src)
+        cp  = classpath()
+        src = src.kind_of?(Tempfile) || src.kind_of?(File) ? "@\"#{src.path}\"" : src
+        if cp
+            [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', destination(), src ]
+        else
+            [ compile_with, OPTS(), '-d', destination(), src ]
         end
     end
 
     def build()
         super
 
-        list = build_target_list()
-        if list.nil? || list.length == 0
+        src, length = source()
+        if src.nil? || length == 0
             puts_warning "Nothing to be compiled"
         else
-            target = nil
             begin
-                target = build_target(list)
-                cmd    = build_cmd(list, target.kind_of?(File) ? "@#{target.path}" : target, destination())
                 go_to_homedir()
-                raise 'Compilation has failed' if Artifact.exec(*cmd) != 0
-                puts "#{list.length} source files have been compiled"
+                raise 'Compilation has failed' if Artifact.exec(*cmd(src)) != 0
+                puts "#{length} source files have been compiled"
             ensure
-                File.delete(target.path) if target.kind_of?(File)
+                src.unlink if src.kind_of?(Tempfile)
             end
         end
     end
@@ -113,7 +128,7 @@ class JavaCompiler < FileMask
 end
 
 #
-# Groovy compiler
+# Groovy compile_with
 #
 class GroovyCompiler < JavaCompiler
     REQUIRE JAVA
@@ -121,14 +136,14 @@ class GroovyCompiler < JavaCompiler
 
     def initialize(*args)
         super
-        @description = 'Groovy compiler'
+        @description = 'Groovy compile_with'
     end
 
-    def build_compiler()
+    def compile_with()
         @groovy.groovyc
     end
 
-    def build_classpath()
+    def classpath()
         JavaClasspath::join(@groovy.classpath, @java.classpath)
     end
 
@@ -138,7 +153,7 @@ class GroovyCompiler < JavaCompiler
 end
 
 #
-# Kotlin compiler
+# Kotlin compile_with
 #
 class KotlinCompiler < JavaCompiler
     REQUIRE JAVA
@@ -146,15 +161,14 @@ class KotlinCompiler < JavaCompiler
 
     def initialize(*args)
         super
-        @description = 'Kotlin compiler'
+        @description = 'Kotlin compile_with'
     end
 
-    def build_compiler()
+    def compile_with()
         @kotlin.kotlinc
     end
 
-    def build_classpath()
-        #return @kotlin.classpath
+    def classpath()
         JavaClasspath::join(@kotlin.classpath, @java.classpath)
     end
 
@@ -171,7 +185,7 @@ class KotlinCompiler < JavaCompiler
 end
 
 #
-# Scala compiler
+# Scala compile_with
 #
 class ScalaCompiler < JavaCompiler
     REQUIRE JAVA
@@ -179,14 +193,14 @@ class ScalaCompiler < JavaCompiler
 
     def initialize(*args)
         super
-        @description = 'Scala compiler'
+        @description = 'Scala compile_with'
     end
 
-    def build_compiler()
+    def compile_with()
         @scala.scalac
     end
 
-    def build_classpath()
+    def classpath()
         JavaClasspath::join(@scala.classpath, @java.classpath)
     end
 

@@ -15,7 +15,7 @@ class BuildVaadinSass < JavaFileRunner
         @arguments.push("'#{@inputFile}'", "'#{@outputFile}'")
     end
 
-    def build_target()
+    def target()
         'com.vaadin.sass.SassCompiler'
     end
 

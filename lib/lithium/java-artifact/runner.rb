@@ -17,22 +17,22 @@ class JavaFileRunner < FileCommand
     end
 
     def cmd()
-        clpath = build_classpath()
-        cmd = [ build_runner() ]
+        clpath = classpath()
+        cmd = [ run_with() ]
         cmd.push('-classpath', "\"#{clpath}\"") unless clpath.nil?
-        cmd.push(OPTS(), build_target(), @arguments.join(' '))
+        cmd.push(OPTS(), target(), @arguments.join(' '))
         return cmd
     end
 
-    def build_target()
+    def target()
         @name
     end
 
-    def build_classpath()
+    def classpath()
         @java.classpath
     end
 
-    def build_runner()
+    def run_with()
         @java.java
     end
 
@@ -53,7 +53,7 @@ end
 class RunJavaClass < JavaFileRunner
     REQUIRE JAVA
 
-    def build_target()
+    def target()
         n = @name.dup
         n[/[.]class$/] = '' if n.end_with?('.class')
         n
@@ -71,7 +71,7 @@ class RunJavaCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def build_target()
+    def target()
         pkgname = grep_package()
 
         clname  = File.basename(fullpath)
@@ -87,7 +87,7 @@ end
 class RunJAR < JavaFileRunner
     REQUIRE JAVA
 
-    def build_target()
+    def target()
         "-jar #{@name}"
     end
 
@@ -100,15 +100,15 @@ class RunGroovyScript < JavaFileRunner
     REQUIRE JAVA
     REQUIRE GROOVY
 
-    def build_classpath()
+    def classpath()
         JavaClasspath::join(@groovy.classpath, @java.classpath)
     end
 
-    def build_target()
+    def target()
         fullpath()
     end
 
-    def build_runner()
+    def run_with()
         @groovy.groovy
     end
 
@@ -118,13 +118,13 @@ class RunGroovyScript < JavaFileRunner
 end
 
 module RunJavaTestCase
-    def build_target()
+    def target()
         st = super
         st.sub(/(([a-zA-Z_$][a-zA-Z0-9_$]*\.)*)([a-zA-Z_$][a-zA-Z0-9_$]*)/, '\1Test\3')
     end
 
     def what_it_does()
-       "Run Java test-cases '#{build_target}'\n                for '#{@name}'"
+       "Run Java test-cases '#{target}'\n                for '#{@name}'"
     end
 end
 
@@ -147,11 +147,11 @@ class RunKotlinCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def build_classpath()
+    def classpath()
         JavaClasspath::join(@kotlin.classpath, @java.classpath)
     end
 
-    def build_target()
+    def target()
         fp = fullpath()
 
         pkg  = grep_package()
@@ -186,11 +186,11 @@ class RunScalaCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def build_classpath()
+    def classpath()
         JavaClasspath::join(@scala.classpath, @java.classpath)
     end
 
-    def build_target()
+    def target()
         pkg = grep_package()
         cln = nil
         res = FileArtifact.grep_file(fullpath, /^object[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
@@ -206,7 +206,7 @@ class RunScalaCode < JavaFileRunner
         return pkg.nil? ? cln[-1] : "#{pkg}.#{cln[-1]}"
     end
 
-    def build_runner()
+    def run_with()
         @scala.scala
     end
 

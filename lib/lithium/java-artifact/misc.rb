@@ -58,11 +58,11 @@ class SuggestClassname < JavaFileRunner
         @arguments = [ $lithium_args[0] ]
     end
 
-    def build_classpath()
+    def classpath()
         File.join($lithium_code, 'classes') + File::PATH_SEPARATOR + @java.classpath
     end
 
-    def build_target()
+    def target()
         'test.ClassMethods'
     end
 end

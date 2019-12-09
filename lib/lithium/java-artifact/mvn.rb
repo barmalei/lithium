@@ -187,7 +187,7 @@ class RunMaven < PomFile
         raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(),  @targets.join(' ')) != 0
     end
 
-    def what_it_does() "Run maven: '#{@name}' #{@targets.join(' ')} OPTS=#{@mvn.OPTS()}" end
+    def what_it_does() "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{@mvn.OPTS()}'" end
 end
 
 class MavenCompiler < RunMaven
