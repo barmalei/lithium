@@ -105,7 +105,7 @@ class RunGroovyScript < JavaFileRunner
     end
 
     def target()
-        fullpath()
+        "\"#{fullpath}\""
     end
 
     def run_with()
