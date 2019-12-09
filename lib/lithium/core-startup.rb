@@ -13,6 +13,7 @@ require 'lithium/java-artifact/misc'
 require 'lithium/java-artifact/checkstyle'
 require 'lithium/java-artifact/vaadin-sass'
 require 'lithium/java-artifact/mvn'
+require 'lithium/java-artifact/ant'
 
 require 'lithium/file-artifact/acquired'
 

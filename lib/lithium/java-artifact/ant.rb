@@ -1,4 +1,4 @@
-require 'lithium/core'
+    require 'lithium/core'
 require 'lithium/java-artifact/base'
 
 #

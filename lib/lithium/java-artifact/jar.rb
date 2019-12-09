@@ -6,22 +6,37 @@ require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
-class JarFileContent < Directory
+# directory that hosts a JAR file content
+class JarFileContent < FileArtifact
     REQUIRE JAVA
+
+    def initialize(*args, &block)
+        super
+        @source ||= $lithium_args[0]
+    end
+
+    def expired?
+        true
+    end
 
     def build()
         raise 'Invalid source file' if @source.nil?
-        raise "Source file '#{@source.fullpath}' doesn't exist or points to directory" if !File.exists?(@source.fullpath) || File.directory?(@source.fullpath)
+
+        source_path = @source
+        source_path = fullpath(source_path) unless Pathname.new(source_path).absolute?
+        raise "Source file '#{source_path}' is invalid" if !File.exists?(source_path) || File.directory?(source_path)
 
         fp = fullpath
         FileUtils.mkdir_p(fp) unless File.exists?(fp)
         Dir.chdir(fp)
-        `#{@java.jar} -xfv '#{@source.fullpath}'`.each_line { |i|
+        `#{@java.jar} -xfv '#{source_path}'`.each_line { |i|
             puts " :: #{i.chomp}"
         }
     end
 
-    def what_it_does() "Extract files from '#{@name}' to '#{@destination}'" end
+    def what_it_does()
+        "Extract'#{@source}' JAR content into '#{@name}' directory"
+    end
 end
 
 class FindInZip < FileMask
@@ -82,7 +97,7 @@ class FindInZip < FileMask
         }
     end
 
-    def what_it_does() "Try to find #{@pattern} class in '#{@name}'" end
+    def what_it_does() "Search '#{@pattern}' in '#{@name}' archive " end
 end
 
 

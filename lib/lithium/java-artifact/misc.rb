@@ -80,8 +80,8 @@ class FindInClasspath < FileCommand
     def build()
         unless @java.classpath.nil?
             count = 0
-            FindInClasspath.find(@use_zipinfo, @java.classpath, @target) { | path, item |
-                item_found(path, item)
+            FindInClasspath.find(@use_zipinfo, @java.classpath, @target) { | path, item, is_jar |
+                item_found(path, item, is_jar)
                 count = count + 1
             }
 
@@ -91,7 +91,7 @@ class FindInClasspath < FileCommand
         end
     end
 
-    def item_found(path, item)
+    def item_found(path, item, is_jar)
         puts "    [#{path} => #{item}]"
     end
 
@@ -99,16 +99,16 @@ class FindInClasspath < FileCommand
         classpath.split(File::PATH_SEPARATOR).each { | path |
             if File.directory?(path)
                 Dir.glob(File.join(path, '**', target)).each  { | item |
-                    yield path, item
+                    yield path, item, false
                 }
             elsif path.end_with?('.jar') || path.end_with?('.zip')
                 if use_zipinfo
                     FindInZip.find_with_zipinfo('zipinfo', path, "/" + target) { | item |
-                        yield path, item
+                        yield path, item, true
                     }
                 else
                     FindInZip.find_with_jar('jar', path, "/" + target) { | item |
-                        yield path, item
+                        yield path, item, true
                     }
                 end
             else
@@ -133,15 +133,19 @@ class FindClassInClasspath < FindInClasspath
                       "\"#{File.join($lithium_code, 'classes')}\"",
                       'lithium.DiscoverSystemClass',
                       @target ) { | stdin, stdout, thread |
-            # if thread.value != 0
-            #     puts_warning "System class detection has failed"
-            # else
                 Artifact.read_exec_output(stdin, stdout, thread) { | line |
                     puts line
                 }
-           # end
         }
 
+        super
+    end
+
+    def item_found(path, item, is_jar)
+        unless is_jar
+            path = path + '/' if path[-1] != '/'
+            item[path] = ''
+        end
         super
     end
 end

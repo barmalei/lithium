@@ -25,23 +25,30 @@ end
 class CopyOfFile < FileCommand
     attr_reader :source
 
+    def initialize(*args, &block)
+        super
+        @source ||= $lithium_args[0]
+    end
+
     def expired?
         src = validate_source()
         return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
     end
 
     def clean()
-        File.delete(fullpath) if File.exists?(fullpath)
+        if File.exists?(fullpath)
+            File.delete(fullpath)
+        else
+            puts_warning "File '#{fullpath}' doesn't exist"
+        end
     end
 
     def build()
         super
-        src  = validate_source()
-        dest = fullpath()
-        fetch()
+        fetch(validate_source, fullpath)
     end
 
-    def fetch()
+    def fetch(src, dest)
         FileUtils.cp(src, dest)
     end
 
@@ -52,8 +59,7 @@ class CopyOfFile < FileCommand
         return src
     end
 
-
-    def what_it_does() "    '#{@source}' => '#{fullpath()}'" end
+    def what_it_does() "    '#{@source}' => '#{fullpath}'" end
 end
 
 #  Remove a file or directory
@@ -64,8 +70,10 @@ class RmFile < FileCommand
         path = fullpath()
         if File.directory?(path)
             FileUtils.remove_dir(path)
-        else
+        elsif File.exists?(path)
             File.delete(path)
+        else
+            puts_warning "File '#{path}' doesn't exist"
         end
     end
 
