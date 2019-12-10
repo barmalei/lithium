@@ -27,9 +27,10 @@
 
     ARTIFACT("run:*") {
         ARTIFACT('.lithium/**/*.java') {
-            JavaClasspath {
-                @libs = '.lithium/classes'
+            DefaultClasspath {
+                PATH('.lithium/classes')
             }
+
             RunJavaCode('**/*.java')
         }
 
