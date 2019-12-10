@@ -29,48 +29,43 @@ class MVN < EnvArtifact
     def what_it_does() "Initialize Maven environment '#{@name}'" end
 
     def mvn() File.join(@mvn_home, 'bin', 'mvn') end
-
-    def self.parse_name(name)
-        name = File.dirname(name) == '.' ? name : File.basename(name)
-        m = /(.*)\-(\d+\.\d+)(\.\d+)?([-.]\w+)?\.[a-zA-Z]+$/.match(name)
-        raise "Incorrect maven artifact name '#{name}'" if m.nil? || m.length < 3
-        id     = m[1]
-        group  = m[1].tr('.', '/')
-        ver    = m[2] + (m[3] ? m[3] : '') +  (m[4] ? m[4] : '')
-
-        return group, id, ver
-    end
 end
 
-class MavenArtifact < CopyOfFile
+class MavenRepoArtifact < FileArtifact
     include StdFormater
 
     REQUIRE MVN
 
-    def initialize(*args)
-        super
+    def initialize(name, &block)
+        r = /\[([^\[\/\]]+)\/([^\[\/\]]+)\/([^\[\/\]]+)\]$/
+        m = r.match(name)
+        raise "Invalid artifact name '#{name}'" if m.nil?
 
-        unless @source
-            group, id, ver = MVN.parse_name(@name)
-            raise "Group, if or version cannot be figured out by artifact name '#{name}'" if group.nil? || id.nil? || ver.nil?
-            @source = "#{group}:#{id}:#{ver}"
-        end
+        @group, @id, @ver = m[1], m[2], m[3]
+        name[r] = ''
+        super(name, &block)
     end
 
     def expired?
-        src = validate_source()
-        return !File.exists?(fullpath)
+        return !File.exists?(File.join(fullpath, "#{@id}-#{@ver}.jar"))
     end
 
-    def validate_source()
-        raise 'Source is not defined' if @source.nil?
-        return @source
+    def clean()
+        path = File.join(fullpath, "#{@id}-#{@ver}.jar")
+        File.delete(path) if File.file?(path)
     end
 
-    def fetch()
-        raise "Artifact '#{@source}' cannot be copied" if 0 != Artifact.exec(@mvn.mvn(),
-                                                                            "dependency:copy",  "-Dartifact=#{@source}",
-                                                                            "-DoutputDirectory=#{File.dirname(fullpath)}")
+    def build()
+        raise "Artifact '#{@group}:#{@id}:#{@ver}' cannot be copied" if 0 != Artifact.exec(
+            @mvn.mvn,
+            "dependency:copy",
+            "-Dartifact=#{@group}:#{@id}:#{@ver}",
+            "-DoutputDirectory=\"#{fullpath}\""
+        )
+    end
+
+    def what_it_does()
+        "Fetch '#{@group}:#{@id}:#{@ver}' maven artifact\n   to '#{@name}'"
     end
 end
 
@@ -83,8 +78,9 @@ class PomFile < PermanentFile
 
     def initialize(*args, &block)
         name = args.length > 0 && !args[0].nil? ? args[0] : homedir
-        pom = FileArtifact.look_file_up(fullpath(name), 'pom.xml', homedir)
-        raise "POM '#{fullpath(name)}' not found" if pom.nil?
+        fp   = fullpath(name)
+        pom = FileArtifact.look_file_up(fp, 'pom.xml', homedir)
+        raise "POM cannot be detetced by '#{fp}' path" if pom.nil?
         super(pom, &block)
     end
 
@@ -134,14 +130,18 @@ class MavenDependenciesDir < FileArtifact
 
     def initialize(name, &block)
         @excludeTransitive = false
+        @excludeGroupIds   = []
 
         super(name, &block)
 
         fp = fullpath()
-        raise "POMDependencies should point to file #{fp}" if File.exists?(fp) && !File.directory?(fp)
+        raise "Invalid dependency dir '#{fp}'" unless File.directory?(fp)
 
         REQUIRE(PomFile.new(@name))
-        @excludeGroupIds   ||= [ ]
+    end
+
+    def EXCLUDE(groupId)
+        @excludeGroupIds.push(groupId)
     end
 
     def expired?
@@ -150,11 +150,13 @@ class MavenDependenciesDir < FileArtifact
 
     def build()
         Dir.chdir(File.dirname(@pom.fullpath))
-        raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(@mvn.mvn,
-                                                                       "dependency:copy-dependencies",
-                                                                       "-DexcludeTransitive=#{@excludeTransitive}",
-                                                                       @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
-                                                                       "-DoutputDirectory=#{fullpath}")
+        raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
+            @mvn.mvn,
+           "dependency:copy-dependencies",
+           "-DexcludeTransitive=#{@excludeTransitive}",
+           @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
+           "-DoutputDirectory=#{fullpath}"
+        )
     end
 end
 
@@ -184,7 +186,7 @@ class RunMaven < PomFile
         path = fullpath()
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
         Dir.chdir(File.dirname(path));
-        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(),  @targets.join(' ')) != 0
+        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(), @targets.join(' ')) != 0
     end
 
     def what_it_does() "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{@mvn.OPTS()}'" end
@@ -195,7 +197,7 @@ class MavenCompiler < RunMaven
 
     def initialize(*args)
         super
-        @targets = [ 'compile' ]
+        TARGETS('compile')
     end
 
     def expired?
@@ -208,7 +210,7 @@ class MavenCompiler < RunMaven
             yield f, t
         }
 
-        super { |f, t|
+        super { | f, t |
             yield f, t
         }
     end
