@@ -21,10 +21,6 @@
         @source = "jnc-easy/jnc-easy-1.1.1/test.jar"
     }
 
-    ARTIFACT(".lithium/**/*.java") {
-
-    }
-
     ARTIFACT("run:*") {
         ARTIFACT('.lithium/**/*.java') {
             DefaultClasspath {

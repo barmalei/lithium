@@ -4,59 +4,43 @@ require 'uri'
 require 'lithium/core'
 
 class RemoteFile < FileArtifact
-    attr_reader :url
+    attr_reader :uri
 
-    class RemoteFileNotFound < Exception
+    def initialize(*args)
+        super
+        @uri ||= $lithium_args[0]
     end
 
-    @@PROXY_PORT = nil
-    @@PROXY_HOST = nil
+    def build()
+        uri = URI.parse(@uri)
+        m = method("#{uri.scheme.downcase}_fetch")
+        raise "Unsupported protocol '#{uri.scheme}'" if m.nil?
+        m.call(uri)
+    end
 
-    def build() fetch(@name, fullpath()) end
+    def expired?
+        !File.exists?(fullpath) || File.size(fullpath) == 0
+    end
 
-    def expired?()  !File.exists?(fullpath()) || File.size(fullpath()) == 0 end
-    def what_it_does() "Download '#{@name}'\nfrom '#{@url}'" end
+    def what_it_does()
+        "Download '#{@name}'\n    from '#{@uri}'"
+    end
 
     def clean()
-        lp = fullpath()
-        File.delete(lp) if File.exists?(lp)
-    end
-
-    protected
-
-    @@bin_types = [
-        'jar', 'zip', 'gz', 'tar', 'gif', 'jpeg', 'jpg', 'png',
-        'tiff', 'bmp', 'avi', 'exe', 'mov', 'chm', 'pdf', 'iso',
-        'doc', 'vsd', 'psd', 'dmg', 'rar', 'bin'
-    ]
-
-    def detect_binary_mode(path)
-        i = path.index(/[.]\w+{6}$/)
-        return true if i && @@bin_types.index(path[i+1, path.length - i])
-        return false
-    end
-
-    def fetch(src_path, dest_path)
-        u = URI.parse(@url[-1, 1] == '/' ? @url +  src_path : @url + '/' + src_path)
-        m = method("#{u.scheme.downcase}_fetch")
-        raise "Unsupported protocol '#{u.scheme}'" if m.nil?
-        m.call(u, dest_path)
+        fp = fullpath()
+        File.delete(lp) if File.file?(fp)
     end
 end
 
 class HTTPRemoteFile < RemoteFile
-    def http_fetch(src_url, dest_path)
-        is_bin = detect_binary_mode(src_url.path)
-        Net::HTTP::Proxy(@@PROXY_HOST, @@PROXY_PORT).start(src_url.host) { |http|
-            res, data = http.get(src_url.path)
-            raise RemoteFileNotFound.new("Remote file '#{src_url}' not found") if res.code == '404'
-            res.value()
-            raise "Destination '#{dest_path}' directory doesn't exist" if !File.exists?(File.dirname(dest_path))
-            File.open(dest_path, 'w') { |f|
-                f.binmode() if is_bin
-                f.print(data)
+    def http_fetch(uri)
+        Net::HTTP.get_response(uri) { | res |
+            raise "Failed (#{res.code}) to get data by '#{uri}'"if res.code != '200'
+            File.open(fullpath, 'w') { | f |
+                res.read_body { | data |
+                    f.write(data)
+                }
             }
         }
-        true
     end
 end
