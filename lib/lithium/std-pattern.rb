@@ -143,6 +143,25 @@ class StdPattern
         instance_eval(&block) unless block.nil?
     end
 
+    # TODO: not clear if the method shoul be here
+    def COMPLETE_PATH()
+        BLOCK(:file) { | path |
+            break path if Pathname.new(path).absolute?
+            if $current_artifact.kind_of?(FileArtifact)
+                fp = $current_artifact.fullpath
+                if fp.end_with?(path)
+                    next fp
+                else
+                    hd = $current_artifact.homedir
+                    fp = File.join(hd, path)
+                    next fp if File.exists?(fp)
+                end
+            end
+            next FileArtifact.search(path)[0]
+        }
+    end
+
+
     def _add_group(name, &block)
         @groups.push({
             :name  => name.kind_of?(Symbol) ? name : name.to_sym,
@@ -439,23 +458,6 @@ class JavaPattern < StdPattern
     def class_name
         _append('[a-zA-Z$_][a-zA-Z0-9$_]*(\.[a-zA-Z$_][a-zA-Z0-9$_]*)*', :class)
     end
-
-    def enable_path_detection()
-        BLOCK(:file) { | path |
-            break path if Pathname.new(path).absolute?
-            if $current_artifact.kind_of?(FileArtifact)
-                fp = $current_artifact.fullpath
-                if fp.end_with?(path)
-                    next fp
-                else
-                    hd = $current_artifact.homedir
-                    fp = File.join(hd, path)
-                    next fp if File.exists?(fp)
-                end
-            end
-            next FileArtifact.search(path)[0]
-        }
-    end
 end
 
 class JavaExceptionLocPattern < JavaPattern
@@ -467,7 +469,7 @@ class JavaExceptionLocPattern < JavaPattern
             }
         }
 
-        enable_path_detection()
+        COMPLETE_PATH()
     end
 
     def method_ref
@@ -489,7 +491,7 @@ class KotlinCompileErrorPattern < JavaPattern
             location('kt'); any('\s+error:\s+'); group(:message, '.*$')
         }
 
-        enable_path_detection()
+        COMPLETE_PATH()
     end
 end
 

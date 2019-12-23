@@ -120,7 +120,9 @@ class TREE < Artifact
     def build()
         tree = ArtifactTree.new(@name)
         tree.build()
-        tree.norm_tree() if @normalize_tree
+
+        #TODO: makes sense to support the flag on the level of ArtifactTree class
+        #tree.norm_tree() #if @normalize_tree
         tree.show_tree()
     end
 

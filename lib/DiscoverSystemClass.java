@@ -9,6 +9,7 @@ public class DiscoverSystemClass {
         "java.util.function",
         "java.util.regex",
         "java.util.concurrent",
+        "java.util.stream",
         "javax.crypto",
         "java.io",
         "java.text",

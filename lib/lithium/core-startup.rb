@@ -26,6 +26,7 @@ require 'lithium/web-artifact'
 
 require 'lithium/misc-artifact'
 
+# TODO:
 # Proposed pattern definition syntacsis
 #  -> {
 #     PATTERN(JavaExceptionLocPattern.new).TO(JavaFileRunner)
@@ -74,6 +75,21 @@ PATTERNS ({
         FileLocPattern.new('js')
     ],
 
+    TypeScriptCompiler => [
+        StdPattern.new {
+            group(:location) {
+                file('ts')
+                rbrackets {
+                    line; comma; column;
+                }
+                colon
+            }
+            group(:message, '.*$')
+
+            COMPLETE_PATH()
+        }
+    ],
+
     JavaCheckStyle => [
         # '\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?'
         StdPattern.new {
@@ -92,10 +108,11 @@ PATTERNS ({
         }
     ],
 
-    RunPhpScript => [
-        # '\s*Parse error\:(?<file>${file_pattern}\.php)\s+in\s+on\s+line\s+(?<line>[0-9]+)'
+    [ ValidatePhpScript, RunPhpScript ] => [
         StdPattern.new {
-            any('\s*Parse error\:'); group(:location) { file('php'); any('\s+in\s+on\s+'); line }
+            any('Parse error\:'); any; any('in\s+'); group(:location) {
+                file('php'); any('\s+on line\s+'); line;
+            }
         }
     ],
 
@@ -128,7 +145,6 @@ def BUILD_ARTIFACT(name, &block)
     }
 
     tree.build()
-    tree.norm_tree()
     BUILD_ARTIFACT_TREE(tree.root_node)
     return tree.root_node.art
 end
@@ -252,4 +268,3 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
 
     puts "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact}' has been done"
 end
-

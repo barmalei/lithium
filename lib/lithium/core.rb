@@ -476,6 +476,13 @@ class ArtifactName < String
         "#{self.class.name}: { prefix='#{@prefix}', suffix='#{@suffix}', path='#{@path}', mask='#{@path_mask}' mask_type=#{mask_type}, clazz=#{@clazz}}"
     end
 
+    def same?(an)
+        !an.nil? && an == self && an.class == self.class &&
+        an.suffix    == @suffix    && an.prefix    == @prefix    && an.path == @path &&
+        an.path_mask == @path_mask && an.mask_type == @mask_type &&
+        an.clazz     == @clazz     && an.block     == @block
+    end
+
     # re-create the artifact name with new block
     def reuse(&block)
         bk = block
@@ -649,7 +656,7 @@ class Artifact
         end
 
         # if artifact name has not been passed let's try to use default one
-        args = [ instance.default_name ] if args.length == 0 && !instance.default_name.nil?
+        args = [ instance.class.default_name ] if args.length == 0 && !instance.class.default_name.nil?
 
         instance.send(:initialize, *args, &block)
         return instance_proxy
@@ -881,71 +888,97 @@ class ArtifactTree < Artifact
     # build tree starting from the root artifact (identified by @name)
     def build()
         @root_node = Node.new(@name)
-        build_tree(@root_node)
+        map = []
+        build_tree(@root_node, map)
     end
 
-    def norm_tree()
-        norm_tree_exp(@root_node)
-        norm_tree_ver(@root_node)
-    end
-
-    def build_tree(root, shift = '')
-        #!!!puts "#{shift}build_tree(): root = #{root.art.class}:#{root.art} owner = #{root.art.owner}"
+    def build_tree(root, map = [])
+        bt = root.art.mtime()
 
         root.art.requires { | dep, assignMeTo, is_own, block |
-            node, parent = Node.new(dep, root, &block), root
+            node = Node.new(dep, root, &block)
+
+            # TODO: we have take in account custom block passed to the method!
+            # most likely it has to be also compared
+            #
+            # optimize tree to exclude dependencies that are already in the tree
+            foundNode = map.detect { | n |
+                node.art.name  == n.art.name  &&
+                node.art.class == n.art.class &&
+                node.art.createdByMeta.same?(n.art.createdByMeta)
+            }
+
+            # save in list if a new artifact has been detected
+            map.push(node) if foundNode.nil?
+
+            # cyclic dependency detection
+            parent = root
             while parent && parent.art != node.art
                 parent = parent.parent
             end
-
-            #!!!puts "#{shift + '    '}build_tree(): dependecy = #{node.art.class}:#{node.art}, (#{is_own == true}) -> #{root.art.owner}"
-
             raise "#{root.art.class}:'#{root.art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
-            root.children << node
-
-            # has to be placed before recursove build tree method call
-            node.art.owner = root.art.owner if is_own == true
-
-            build_tree(node, shift + '    ')
-
-            if node.art.class < AssignableDependency
-
-                # call special method that is declared with AssignableDependency module
-                # to resolve host artifact property name the given depndency artigact has
-                # to be stored
-                assignMeTo = node.art.assign_me_to if assignMeTo.nil?
-
-                raise "Invalid attribute name 'node.art' artifact has to be assigned" if assignMeTo.nil?
-
-                asn = "@#{assignMeTo.to_s}".to_sym
-                av  = root.art.instance_variable_get(asn)
-                if av.kind_of?(Array)
-                    av.push(node.art)
-                    root.art.instance_variable_set(asn, av)
-                else
-                    root.art.instance_variable_set(asn, node.art)
-                end
+            # build subtree to evaluate expiration
+            build_tree(node, map)
+            if !root.expired && (node.expired || bt.nil? || (bt > 0 && node.art.mtime() > bt))
+                root.expired = true
+                root.expired_by_kid = node.art
             end
+
+            # add the new node to tree and process it only if doesn't already exist
+            root.children << node if foundNode.nil?
+
+ #           if
+                # has to be placed before recursive build tree method call
+                node.art.owner = root.art.owner if is_own == true
+
+                if node.art.class < AssignableDependency
+                    # call special method that is declared with AssignableDependency module
+                    # to resolve host artifact property name the given dependency artifact has
+                    # to be stored
+                    assignMeTo = node.art.assign_me_to if assignMeTo.nil?
+
+                    raise "Invalid attribute name 'node.art' artifact has to be assigned" if assignMeTo.nil?
+
+                    asn = "@#{assignMeTo.to_s}".to_sym
+                    av  = root.art.instance_variable_get(asn)
+                    if av.kind_of?(Array)
+
+                        # find the artifact in the arry
+                        found = av.detect { | art |
+                            node.art.name  == art.name  &&
+                            node.art.class == art.class &&
+                            node.art.createdByMeta.same?(art.createdByMeta)
+                        }
+
+                        if found.nil?
+                            av.push(node.art)
+                            root.art.instance_variable_set(asn, av)
+                        end
+                    else
+                        root.art.instance_variable_set(asn, node.art)
+                    end
+                end
+  #          end
         }
     end
 
     def show_tree() puts tree2string(nil, @root_node) end
 
     def norm_tree_ver(root, map={})
-        # !!! key building code should be optimized
-        key = root.art.name + root.art.class.to_s
+        # TODO: key building code should be optimized
+        key = root.art.name + root.art.class.name
         if map[key].nil?
             map[key] = root
-            root.children.each { |i| norm_tree_ver(i, map) }
+            root.children.each { | kid | norm_tree_ver(kid, map) }
             root.children = root.children.compact()
         else
             #puts "Cut dependency branch '#{root.art}'"
             root.parent.children[root.parent.children.index(root)], item  = nil, map[key]
-            if Version.compare(root.art.ver, item.art.ver) == 1
-                puts "Replace branch '#{item.art}' with version #{root.art.ver}"
-                item.art = root.art
-            end
+            # if Version.compare(root.art.ver, item.art.ver) == 1
+            #     puts "Replace branch '#{item.art}' with version #{root.art.ver}"
+            #     item.art = root.art
+            # end
         end
     end
 
@@ -959,6 +992,14 @@ class ArtifactTree < Artifact
             end
         }
     end
+
+    # TODO: artifact cannot be easily compared since they are equal only if both point to the same instance !
+    # def has_a_descendant?(root, target)
+    #     root.children.each { | kid |
+    #         return true if target.art == kid.art
+    #     }
+    #     return false
+    # end
 
     def tree2string(parent, root, shift=0)
         pshift, name = shift, root.art.to_s()
@@ -1429,8 +1470,8 @@ module ArtifactContainer
         meta = find_meta(artname)
 
         if meta.nil?
-            # meta cannot be locally found try to delegate search to owner
-            # path nil or doesn't match project then delegate finding an artifact in an owner project context
+            # meta cannot be locally found try to delegate search to owner container
+            # if owner exists and artifact name doesn't identify environment artifact
             unless owner.nil?
                 unless artname.env_path?
                     return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
@@ -1443,7 +1484,7 @@ module ArtifactContainer
                 # attempt to handle situation when an artifact meta the container has been
                 # created is going to be applied to artifact creation. It can indicate we
                 # have cyclic come back
-                raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
+                raise "There is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
                 meta = artname unless artname.clazz.nil?
             end
@@ -1486,8 +1527,8 @@ module ArtifactContainer
     end
 
     def _remove_from_cache(name)
-        name = ArtifactName.new(name)
-        _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
+        # name = ArtifactName.new(name)
+        # _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
     end
 
     # instantiate the given artifact by its meta
@@ -1719,17 +1760,13 @@ class EnvArtifact < Artifact
     def self.default_name(*args)
         @default_name ||= nil
         if args.length > 0
+            raise "Invalid environment artifact '#{name}' name ('.env/<artifact_name>' ie expected)" unless name.start_with?('.env/')
             @default_name = validate_env_name(args[0])
         elsif @default_name.nil?
             @default_name = File.join('.env', self.name)
         end
 
         return @default_name
-    end
-
-    def self.validate_env_name(name)
-        raise "Environment artifact cannot be assigned with '#{name}' name. Use '.env/<artifact_name>' name pattern" unless name.start_with?('.env/')
-        name
     end
 
     def build() end
@@ -1759,3 +1796,7 @@ class GroupByExtension < FileMask
         }
     end
 end
+
+
+
+

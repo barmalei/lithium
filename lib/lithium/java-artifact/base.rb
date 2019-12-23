@@ -20,21 +20,21 @@ class JavaClasspath < Artifact
     # split classpath and remove duplicated libs
     def JavaClasspath.norm_classpath(cp)
         res   = []
-        names = {}
-        cp.split(File::PATH_SEPARATOR).each { | part |
-            ext = File.extname(part)
-            if ext == '.jar' || ext == '.zip'
-                name = File.basename(part)
-                if names[name].nil?
-                    names[name] = part
-                else
-                    puts_error "Duplicated '#{name}' library has been detected in class path:"
-                    puts_error "   ? '#{names[name]}'"
-                    puts_error "   ? '#{part}'"
-                end
+        paths = {}
+        cp.split(File::PATH_SEPARATOR).each { | path |
+            ext = File.extname(path)
+            key = path
+            key = File.basename(path) if ext == '.jar' || ext == '.zip'
+
+            if paths[key].nil?
+                paths[key] = path
+            else
+                puts_error "Duplicate '#{key}' in class path has detected"
+                puts_error "   ? '#{paths[key]}'"
+                puts_error "   ? '#{path}'"
             end
 
-            res.push(part) unless res.include?(part)
+            res.push(path) unless res.include?(path)
         }
         return res.join(File::PATH_SEPARATOR)
     end
@@ -289,7 +289,8 @@ class JVM < EnvArtifact
 
     def classpath()
         classpath = @classpaths.map { | art | art.classpath }.select { | cp | !cp.nil? && cp.length > 0 }.join(File::PATH_SEPARATOR)
-        return classpath.nil? || classpath.length == 0 ? nil : JavaClasspath.norm_classpath(classpath)
+        classpath = classpath.nil? || classpath.length == 0 ? nil : JavaClasspath.norm_classpath(classpath)
+        return classpath
     end
 
     def list_classpaths()
@@ -457,5 +458,21 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
+
+
+
+
+# def puts_warning(s)
+#     puts s
+# end
+
+# p = Project.new('/Users/brigadir/projects/')
+# Project.current = p
+# j = JAVA.new()
+# puts(j.name)
+# r = j.requires { | dep, assignMeTo, is_own, block |
+#     puts "#{dep} => #{p.artifact(dep).object_id}, #{dep.default_name}"
+#     puts "#{dep} => #{p.artifact(dep).object_id}"
+# }
 
 

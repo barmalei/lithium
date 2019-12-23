@@ -16,23 +16,21 @@ class JavaCheckStyle < FileMask
         @checkstyle_config = "#{@checkstyle_home}/jnet.xml"                         unless @checkstyle_config
         raise "Checkstyle config '#{@checkstyle_config}' cannot be found"           unless File.exists?(@checkstyle_config)
 
-        puts "Checkstyle home  : '#{@checkstyle_home}'     \n           config: '#{@checkstyle_config}'"
+        puts "Checkstyle home  : '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
     end
 
     def build_item(path, mt)
         raise "Cannot run check style" if Artifact.exec(@java.java,
-                                                       '-cp', "#{@checkstyle_home}/checkstyle-8.16-all.jar",
+                                                       '-cp', "\"#{@checkstyle_home}/checkstyle-8.16-all.jar\"",
                                                        'com.puppycrawl.tools.checkstyle.Main',
-                                                       '-c', @checkstyle_config,
+                                                       '-c', "\"#{@checkstyle_config}\"",
                                                        "\"#{fullpath(path)}\"") != 0
     end
 
     def what_it_does() "Check '#{@name}' java code style" end
 end
 
-#
 #  PMD code analyzer
-#
 class PMD < FileCommand
     include OptionsSupport
 
@@ -41,9 +39,9 @@ class PMD < FileCommand
         @pmd_path = File.join($lithium_code, 'tools', 'pmd')
         raise "Path cannot be found '#{@pmd_path}'" if !File.exists?(@pmd_path) || !File.directory?(@pmd_path)
 
-        @pmd_rules   ||= File.join('rulesets', 'java', 'quickstart.xml')
-        @pmd_format  ||= 'text'
-        @pmd_cmd     ||= 'run.sh'
+        @pmd_rules  ||= File.join('rulesets', 'java', 'quickstart.xml')
+        @pmd_format ||= 'text'
+        @pmd_cmd    ||= 'run.sh'
     end
 
     def build()

@@ -102,10 +102,12 @@ end
 
 # Run JS with nodejs
 class RunNodejs < FileCommand
+    include OptionsSupport
+
     REQUIRE JS
 
     def build()
-        raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, "\"#{fullpath}\"") != 0
+        raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), "\"#{fullpath}\"") != 0
     end
 
     def what_it_does()
@@ -260,7 +262,19 @@ class JavaScriptDoc < FileArtifact
     end
 end
 
-class CompileTypeScript < FileMask
+class TypeScriptCompiler < FileMask
+    include OptionsSupport
+
+    REQUIRE JS
+
+    def build()
+        go_to_homedir
+        raise "Compilation of '#{@name}' has failed" if Artifact.exec('tsc', OPTS(), "\"#{fullpath}\"") != 0
+    end
+
+    def what_it_does()
+        "Compile typescript'#{@name}'"
+    end
 end
 
 
