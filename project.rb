@@ -43,6 +43,7 @@
         RunJavaClass     ('**/*.class')
         RunHtml          ('**/*.html')
         RunRubyScript    ('**/*.rb') {
+            # TODO: remove after documenting
             DONE { | art |
                 Touch.build('dsdsd')
             }
@@ -64,14 +65,15 @@
             @destination = '.lithium/classes'
         }
 
-        JavaCompiler('**/*.java')  { OPT "-Xlint:deprecation" }
+        JavaCompiler('**/*.java')  { OPT '-Xlint:deprecation' }
 
-        GroovyCompiler    ('**/*.groovy')
-        KotlinCompiler    ('**/*.kt')
-        ScalaCompiler     ('**/*.scala')
-        ValidateRubyScript('**/*.rb')
-        ValidatePhpScript ('**/*.php')
-
+        GroovyCompiler      ('**/*.groovy')
+        KotlinCompiler      ('**/*.kt')
+        ScalaCompiler       ('**/*.scala')
+        ValidateRubyScript  ('**/*.rb')
+        ValidatePhpScript   ('**/*.php')
+        TypeScriptCompiler  ('**/*.ts')
+        RunNodejs           ('**/*.js') { OPT '--check'  }
         ValidatePythonScript('**/*.py')
         MavenCompiler       ('**/pom.xml')
         ValidateXML         ('**/*.xml')
