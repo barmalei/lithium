@@ -7,9 +7,9 @@ require 'lithium/java-artifact/base'
 class JavaCheckStyle < FileMask
     include OptionsSupport
 
-    REQUIRE JAVA
-
     def initialize(*args)
+        REQUIRE JAVA
+
         super
         @checkstyle_home = File.join($lithium_code, 'tools', 'java', 'checkstyle')  unless @checkstyle_home
         raise "Checkstyle home '#{@checkstyle_home}' is incorrect"                  unless File.directory?(@checkstyle_home)

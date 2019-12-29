@@ -2,8 +2,6 @@ require 'lithium/java-artifact/runner'
 
 
 class BuildVaadinSass < JavaFileRunner
-    REQUIRE JAVA
-
     def initialize(*args)
         super
 

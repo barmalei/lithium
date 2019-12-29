@@ -16,13 +16,17 @@ class Touch < FileCommand
         end
     end
 
+    def self.touch(path)
+        Touch.new(path).build
+    end
+
     def what_id_does()
         "Touch '#{fullpath}'"
     end
 end
 
 #  Copy of a file artifact
-class CopyOfFile < FileCommand
+class CopyOfFile < FileArtifact
     attr_reader :source
 
     def initialize(*args, &block)

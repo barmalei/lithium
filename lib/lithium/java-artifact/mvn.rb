@@ -34,9 +34,9 @@ end
 class MavenRepoArtifact < FileArtifact
     include StdFormater
 
-    REQUIRE MVN
-
     def initialize(name, &block)
+        REQUIRE MVN
+
         r = /\[([^\[\/\]]+)\/([^\[\/\]]+)\/([^\[\/\]]+)\]$/
         m = r.match(name)
         raise "Invalid artifact name '#{name}'" if m.nil?
@@ -74,9 +74,8 @@ class PomFile < PermanentFile
     include StdFormater
     include AssignableDependency
 
-    REQUIRE MVN
-
     def initialize(*args, &block)
+        REQUIRE MVN
         name = args.length > 0 && !args[0].nil? ? args[0] : homedir
         fp   = fullpath(name)
         pom = FileArtifact.look_file_up(fp, 'pom.xml', homedir)
@@ -95,13 +94,12 @@ class PomFile < PermanentFile
 end
 
 class MavenClasspath < InFileClasspath
-    REQUIRE MVN
-
     include StdFormater
 
     log_attr :excludeGroupIds, :excludeTransitive
 
     def initialize(*args, &block)
+        REQUIRE MVN
         @excludeTransitive = false
         super(*args, &block)
         REQUIRE(PomFile.new(homedir))
@@ -126,9 +124,8 @@ end
 class MavenDependenciesDir < FileArtifact
     include StdFormater
 
-    REQUIRE MVN
-
     def initialize(name, &block)
+        REQUIRE MVN
         @excludeTransitive = false
         @excludeGroupIds   = []
 
@@ -164,8 +161,6 @@ end
 class RunMaven < PomFile
     include OptionsSupport
 
-    REQUIRE MVN
-
     def initialize(name, &block)
         super
         @targets ||= [ 'clean', 'install' ]
@@ -193,8 +188,6 @@ class RunMaven < PomFile
 end
 
 class MavenCompiler < RunMaven
-    REQUIRE MVN
-
     def initialize(*args)
         super
         TARGETS('compile')

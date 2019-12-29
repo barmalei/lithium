@@ -8,13 +8,13 @@ class JavaCompiler < FileMask
     include LogArtifactState
     include OptionsSupport
 
-    REQUIRE JAVA
-
-    log_attr :destination, :options, :create_destination
+    log_attr :destination,   :create_destination, :options
 
     def initialize(*args)
+        REQUIRE JAVA
+
         @create_destination = false
-        @description        = 'JAVA compile_with'
+        @description        = 'JAVA'
         @list_expired       = false
         @source_as_file     = false
 
@@ -63,7 +63,7 @@ class JavaCompiler < FileMask
 
     def list_source_items()
         if @list_expired
-            list_expired { | n, t |  yield "\"#{n}\"" }
+            list_expired_items { | n, t |  yield "\"#{n}\"" }
         else
             list_items   { | n, t |  yield "\"#{n}\"" }
         end
@@ -131,10 +131,9 @@ end
 # Groovy compile_with
 #
 class GroovyCompiler < JavaCompiler
-    REQUIRE JAVA
-    REQUIRE GROOVY
-
     def initialize(*args)
+        REQUIRE GROOVY
+
         super
         @description = 'Groovy compile_with'
     end
@@ -156,10 +155,8 @@ end
 # Kotlin compile_with
 #
 class KotlinCompiler < JavaCompiler
-    REQUIRE JAVA
-    REQUIRE KOTLIN
-
     def initialize(*args)
+        REQUIRE KOTLIN
         super
         @description = 'Kotlin compile_with'
     end
@@ -188,10 +185,8 @@ end
 # Scala compile_with
 #
 class ScalaCompiler < JavaCompiler
-    REQUIRE JAVA
-    REQUIRE SCALA
-
     def initialize(*args)
+        REQUIRE SCALA
         super
         @description = 'Scala compile_with'
     end

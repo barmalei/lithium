@@ -76,7 +76,12 @@ module LogArtifactState
         def log_attr(*args)
             @logged_attrs ||= []
             @logged_attrs += args
-            attr_accessor *args
+
+            # check if attribute accessor method has not been already defined with a class
+            # and define it if it doesn't
+            args.each { | arg |
+                attr_accessor arg unless method_defined?(arg)
+            }
         end
 
         def _log_attrs()
@@ -281,6 +286,15 @@ module LogArtifactState
         end
     end
 
+    def list_expired_attrs_as_array()
+        res = []
+        list_expired_items { | k, v |
+            res.push([k, v]);
+        }
+        return res
+    end
+
+
     def list_expired_attrs(&block)
         # check attributes state expiration
 
@@ -476,11 +490,11 @@ class ArtifactName < String
         "#{self.class.name}: { prefix='#{@prefix}', suffix='#{@suffix}', path='#{@path}', mask='#{@path_mask}' mask_type=#{mask_type}, clazz=#{@clazz}}"
     end
 
-    def same?(an)
-        !an.nil? && an == self && an.class == self.class &&
-        an.suffix    == @suffix    && an.prefix    == @prefix    && an.path == @path &&
-        an.path_mask == @path_mask && an.mask_type == @mask_type &&
-        an.clazz     == @clazz     && an.block     == @block
+    def ==(an)
+        !an.nil? && self.object_id == an.object_id ||
+        (an.class == self.class && an.suffix == @suffix && an.prefix == @prefix &&
+         an.path == @path && an.path_mask == @path_mask && an.mask_type == @mask_type &&
+         an.clazz == @clazz && an.block == @block)
     end
 
     # re-create the artifact name with new block
@@ -615,30 +629,6 @@ class Artifact
         def OWN() @item[2] = true; return self end
     end
 
-    def Artifact.REQUIRE(art, &block)
-        raise 'Dependency cannot be null artifact' if art.nil?
-        @requires ||= []
-        @requires.push([art, nil, nil, block])
-        return AssignRequiredTo.new(@requires[-1])
-    end
-
-    def Artifact.DISMISS(art)
-        raise 'No dependencies have been specified' if art.nil?
-        ln1 = ln2 = 0
-        if @requires && @requires.length > 0
-            ln1 = @requires.length
-            @requires.delete_if { | el | el[0] == art }
-            ln2 = @requires.length
-        end
-
-        raise "'#{art}' Class DEPENDENCY cannot be removed" if ln2 == ln1
-    end
-
-    def Artifact.requires_as_array()
-        @requires ||= []
-        @requires
-    end
-
     # !!! this method creates wrapped with context class artifact
     # !!! to keep track for the current context (instance
     # !!! where a method has been executed)
@@ -725,13 +715,19 @@ class Artifact
     # return cloned array of the artifact dependencies
     def requires()
         @requires ||= []
-        req = self.class.requires_as_array + @requires
+        req = @requires
+
+        # artifacts have to be unique by names
         req = req.reverse.uniq { | e |
             art = e[0]
             if art.kind_of?(Artifact)
                 art.name
             elsif art.kind_of?(Class)
-                art.default_name
+                if art < EnvArtifact  # only one environment of the given type can be required
+                    art.name
+                else
+                    art.default_name
+                end
             elsif art.kind_of?(String)
                 art
             else
@@ -772,12 +768,13 @@ class Artifact
             ln2 = @requires.length
         end
 
-        raise "'#{art}' Instance DEPENDENCY cannot be removed" if ln2 == ln1
+        raise "'#{art}' DEPENDENCY cannot be found and dismissed" if ln2 == ln1
     end
 
     # Overload "eq" operation of two artifact instances.
     def ==(art)
-        art && self.class == art.class && @name == art.name && @ver == art.ver && owner == art.owner
+        return !art.nil? && self.object_id == art.object_id ||
+                (self.class == art.class && @name == art.name && createdByMeta == art.createdByMeta)
     end
 
     # return last time the artifact has been modified
@@ -789,10 +786,8 @@ class Artifact
                 rr = IO.select([ stdout ], nil, nil, 2)
                 if !rr.nil? && !rr.empty?
                     for std in rr[0]
-                        line = std.readline.rstrip()
-                        if line
-                            yield line
-                        end
+                        line = std.readline.rstrip
+                        yield line unless line.nil?
                     end
                 end
             rescue EOFError => e
@@ -880,8 +875,7 @@ class ArtifactTree < Artifact
     end
 
     def initialize(*args)
-        @show_mtime = true
-        @show_owner = true
+        @show_id, @show_owner, @show_mtime = true, true, true
         super
     end
 
@@ -896,20 +890,15 @@ class ArtifactTree < Artifact
         bt = root.art.mtime()
 
         root.art.requires { | dep, assignMeTo, is_own, block |
-            node = Node.new(dep, root, &block)
+            foundNode, node = nil, Node.new(dep, root, &block)
 
-            # TODO: we have take in account custom block passed to the method!
-            # most likely it has to be also compared
-            #
-            # optimize tree to exclude dependencies that are already in the tree
-            foundNode = map.detect { | n |
-                node.art.name  == n.art.name  &&
-                node.art.class == n.art.class &&
-                node.art.createdByMeta.same?(n.art.createdByMeta)
-            }
+            if block.nil?  # requires with a custom block cannot be removed from build tree
+                # optimize tree to exclude dependencies that are already in the tree
+                foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
 
-            # save in list if a new artifact has been detected
-            map.push(node) if foundNode.nil?
+                # save in list if a new artifact has been detected
+                map.push(node) if foundNode.nil?
+            end
 
             # cyclic dependency detection
             parent = root
@@ -928,84 +917,50 @@ class ArtifactTree < Artifact
             # add the new node to tree and process it only if doesn't already exist
             root.children << node if foundNode.nil?
 
- #           if
-                # has to be placed before recursive build tree method call
-                node.art.owner = root.art.owner if is_own == true
+            # we have to check if the artifact is assignable to
+            # its parent and assign it despite if the artifact has
+            # been excluded from the tree
 
-                if node.art.class < AssignableDependency
-                    # call special method that is declared with AssignableDependency module
-                    # to resolve host artifact property name the given dependency artifact has
-                    # to be stored
-                    assignMeTo = node.art.assign_me_to if assignMeTo.nil?
+            # has to be placed before recursive build tree method call
+            node.art.owner = root.art.owner if is_own == true
 
-                    raise "Invalid attribute name 'node.art' artifact has to be assigned" if assignMeTo.nil?
+            if node.art.class < AssignableDependency
+                # call special method that is declared with AssignableDependency module
+                # to resolve host artifact property name the given dependency artifact has
+                # to be stored
+                assignMeTo = node.art.assign_me_to if assignMeTo.nil?
 
-                    asn = "@#{assignMeTo.to_s}".to_sym
-                    av  = root.art.instance_variable_get(asn)
-                    if av.kind_of?(Array)
+                raise "Invalid assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
 
-                        # find the artifact in the arry
-                        found = av.detect { | art |
-                            node.art.name  == art.name  &&
-                            node.art.class == art.class &&
-                            node.art.createdByMeta.same?(art.createdByMeta)
-                        }
+                asn = "@#{assignMeTo.to_s}".to_sym
+                av  = root.art.instance_variable_get(asn)
+                if av.kind_of?(Array)
+                    # check if the artifact is already in
+                    found = av.detect { | art | node.art.object_id == art.object_id }
 
-                        if found.nil?
-                            av.push(node.art)
-                            root.art.instance_variable_set(asn, av)
-                        end
-                    else
-                        root.art.instance_variable_set(asn, node.art)
+                    if found.nil?
+                        av.push(node.art)
+                        root.art.instance_variable_set(asn, av)
                     end
+                else
+                    root.art.instance_variable_set(asn, node.art)
                 end
-  #          end
+            end
         }
     end
 
     def show_tree() puts tree2string(nil, @root_node) end
 
-    def norm_tree_ver(root, map={})
-        # TODO: key building code should be optimized
-        key = root.art.name + root.art.class.name
-        if map[key].nil?
-            map[key] = root
-            root.children.each { | kid | norm_tree_ver(kid, map) }
-            root.children = root.children.compact()
-        else
-            #puts "Cut dependency branch '#{root.art}'"
-            root.parent.children[root.parent.children.index(root)], item  = nil, map[key]
-            # if Version.compare(root.art.ver, item.art.ver) == 1
-            #     puts "Replace branch '#{item.art}' with version #{root.art.ver}"
-            #     item.art = root.art
-            # end
-        end
-    end
-
-    def norm_tree_exp(root)
-        bt = root.art.mtime()
-        root.children.each { | kid |
-            norm_tree_exp(kid)
-            if !root.expired && (kid.expired || bt.nil? || (bt > 0 && kid.art.mtime() > bt))
-                root.expired = true
-                root.expired_by_kid = kid.art
-            end
-        }
-    end
-
-    # TODO: artifact cannot be easily compared since they are equal only if both point to the same instance !
-    # def has_a_descendant?(root, target)
-    #     root.children.each { | kid |
-    #         return true if target.art == kid.art
-    #     }
-    #     return false
-    # end
-
     def tree2string(parent, root, shift=0)
-        pshift, name = shift, root.art.to_s()
+        pshift, name = shift, root.art.to_s
 
-        e = (root.expired ? '*' : '') + (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') + (@show_mtime ? ":#{root.art.mtime}" : '') + (@show_owner ? " <#{root.art.owner}>" : '')
-        s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name}(#{root.art.class})"  + e
+        e = (root.expired ? '*' : '') +
+            (@show_id ? " #{root.art.object_id}" : '') +
+            (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
+            (@show_mtime ? ":#{root.art.mtime}" : '') +
+            (@show_owner ? ":<#{root.art.owner}>" : '')
+
+        s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name} (#{root.art.class})"  + e
         b = parent && root != parent.children.last
         if b
             s, k = "#{s}\n#{' '*shift}|", name.length/2 + 1
@@ -1049,8 +1004,6 @@ class FileArtifact < Artifact
     def _contains_path?(base, path)
         base = base[0..-2] if base[-1] == '/'
         path = path[0..-2] if path[-1] == '/'
-
-        #!!!puts "FileArtifact._contains_path?(): base = #{base} path = #{path}"
 
         return true  if base == path
         return false if base.length == path.length
@@ -1459,7 +1412,7 @@ end
 module ArtifactContainer
     #  (name : String | ArtifactName | Class)
     def artifact(name, &block)
-        raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 15
+        raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 25
 
         artname = ArtifactName.new(name)
 
@@ -1493,31 +1446,36 @@ module ArtifactContainer
         end
 
         # manage cache
-        _remove_from_cache(artname) unless block.nil?  # remove from cache if a custom block has been passed
-        art = _artifact_from_cache(artname)
+        _remove_from_cache(artname)          unless block.nil?  # remove from cache if a custom block has been passed
+        art = _artifact_from_cache(artname)  if block.nil?      # read from cache if custom block has not been passed
 
         # instantiate artifact with meta if it has not been found in cache
         art = _artifact_by_meta(artname, meta, &block) if art.nil?
-        art = _cache_artifact(artname, art)
+        art = _cache_artifact(artname, art)            if block.nil? # cache only if a custom block has been passed
 
         # if the artifact is a container handling of target (suffix) is delegated to the container
         return art.artifact(artname.suffix) if art.kind_of?(ArtifactContainer)
 
-        # return artifact
         return art
     end
 
     # cache artifact only if it is not identified by a mask or is an artifact container
     def _cache_artifact(name, art)
         name = ArtifactName.new(name)
-        _artifacts_cache[name] = art if name.path_mask.nil? || art.kind_of?(ArtifactContainer)
+        if name.path_mask.nil? || art.kind_of?(ArtifactContainer)
+            _artifacts_cache[name] = art
+        end
         return art
     end
 
     # fetch an artifact from cache
     def _artifact_from_cache(name)
         name = ArtifactName.new(name)
-        return _artifacts_cache[name] unless _artifacts_cache[name].nil?
+        unless _artifacts_cache[name].nil?
+            return _artifacts_cache[name]
+        else
+            return nil
+        end
     end
 
     # { art_name:ArtifactName => instance : Artifact ...}
@@ -1527,6 +1485,7 @@ module ArtifactContainer
     end
 
     def _remove_from_cache(name)
+        #TODO: WTF?
         # name = ArtifactName.new(name)
         # _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
     end
@@ -1727,7 +1686,7 @@ end
 # Option support
 module OptionsSupport
     def OPTS(*args)
-        @options ||= []
+        @options = options()
         if args.length > 0
             @options = []
             args.each { | o |
@@ -1738,18 +1697,26 @@ module OptionsSupport
     end
 
     def OPT(opt)
-        @options ||= []
+        @options = options()
         @options.push(opt)
     end
 
     def OPT?(op)
-        @options ||= []
+        @options = options()
         return @options.include?(op)
     end
 
     def OPTS?()
-        @options ||= []
+        @options = options()
         return @options.length > 0
+    end
+
+    # return valid not nil attribute value in a case of making it loggable.
+    # Otherwise 'option' attribute can equal [] after building (since OPTS)
+    # method has been called, but be nil before an artifact building
+    def options()
+        @options ||= []
+        return @options
     end
 end
 
@@ -1796,7 +1763,4 @@ class GroupByExtension < FileMask
         }
     end
 end
-
-
-
 

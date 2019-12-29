@@ -1,12 +1,10 @@
 require 'lithium/java-artifact/base'
 
-
 class JavaFileRunner < FileCommand
     include OptionsSupport
 
-    REQUIRE JAVA
-
     def initialize(*args)
+        REQUIRE JAVA
         super
         @arguments ||= []
     end
@@ -51,8 +49,6 @@ class JavaFileRunner < FileCommand
 end
 
 class RunJavaClass < JavaFileRunner
-    REQUIRE JAVA
-
     def target()
         n = @name.dup
         n[/[.]class$/] = '' if n.end_with?('.class')
@@ -63,8 +59,6 @@ class RunJavaClass < JavaFileRunner
 end
 
 class RunJavaCode < JavaFileRunner
-    REQUIRE JAVA
-
     def initialize(*args)
         super
         # TODO: hardcoded artifact prefix
@@ -85,8 +79,6 @@ class RunJavaCode < JavaFileRunner
 end
 
 class RunJAR < JavaFileRunner
-    REQUIRE JAVA
-
     def target()
         "-jar #{@name}"
     end
@@ -97,8 +89,10 @@ class RunJAR < JavaFileRunner
 end
 
 class RunGroovyScript < JavaFileRunner
-    REQUIRE JAVA
-    REQUIRE GROOVY
+    def initialize(*args)
+        REQUIRE GROOVY
+        super
+    end
 
     def classpath()
         JavaClasspath::join(@groovy.classpath, @java.classpath)
@@ -129,20 +123,16 @@ module RunJavaTestCase
 end
 
 class RunJavaTestCode < RunJavaCode
-    REQUIRE JAVA
     include RunJavaTestCase
 end
 
 class RunJavaTestClass < RunJavaClass
-    REQUIRE JAVA
     include RunJavaTestCase
 end
 
 class RunKotlinCode < JavaFileRunner
-    REQUIRE JAVA
-    REQUIRE KOTLIN
-
     def initialize(*args)
+        REQUIRE KOTLIN
         super
         REQUIRE "compile:#{name}"
     end
@@ -170,18 +160,13 @@ class RunKotlinCode < JavaFileRunner
 end
 
 class RunKotlinTestCode < RunKotlinCode
-    REQUIRE JAVA
-    REQUIRE KOTLIN
-
     include RunJavaTestCase
 end
 
 
 class RunScalaCode < JavaFileRunner
-    REQUIRE JAVA
-    REQUIRE SCALA
-
     def initialize(*args)
+        REQUIRE SCALA
         super
         REQUIRE "compile:#{name}"
     end
@@ -216,8 +201,5 @@ class RunScalaCode < JavaFileRunner
 end
 
 class RunScalaTestCode < RunScalaCode
-    REQUIRE JAVA
-    REQUIRE SCALA
-
     include RunJavaTestCase
 end

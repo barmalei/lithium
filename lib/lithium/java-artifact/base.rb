@@ -1,5 +1,6 @@
 require "pathname"
 
+require 'lithium/std-core' # help to run it as a code, since puts_warning is expected
 require 'lithium/core'
 
 require 'rexml/document'
@@ -458,21 +459,4 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
-
-
-
-
-# def puts_warning(s)
-#     puts s
-# end
-
-# p = Project.new('/Users/brigadir/projects/')
-# Project.current = p
-# j = JAVA.new()
-# puts(j.name)
-# r = j.requires { | dep, assignMeTo, is_own, block |
-#     puts "#{dep} => #{p.artifact(dep).object_id}, #{dep.default_name}"
-#     puts "#{dep} => #{p.artifact(dep).object_id}"
-# }
-
 

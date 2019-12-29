@@ -2,7 +2,6 @@ require 'fileutils'
 
 require 'lithium/core'
 
-
 class CLEAN < Artifact
     def build()
         # firstly let's create tree that resolves static dependencies (for instance set environment variables)

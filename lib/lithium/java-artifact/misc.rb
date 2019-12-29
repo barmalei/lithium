@@ -3,9 +3,9 @@ require 'lithium/java-artifact/base'
 
 class JavaDoc < FileCommand
     #include LogArtifactState
-    REQUIRE JAVA
 
     def initialize(*args)
+        REQUIRE JAVA
         @sources = []
         super
         @sources = $lithium_args.dup if @sources.length == 0 && $lithium_args.length > 0
@@ -51,8 +51,6 @@ end
 
 # TODO: most likely it should be removed
 class SuggestClassname < JavaFileRunner
-    REQUIRE JAVA
-
     def initialize(*args)
         super
         @arguments = [ $lithium_args[0] ]
@@ -68,9 +66,8 @@ class SuggestClassname < JavaFileRunner
 end
 
 class FindInClasspath < FileCommand
-    REQUIRE JAVA
-
     def initialize(*args)
+        REQUIRE JAVA
         super
         @target ||= $lithium_args[0]
         @use_zipinfo = false
@@ -121,8 +118,6 @@ class FindInClasspath < FileCommand
 end
 
 class FindClassInClasspath < FindInClasspath
-    REQUIRE JAVA
-
     def initialize(*args)
         super
         @target = @target + '.class' unless @target.end_with?('.class')

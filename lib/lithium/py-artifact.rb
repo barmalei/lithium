@@ -62,9 +62,8 @@ end
 class RunPythonScript < FileCommand
     include OptionsSupport
 
-    REQUIRE PYTHON
-
     def initialize(*args)
+        REQUIRE PYTHON
         OPT '-u'
         super
     end
@@ -78,7 +77,10 @@ class RunPythonScript < FileCommand
 end
 
 class RunPythonString < StringRunner
-    REQUIRE PYTHON
+    def initialize(*args)
+        REQUIRE PYTHON
+        super
+    end
 
     def cmd() [ @python.python,  '-' ] end
 end

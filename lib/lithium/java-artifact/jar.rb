@@ -8,9 +8,8 @@ require 'lithium/java-artifact/base'
 
 # directory that hosts a JAR file content
 class JarFileContent < FileArtifact
-    REQUIRE JAVA
-
     def initialize(*args, &block)
+        REQUIRE JAVA
         super
         @source ||= $lithium_args[0]
     end
@@ -42,11 +41,10 @@ end
 class FindInZip < FileMask
     include ZipTool
 
-    REQUIRE JAVA
-
     attr_accessor  :pattern
 
     def initialize(*args)
+        REQUIRE JAVA
         super
         @pattern ||= $lithium_args[0]
     end
@@ -102,11 +100,10 @@ end
 
 
 class JarFile < ArchiveFile
-    REQUIRE JAVA
-
     log_attr :manifest
 
     def initialize(*args)
+        REQUIRE JAVA
         super
         @manifest ||= nil
 

@@ -50,9 +50,8 @@ end
 
 # nodejs module
 class NodejsModule < FileArtifact
-    REQUIRE JS
-
     def initialize(name, &block)
+        REQUIRE JS
         puts "1)    ------ #{name}"
         puts "2)    ------ #{project.homedir}"
 
@@ -104,7 +103,10 @@ end
 class RunNodejs < FileCommand
     include OptionsSupport
 
-    REQUIRE JS
+    def initialize(*args, &block)
+        REQUIRE JS
+        super
+    end
 
     def build()
         raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), "\"#{fullpath}\"") != 0
@@ -119,11 +121,13 @@ end
 class UglifiedJSFile < ArchiveFile
     extend NPM
 
-    REQUIRE(JS)
-
-    NPM('uglify-js').OWN.TO('uglify')
-
     include OptionsSupport
+
+    def initialize(*args, &block)
+        REQUIRE JS
+        NPM('uglify-js').OWN.TO('uglify')
+        super
+    end
 
     def generate(path, dest_dir, list)
         validate_extension()
@@ -202,9 +206,8 @@ class CombinedJSFile < ArchiveFile
 end
 
 class JavaScriptDoc < FileArtifact
-    REQUIRE JS
-
     def initialize(name)
+        REQUIRE JS
         super
         @config   ||= nil
         @template ||= nil
@@ -265,7 +268,10 @@ end
 class TypeScriptCompiler < FileMask
     include OptionsSupport
 
-    REQUIRE JS
+    def initialize(name)
+        REQUIRE JS
+        super
+    end
 
     def build()
         go_to_homedir
@@ -279,7 +285,10 @@ end
 
 
 class JavaScriptHint < FileMask
-    REQUIRE JS
+    def initialize(name)
+        REQUIRE JS
+        super
+    end
 
     def build()
         raise "Linting of '#{@name}' failed" if Artifact.exec('jshint', fullpath) != 0

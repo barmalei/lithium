@@ -46,9 +46,12 @@ end
 
 # Run ruby script
 class RunRubyScript < FileCommand
-    REQUIRE RUBY
-
     include OptionsSupport
+
+    def initialize(*args)
+        REQUIRE RUBY
+        super
+    end
 
     def build()
         raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, OPTS(), @ruby.rpath, "\"#{fullpath}\"") != 0
@@ -58,18 +61,20 @@ class RunRubyScript < FileCommand
 end
 
 class RunRubyString < StringRunner
-    REQUIRE RUBY
+    def initialize(*args)
+        REQUIRE RUBY
+        super
+    end
 
     def cmd() @ruby.ruby end
 end
 
 # Validate RUBY script
 class ValidateRubyScript < FileMask
-    REQUIRE RUBY
-
     include OptionsSupport
 
     def initialize(*args)
+        REQUIRE RUBY
         OPT '-c'
         super
     end

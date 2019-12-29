@@ -2,7 +2,8 @@ require 'lithium/std-core'
 require 'pathname'
 
 class LithiumStd < Std
-    @@signs_map = [ [ 'INF', 'Z'], [ 'WAR', '!'], [ 'ERR', '?'], [ 'EXC', '?'] ]
+    @@signs_map = ['INF', 'WAR', 'ERR', 'EXC']
+    @@signs_map = ['I', 'W', 'E', 'X']
 
     def initialize(prj_home = nil)
         super()
@@ -26,8 +27,9 @@ class LithiumStd < Std
     end
 
     def format(msg, level)
-        level, sign = @@signs_map[level]
-        "(#{level})  #{sign} #{msg}"
+        level    = @@signs_map[level]
+        artclass = $current_artifact.nil? ? 'Startup' : $current_artifact.class.name
+        "(#{level}) [#{artclass}]  #{msg}"
     end
 
     def pattern_matched(msg, pattern, match)

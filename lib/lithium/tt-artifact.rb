@@ -7,9 +7,8 @@ require 'lithium/rb-artifact'
 #   Tree top grammar compiler
 #
 class CompileTTGrammar < FileCommand
-    REQUIRE RUBY
-
     def initialize(*args)
+        REQUIRE RUBY
         super
         @output_dir ||= File.dirname(@name)
         @output_dir = fullpath(@output_dir)

@@ -1,4 +1,4 @@
-    require 'lithium/core'
+require 'lithium/core'
 require 'lithium/java-artifact/base'
 
 #
@@ -30,9 +30,8 @@ end
 class RunANT < FileCommand
     include OptionsSupport
 
-    REQUIRE ANT
-
     def initialize(name, &block)
+        REQUIRE ANT
         ant_build = FileArtifact.look_file_up(fullpath(name), 'build.xml', homedir)
         raise "ANT build file cannot be detected by '#{fullpath(name)}'" if ant_build.nil?
         super(ant_build, &block)
