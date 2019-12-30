@@ -42,6 +42,8 @@ class RUBY < EnvArtifact
     def ruby() File.join(@ruby_home, 'bin', 'ruby') end
 
     def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{rpath}'" end
+
+    def self.abbr() 'RUB' end
 end
 
 # Run ruby script
@@ -58,6 +60,8 @@ class RunRubyScript < FileCommand
     end
 
     def what_it_does() "Run '#{@name}' script" end
+
+    def self.abbr() 'RRS' end
 end
 
 class RunRubyString < StringRunner
@@ -85,4 +89,6 @@ class ValidateRubyScript < FileMask
     end
 
     def what_it_does() "Validate '#{@name}' script" end
+
+    def self.abbr() 'VRS' end
 end

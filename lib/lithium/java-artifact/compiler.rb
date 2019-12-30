@@ -8,7 +8,7 @@ class JavaCompiler < FileMask
     include LogArtifactState
     include OptionsSupport
 
-    log_attr :destination,   :create_destination, :options
+    log_attr :destination,  :create_destination, :options
 
     def initialize(*args)
         REQUIRE JAVA
@@ -115,7 +115,7 @@ class JavaCompiler < FileMask
             puts_warning "Nothing to be compiled"
         else
             begin
-                go_to_homedir()
+                go_to_homedir
                 raise 'Compilation has failed' if Artifact.exec(*cmd(src)) != 0
                 puts "#{length} source files have been compiled"
             ensure
@@ -125,6 +125,8 @@ class JavaCompiler < FileMask
     end
 
     def what_it_does() "Compile (#{@description})\n    from: '#{@name}'\n    to:   '#{destination()}'" end
+
+    def self.abbr() 'JVC' end
 end
 
 #
@@ -135,7 +137,7 @@ class GroovyCompiler < JavaCompiler
         REQUIRE GROOVY
 
         super
-        @description = 'Groovy compile_with'
+        @description = 'Groovy'
     end
 
     def compile_with()
@@ -149,6 +151,8 @@ class GroovyCompiler < JavaCompiler
     def what_it_does()
         "Compile groovy '#{@name}' code"
     end
+
+    def self.abbr() 'GTC' end
 end
 
 #
@@ -158,7 +162,7 @@ class KotlinCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE KOTLIN
         super
-        @description = 'Kotlin compile_with'
+        @description = 'Kotlin'
     end
 
     def compile_with()
@@ -179,6 +183,8 @@ class KotlinCompiler < JavaCompiler
     def what_it_does()
         "Compile Kotlin '#{@name}' code"
     end
+
+    def self.abbr() 'KTC' end
 end
 
 #
@@ -188,7 +194,7 @@ class ScalaCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE SCALA
         super
-        @description = 'Scala compile_with'
+        @description = 'Scala'
     end
 
     def compile_with()
@@ -202,4 +208,6 @@ class ScalaCompiler < JavaCompiler
     def what_it_does()
         "Compile Scala '#{@name}' code"
     end
+
+    def self.abbr() 'STC' end
 end

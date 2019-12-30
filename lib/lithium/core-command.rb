@@ -100,6 +100,8 @@ class META < Artifact
     def what_it_does()
         "List meta tree"
     end
+
+    def self.abbr() 'MET' end
 end
 
 class REQUIRE < Artifact
@@ -126,6 +128,8 @@ class TREE < Artifact
     end
 
     def what_it_does() "Show '#{@name}' dependencies tree" end
+
+    def self.abbr() 'TRE' end
 end
 
 # list expired items or/and attributes for the given artifact
@@ -202,6 +206,8 @@ class INFO < Artifact
         val = val[0 .. 128] + " [more ..] " if val.length > 128
         return val
     end
+
+    def self.abbr() 'INF' end
 end
 
 class INIT < FileCommand

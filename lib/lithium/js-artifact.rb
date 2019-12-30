@@ -115,6 +115,8 @@ class RunNodejs < FileCommand
     def what_it_does()
         "Run JS '#{@name}' script with nodejs"
     end
+
+    def self.abbr() 'RJS' end
 end
 
 # nodejs uglyfier

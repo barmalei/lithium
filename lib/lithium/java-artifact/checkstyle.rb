@@ -28,6 +28,8 @@ class JavaCheckStyle < FileMask
     end
 
     def what_it_does() "Check '#{@name}' java code style" end
+
+    def self.abbr() 'CHS' end
 end
 
 #  PMD code analyzer
@@ -55,5 +57,7 @@ class PMD < FileCommand
     end
 
     def what_it_does() "Validate '#{@name}' code applying PMD:#{@pmd_rules}" end
+
+    def self.abbr() 'PMD' end
 end
 

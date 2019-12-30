@@ -304,6 +304,8 @@ class JVM < EnvArtifact
     def what_it_does()
         "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
     end
+
+    def self.abbr() 'JVM' end
 end
 
 class JAVA < JVM

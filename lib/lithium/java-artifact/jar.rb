@@ -118,4 +118,6 @@ class JarFile < ArchiveFile
         return Artifact.exec(@java.jar, 'cfm', "\"#{jar}\"", "\"#{@manifest}\"", "-C \"#{destdir}\"", list) unless @manifest.nil?
         return Artifact.exec(@java.jar, 'cf', "\"#{jar}\"",  "-C \"#{destdir}\"", list)
     end
+
+    def self.abbr() 'JAR' end
 end

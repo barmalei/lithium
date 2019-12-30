@@ -29,6 +29,8 @@ class MVN < EnvArtifact
     def what_it_does() "Initialize Maven environment '#{@name}'" end
 
     def mvn() File.join(@mvn_home, 'bin', 'mvn') end
+
+    def self.abbr() 'MVN' end
 end
 
 class MavenRepoArtifact < FileArtifact
@@ -91,6 +93,8 @@ class PomFile < PermanentFile
         f = fullpath
         yield f, File.mtime(f).to_i
     end
+
+    def self.abbr() 'POM' end
 end
 
 class MavenClasspath < InFileClasspath
@@ -185,6 +189,8 @@ class RunMaven < PomFile
     end
 
     def what_it_does() "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{@mvn.OPTS()}'" end
+
+    def self.abbr() 'RMV' end
 end
 
 class MavenCompiler < RunMaven

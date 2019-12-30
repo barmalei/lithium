@@ -24,6 +24,8 @@ class ANT < EnvArtifact
     def what_it_does() "Initialize ANT environment '#{@name}'" end
 
     def ant() File.join(@ant_home, 'bin', 'ant') end
+
+    def self.abbr() 'ANT' end
 end
 
 # Simple ant runner
@@ -44,5 +46,7 @@ class RunANT < FileCommand
     end
 
     def what_it_does() "Run ANT '#{fullpath()}'" end
+
+    def self.abbr() 'RAN' end
 end
 

@@ -46,6 +46,8 @@ class JavaFileRunner < FileCommand
             return res[0][:matched_part]
         end
     end
+
+    def self.abbr() 'JVR' end
 end
 
 class RunJavaClass < JavaFileRunner

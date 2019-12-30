@@ -47,6 +47,8 @@ class JavaDoc < FileCommand
     def clean() FileUtils.rm_r(fullpath()) if  File.exists?(fullpath()) end
     #def expired?() !File.exists?(fullpath()) end
     def what_it_does() "Generate javadoc to '#{@name}' folder" end
+
+    def self.abbr() 'JDC' end
 end
 
 # TODO: most likely it should be removed
@@ -143,4 +145,6 @@ class FindClassInClasspath < FindInClasspath
         end
         super
     end
+
+    def self.abbr() 'FCC' end
 end

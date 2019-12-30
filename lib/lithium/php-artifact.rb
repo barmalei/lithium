@@ -12,6 +12,8 @@ class RunPhpScript < FileCommand
     def build() raise 'Run PHP failed' if Artifact.exec('php', OPTS(), "\"#{fullpath}\"") != 0 end
 
     def what_it_does() "Run PHP '#{@name}' script" end
+
+    def self.abbr() 'RPH' end
 end
 
 #
@@ -30,5 +32,7 @@ class ValidatePhpScript < FileMask
     end
 
     def what_it_does() "Validate PHP '#{@name}' script" end
+
+    def self.abbr() 'VPH' end
 end
 

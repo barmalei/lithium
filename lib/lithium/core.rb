@@ -780,6 +780,8 @@ class Artifact
     # return last time the artifact has been modified
     def mtime() -1 end
 
+    def Artifact.abbr() 'ART' end
+
     def Artifact.read_exec_output(stdin, stdout, thread)
         while thread.status != false && thread.status != nil
             begin
@@ -1317,6 +1319,8 @@ class FileArtifact < Artifact
             tmp_file.unlink()
         end
     end
+
+    def self.abbr() 'FAR' end
 end
 
 # Permanent file shortcut
@@ -1330,6 +1334,8 @@ end
 # Perform and action on a file artifact
 class FileCommand < PermanentFile
     def expired?() true end
+
+    def self.abbr() 'FCM' end
 end
 
 # Directory artifact
@@ -1406,6 +1412,8 @@ class FileMask < FileArtifact
     end
 
     def expired?() true end
+
+    def self.abbr() 'FMS' end
 end
 
 
@@ -1763,4 +1771,3 @@ class GroupByExtension < FileMask
         }
     end
 end
-

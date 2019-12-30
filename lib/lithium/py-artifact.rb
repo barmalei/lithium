@@ -74,6 +74,8 @@ class RunPythonScript < FileCommand
     end
 
     def what_it_does() "Run '#{@name}' script" end
+
+    def self.abbr() 'RPS' end
 end
 
 class RunPythonString < StringRunner
