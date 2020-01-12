@@ -263,7 +263,11 @@ module LogArtifactState
     end
 
     def items_log_path()
-        @items_log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{self.name.tr("/\\<>:.*{}[]", '_')}")
+        if @items_log_id.nil?
+            @items_log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{self.name.tr("/\\<>:.*{}[]", '_')}")
+        else
+            @items_log_path ||= File.join(logs_home_dir, @items_log_id)
+        end
         @items_log_path
     end
 
@@ -294,6 +298,9 @@ module LogArtifactState
         return res
     end
 
+    def LOG_ID(id)
+        @items_log_id = id
+    end
 
     def list_expired_attrs(&block)
         # check attributes state expiration

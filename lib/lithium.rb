@@ -1,7 +1,7 @@
 require 'pathname'
 
-$lithium_version    = '3.4.5'
-$lithium_date       = 'Dec 2019'
+$lithium_version    = '3.4.6'
+$lithium_date       = 'Jan 2020'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 artifact            = ARGV[ $lithium_options.length ]
