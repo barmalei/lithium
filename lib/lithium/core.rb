@@ -948,6 +948,9 @@ class ArtifactTree < Artifact
                     found = av.detect { | art | node.art.object_id == art.object_id }
 
                     if found.nil?
+
+                        puts "Assign #{node.art.object_id}:#{node.art.class}:#{node.art.name} to #{root.art.object_id}:#{root.art.class}.#{asn}"
+
                         av.push(node.art)
                         root.art.instance_variable_set(asn, av)
                     end

@@ -33,12 +33,12 @@ class JavaCheckStyle < FileMask
 end
 
 #  PMD code analyzer
-class PMD < FileCommand
+class PMD < FileMask
     include OptionsSupport
 
     def initialize(*args)
         super
-        @pmd_path = File.join($lithium_code, 'tools', 'pmd')
+        @pmd_path = File.join($lithium_code, 'tools', 'java', 'pmd')
         raise "Path cannot be found '#{@pmd_path}'" if !File.exists?(@pmd_path) || !File.directory?(@pmd_path)
 
         @pmd_rules  ||= File.join('rulesets', 'java', 'quickstart.xml')
@@ -46,9 +46,8 @@ class PMD < FileCommand
         @pmd_cmd    ||= 'run.sh'
     end
 
-    def build()
-        super
-        fp = fullpath()
+    def build_item(path, mt)
+        fp = fullpath(path)
         raise "PMD target '#{fp}' cannot be found" unless File.exists?(fp)
         raise "PMD failed for '#{fp}'" if Artifact.exec(File.join(@pmd_path, 'bin', @pmd_cmd),
                                                         'pmd', '-d', "\"#{fp}\"",

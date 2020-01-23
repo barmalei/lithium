@@ -45,7 +45,9 @@ PATTERNS ({
 
     [ JavaCompiler, PMD ] => [
         # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
-        JavaCompileErrorPattern.new()
+        StdPattern.new() {
+            location('java'); spaces(); group(:message, '.*$')
+        }
     ],
 
     [ KotlinCompiler ] => [
