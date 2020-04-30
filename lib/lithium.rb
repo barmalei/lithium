@@ -1,7 +1,17 @@
 require 'pathname'
 
-$lithium_version    = '3.4.6'
-$lithium_date       = 'Jan 2020'
+# !==================================================================
+#  "basedir" is starting folder to lookup lithium project definition
+#
+#   1) passing an absolute path of the artifact looks for a "basedir"
+#      (and as a result an owner project) basing on the absolute path
+#   2) passing an absolute path of the artifact looks for a "basedir"
+#      ans "basedir" as an option makes possible to build an external
+#      artifact in a context of the given project
+# !==================================================================
+
+$lithium_version    = '3.5.1'
+$lithium_date       = 'Apr 2020'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 artifact            = ARGV[ $lithium_options.length ]
@@ -10,32 +20,45 @@ artifact_prefix     = artifact.nil? ? nil : (artifact_path.nil? ? artifact : art
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
 $lithium_args     ||= []
 
-
 # modify ruby modules lookup path
 $: << File.join($lithium_code, 'lib')
 
 # artifact name is not a path
-basedir = Dir.pwd
+if $lithium_options.has_key?('basedir')
+    bd = $lithium_options['basedir']
+    basedir = File.realpath(bd)
+    raise "Invalid project base directory '#{basedir}' has been passed" if !File.exists?(basedir) || !File.directory?(basedir)
+    Dir.chdir basedir
+else
+    basedir = Dir.pwd
+end
 
+#
+# IF artifact path is absolute AND "basedir" has not been passed as an option then:
+#   -- basedir is computed by passed artifact path if possible, pwd otherwise
+#
 unless artifact_path.nil?
-    i = artifact_path.index(/[\?\*\{\}]/)                                  # cut mask
-    artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil   # store mask
-    artifact_path = artifact_path[0, i] if !i.nil? && i >= 0               # cut mask from path
+    i = artifact_path.index(/[\?\*\{\}]/)                                # cut mask
+    artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil # store mask
+    artifact_path = artifact_path[0, i] if !i.nil? && i >= 0             # cut mask from path
 
-    if (artifact_path.length > 0 || artifact_mask != '*') && artifact_path.start_with?('.env/') == false
-        artifact_path = File.expand_path(artifact_path)  # expand path to artifact to absolute path if
-
-        basedir = artifact_path
-        while !File.exists?(basedir) || !File.directory?(basedir) do
-            if Pathname.new(basedir).root?
-                basedir = Dir.pwd
-                break
+    path  = Pathname.new(artifact_path)
+    if path.absolute?
+        # resolve link to real path for absolute paths
+        artifact_path = File.realpath(artifact_path)
+        unless $lithium_options.has_key?('basedir')
+            basedir = artifact_path
+            while !File.exists?(basedir) || !File.directory?(basedir) do
+                if Pathname.new(basedir).root?
+                    basedir = Dir.pwd
+                    break
+                end
+                basedir = File.dirname(basedir)
             end
-            basedir = File.dirname(basedir)
         end
-
-        artifact_path = artifact_path[0 .. -2] if artifact_path.length > 1 && artifact_path[-1] == '/'
     end
+
+    artifact_path = artifact_path[0 .. -2] if artifact_path.length > 1 && artifact_path[-1] == '/'
 end
 
 # start lithium

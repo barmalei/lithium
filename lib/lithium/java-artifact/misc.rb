@@ -51,19 +51,16 @@ class JavaDoc < FileCommand
     def self.abbr() 'JDC' end
 end
 
-# TODO: most likely it should be removed
-class SuggestClassname < JavaFileRunner
+class ShowClassMethods < EnvArtifact
     def initialize(*args)
+        REQUIRE JAVA
         super
-        @arguments = [ $lithium_args[0] ]
     end
 
-    def classpath()
-        File.join($lithium_code, 'classes') + File::PATH_SEPARATOR + @java.classpath
-    end
-
-    def target()
-        'test.ClassMethods'
+    def build()
+        cn = @shortname
+        cp = JavaClasspath.join(@java.classpath, File.join($lithium_code, 'classes'))
+        raise "Failed " if Artifact.exec(@java.java, '-classpath', "\"#{cp}\"", 'lithium.JavaTools', "methods:#{cn}") != 0
     end
 end
 
@@ -122,18 +119,21 @@ end
 class FindClassInClasspath < FindInClasspath
     def initialize(*args)
         super
+        raise 'Target class is not known' if @target.nil?
         @target = @target + '.class' unless @target.end_with?('.class')
     end
 
     def build()
-        Artifact.exec(@java.java, '-classpath',
-                      "\"#{File.join($lithium_code, 'classes')}\"",
-                      'lithium.DiscoverSystemClass',
-                      @target ) { | stdin, stdout, thread |
+        Artifact.exec(
+            @java.java, 
+            '-classpath',
+            "\"#{File.join($lithium_code, 'classes')}\"",
+            'lithium.JavaTools',
+            "class:#{@target}") { | stdin, stdout, thread |
                 Artifact.read_exec_output(stdin, stdout, thread) { | line |
                     puts line
                 }
-        }
+            }
 
         super
     end

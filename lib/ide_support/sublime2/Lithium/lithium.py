@@ -2,7 +2,7 @@
 
 import sublime, sublime_plugin, subprocess, thread, functools
 
-li_debug = False
+li_debug = True
 li_active_output_view = None
 li_output_views = {}
 
@@ -35,6 +35,7 @@ def li_paths_by_output(view):
         n = view.scope_name(region.b - 3)
         if n and n.strip() == u'source.lithium li.path li.path.line':
             path[1] = view.substr(view.extract_scope(region.b - 3))
+
         paths.append(path)
 
     return paths

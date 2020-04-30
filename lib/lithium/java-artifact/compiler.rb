@@ -15,42 +15,41 @@ class JavaCompiler < FileMask
 
         @create_destination = false
         @description        = 'JAVA'
+        @destination        = nil
         @list_expired       = false
-        @source_as_file     = false
+        @source_as_file     = false  # store target files into tmp file
 
         super
+    end
 
+    def expired?() false end
+
+    def destination()
         unless @destination.nil?
             @destination = File.join(homedir, @destination) unless Pathname.new(@destination).absolute?
             if !File.exists?(@destination) && @create_destination
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
             end
+
+            return @destination
         else
             puts_warning 'Destination has not been specified, it will be auto-detected'
+            pp = project
+            while not pp.nil?
+                hd = pp.homedir
+                [ File.join(hd, 'classes'), File.join(hd, 'WEB-INF', 'classes') ].each { | path |
+                    if File.exists?(path)
+                        return path
+                    else
+                        puts_warning("Evaluated destination '#{path}' doesn't exist")
+                    end
+                }
+                pp = pp.project
+            end
+
+            raise 'Destination cannot be detected'
         end
-    end
-
-    def expired?() false end
-
-    def destination()
-        return @destination unless @destination.nil?
-
-        hd = homedir
-        pp = project.project
-
-        destinations = [
-            File.join(hd, 'classes'),
-            File.join(hd, 'WEB-INF', 'classes')
-        ]
-
-        destinations.push(File.join(pp.homedir, 'classes')) unless pp.nil?
-        destinations.each { | path |
-            return path if File.exists?(path)
-        }
-
-        str = destinations.map { | path |  "    '" + path + "'\n" }
-        raise "Destination folder detection has failed\n#{str.join('')}\n"
     end
 
     def compile_with()
@@ -61,12 +60,29 @@ class JavaCompiler < FileMask
         @java.classpath
     end
 
-    def list_source_items()
+    def list_source_paths()
         if @list_expired
-            list_expired_items { | n, t |  yield "\"#{n}\"" }
+            list_expired_items { | n, t |  yield n }
         else
-            list_items   { | n, t |  yield "\"#{n}\"" }
+            list_items   { | n, t |  yield n }
         end
+    end
+
+    def list_dest_paths()
+        dest = destination()
+        list_source_paths { | path |
+            pkg = JVM.grep_package(path)
+
+            cn  = File.basename(path)
+            cn[/\.java$/] = '' if cn.end_with?('.java')
+            raise 'Class name cannot be identified' if cn.nil?
+
+            fp = File.join(dest, pkg.gsub('.', '/'), "#{cn}.class")
+            yield fp, pkg if File.exists?(fp)
+            FileArtifact.dir(File.join(dest, pkg.gsub('.', '/'), "#{cn}$*.class")) { | item |
+                yield item, pkg
+            }
+        }
     end
 
     def source()
@@ -74,8 +90,8 @@ class JavaCompiler < FileMask
             f = Tempfile.open('lithium')
             c = 0
             begin
-                list_source_items { | path |
-                    f.puts(path)
+                list_source_paths { | path |
+                    f.puts("\"#{path}\"")
                     c = c + 1
                 }
             ensure
@@ -90,8 +106,8 @@ class JavaCompiler < FileMask
             end
         else
             list = []
-            list_source_items { | path |
-                list.push(path)
+            list_source_paths { | path |
+                list.push("\"#{path}\"")
             }
             return list.length == 0 ? nil : list, list.length
         end
@@ -124,10 +140,41 @@ class JavaCompiler < FileMask
         end
     end
 
+    def clean()
+        list_dest_paths { | path |
+            File.delete(path)
+        }
+    end
+
     def what_it_does() "Compile (#{@description})\n    from: '#{@name}'\n    to:   '#{destination()}'" end
 
     def self.abbr() 'JVC' end
 end
+
+class JDTCompiler < JavaCompiler
+    def initialize(*args)
+        REQUIRE JAVA
+
+        super
+        @description = 'JDT'
+        @jdt_jar_path = File.join($lithium_code, 'tools', 'java', 'jdt', 'ecj-4.15.jar') unless @jdt_jar_path
+
+        raise "JDT libray '#{@jdt_jar_path}' cannot be found" unless File.file?(@jdt_jar_path)
+
+        OPTS('-jar', @jdt_jar_path, '-1.8')
+    end
+
+    def compile_with()
+        @java.java
+    end
+
+    def what_it_does()
+        "Compile JAVA '#{@name}' code with JDT"
+    end
+
+    def self.abbr() 'JDT' end
+end
+
 
 #
 # Groovy compile_with
@@ -157,7 +204,6 @@ end
 
 #
 # Kotlin compile_with
-#
 class KotlinCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE KOTLIN

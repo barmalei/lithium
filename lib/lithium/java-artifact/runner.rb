@@ -35,16 +35,7 @@ class JavaFileRunner < FileCommand
     end
 
     def grep_package(pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
-        res = FileArtifact.grep_file(fullpath, pattern)
-
-        if res.length == 0
-            puts_warning 'Package name is empty'
-            return nil
-        elsif res.length > 1
-            raise "Ambiguous package detection '#{res}'"
-        else
-            return res[0][:matched_part]
-        end
+        return JVM.grep_package(fullpath, pattern)
     end
 
     def self.abbr() 'JVR' end

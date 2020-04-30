@@ -65,6 +65,10 @@ class SublimeStd < LithiumStd
     def pattern_matched(msg, pattern, match)
         msg = super
 
+        if match.has_group?(:message)
+            match = match.replace(:message, '')
+        end
+
         if match.has_group?(:location)
             path = match[:file][:value]
             return match.replace(:location, "[[#{path}:%{line}]]").to_s if !path.nil? && File.exist?(path)

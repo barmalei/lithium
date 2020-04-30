@@ -221,8 +221,9 @@ class InFileClasspath < FileArtifact
     include AssignableDependency
     include LogArtifactState
 
-    def initialize(name, &block)
-        name = '.classpath' if name.nil?
+    default_name(".li_classpath")
+
+    def initialize(*args, &block)
         super
         @read_as_lines ||= false
     end
@@ -306,6 +307,30 @@ class JVM < EnvArtifact
     end
 
     def self.abbr() 'JVM' end
+
+    def self.grep_package(path, pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
+        res = FileArtifact.grep_file(path, pattern)
+
+        if res.length == 0
+            puts_warning 'Package name is empty'
+            return nil
+        elsif res.length > 1
+            raise "Ambiguous package detection '#{res}'"
+        else
+            return res[0][:matched_part]
+        end
+    end
+
+    def self.relpath_to_class(src_path)
+        pkg = self.grep_package(src_path)
+
+        cn  = File.basename(src_path)
+        cn[/\.java$/] = '' if cn.end_with?('.java')
+        raise 'Class name cannot be identified' if cn.nil?
+
+        File.join(pkg.gsub('.', '/'), cn + '.class')
+    end
+
 end
 
 class JAVA < JVM

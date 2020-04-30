@@ -50,6 +50,19 @@ PATTERNS ({
         }
     ],
 
+    JDTCompiler => [
+        StdPattern.new() {
+            num(); dot(); spaces(); group(:message, 'WARNING|ERROR'); spaces(); any('in'); spaces(); group(:location) {
+                file('java')
+                spaces()
+                rbrackets {
+                    any("at line ")
+                    line()
+                }
+            }
+        }
+    ],
+
     [ KotlinCompiler ] => [
         KotlinCompileErrorPattern.new()
     ],
@@ -147,6 +160,7 @@ def BUILD_ARTIFACT(name, &block)
     }
 
     tree.build()
+
     BUILD_ARTIFACT_TREE(tree.root_node)
     return tree.root_node.art
 end
@@ -253,20 +267,44 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
 
     puts "TARGET artifact: '#{target_artifact}'"
     built_art = BUILD_ARTIFACT(target_artifact)
+
     INFO.info(built_art) if $lithium_options.key?('i')
-    if $lithium_options.key?('i:m')
-        methods = $lithium_options['i:m'].split(',')
-        methods.each { | method |
-            puts "    #{method}() => #{built_art.send(method.to_sym)}"
-        }
-    end
 
     if $lithium_options.key?('i:p')
         props = $lithium_options['i:p'].split(',')
         props.each { | prop |
-            puts "    @#{prop} = #{built_art.instance_variable_get(('@' + prop).to_sym)}"
+            val = built_art
+            prop.split('.').each { | part |
+                if part.start_with?('@')
+                    val = val.instance_variable_get(part.to_sym)
+                else
+                    val = val.send(part.to_sym)
+                end
+            }
+
+            puts "    #{prop} = #{val}"
         }
     end
 
     puts "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact}' has been done"
 end
+
+
+st = StdPattern.new() {
+        num(); dot(); spaces(); group(:message, 'WARNING|ERROR'); spaces(); any('in'); spaces(); group(:location) {
+            file('java')
+            spaces()
+            rbrackets {
+                any("at line ")
+                line()
+            }
+        }
+    }
+
+msg = '10. WARNING in /Users/brigadir/projects/.lithium/lib/JavaTools.java (at line 102)'
+
+
+mt = st.match(msg)
+
+
+puts mt[:message]

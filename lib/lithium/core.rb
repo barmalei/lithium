@@ -1,7 +1,6 @@
 require 'pathname'
 require 'open3'
 
-
 #  Log takes care about logged expiration state.
 #
 #  Log assists to calculate proper modified time. If an artifact returns
@@ -395,7 +394,7 @@ class ArtifactName < String
                 name = name.to_s
             elsif name.kind_of?(Class)
                 @clazz = name
-                name = name.default_name
+                name = @clazz.default_name
                 raise "Artifact default name cannot be detected by #{@clazz} class" if name.nil?
             elsif !name.kind_of?(String)
                 raise "Invalid artifact name type '#{name.class}'"
@@ -523,29 +522,6 @@ class ArtifactName < String
     end
 end
 
-# version utility class
-class Version
-    attr_reader :version
-
-    def initialize(version) @version = version end
-    def <=>(v) self.compare(@version, v.to_s) end
-    def to_s() return @version end
-
-    def self.compare(ver1, ver2)
-        ver1 = '' if ver1.nil?
-        ver2 = '' if ver2.nil?
-        return 0 if  ver1 == ver2
-        pvers1, pvers2 = ver1.split('.'), ver2.splitplit('.')
-        pvers1.each_index { |i|
-          break     if pvers2.length <= i
-          return -1 if pvers1[i] < pvers2[i]
-          return  1 if pvers1[i] > pvers2[i]
-        }
-        pvers1.length > pvers2.length ? 1 : -1
-    end
-end
-
-
 module AutoRegisteredArtifact
     @arts_classes = []
 
@@ -653,7 +629,7 @@ class Artifact
         end
 
         # if artifact name has not been passed let's try to use default one
-        args = [ instance.class.default_name ] if args.length == 0 && !instance.class.default_name.nil?
+        args = [ instance.class.default_name ] if (args[0] == nil || args.length == 0) && !instance.class.default_name.nil?
 
         instance.send(:initialize, *args, &block)
         return instance_proxy
@@ -724,14 +700,14 @@ class Artifact
         @requires ||= []
         req = @requires
 
-        # artifacts have to be unique by names
+        # artifacts have to be unique by its names
         req = req.reverse.uniq { | e |
             art = e[0]
             if art.kind_of?(Artifact)
                 art.name
             elsif art.kind_of?(Class)
                 if art < EnvArtifact  # only one environment of the given type can be required
-                    art.name
+                    art.name # class name
                 else
                     art.default_name
                 end
@@ -762,7 +738,7 @@ class Artifact
     def REQUIRE(art, &block)
         raise 'No dependencies have been specified' if art.nil?
         @requires ||= []
-        @requires.push([art, nil, nil, block])
+        @requires.push([art, nil, false, block])
         return AssignRequiredTo.new(@requires[-1])
     end
 
@@ -856,7 +832,6 @@ class ArtifactTree < Artifact
             raise 'Artifact cannot be nil' if art.nil?
 
             p = parent.nil? ? Project : parent.art.owner
-
             if !art.kind_of?(Artifact)
                 art = p.artifact(art, &block)
             elsif !block.nil?
@@ -931,7 +906,7 @@ class ArtifactTree < Artifact
             # been excluded from the tree
 
             # has to be placed before recursive build tree method call
-            node.art.owner = root.art.owner if is_own == true
+            node.art.owner = root.art.owner  if is_own == true
 
             if node.art.class < AssignableDependency
                 # call special method that is declared with AssignableDependency module
@@ -948,9 +923,6 @@ class ArtifactTree < Artifact
                     found = av.detect { | art | node.art.object_id == art.object_id }
 
                     if found.nil?
-
-                        puts "Assign #{node.art.object_id}:#{node.art.class}:#{node.art.name} to #{root.art.object_id}:#{root.art.class}.#{asn}"
-
                         av.push(node.art)
                         root.art.instance_variable_set(asn, av)
                     end
@@ -1030,7 +1002,7 @@ class FileArtifact < Artifact
                 home = owner.homedir
                 if Pathname.new(home).absolute?
                     home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
-                    return home if _contains_path?(home, @name)
+                    return home #if _contains_path?(home, @name)
                 end
             end
 
@@ -1068,7 +1040,8 @@ class FileArtifact < Artifact
     end
 
     def fullpath(path = @name)
-        return path if path.start_with?('.env/')
+       # TODO: have no idea if the commented code will have a side effect !
+       # return path if path.start_with?('.env/')
 
         if path == @name
             return path if @is_absolute
@@ -1083,7 +1056,7 @@ class FileArtifact < Artifact
                 raise "Path '#{path}' cannot be relative to '#{home}'" unless _contains_path?(home, path)
                 return path
             else
-                File.join(home, path.to_s)
+                return File.join(home, path.to_s)
             end
         end
     end
@@ -1092,10 +1065,12 @@ class FileArtifact < Artifact
     def match(path)
         raise 'Invalid empty or nil path' if path.nil? || path.length == 0
 
-        # current directory
+        # current directory always match
         return true if path == '.'
 
-        mi = path.index(/[\[\]\?\*\{\}]/)
+        mi = path.index(/[\[\]\?\*\{\}]/) # test if the path contains mask
+
+        # cut mask part if it has been detected in the path
         unless mi.nil?
             pp   = path.dup
             path = path[0, mi]
@@ -1106,6 +1081,7 @@ class FileArtifact < Artifact
         home  = Pathname.new(homedir)
         raise "Home '#{home}' is not an absolute path" if path.absolute? && !home.absolute?
 
+        # any relative path is considered as a not matched path
         return false if !path.absolute? && home.absolute?
         return _contains_path?(home.to_s, path.to_s)
     end
@@ -1153,7 +1129,16 @@ class FileArtifact < Artifact
         return nil
     end
 
-    def self.cpdir(src, dest, em=nil)
+    def self.cpfile(src, dest)
+        self.testdir(dest)
+        raise "Source '#{src}' file doesn't exist" unless File.exists?(src)
+        raise "Source '#{src}' file cannot be dir" if File.directory?(src)
+        raise "Destination '#{dest}' cannot be file" if File.file?(dest)
+        FileUtils.mkdir_p(dest) unless File.exists?(dest)
+        FileUtils.cp(src, dest)
+    end
+
+    def self.cpdir(src, dest, em = nil)
         self.testdir(src) && self.testdir(dest)
 
         Dir.foreach(src) { |path|
@@ -1439,18 +1424,22 @@ module ArtifactContainer
 
         # fund local info about the given artifact
         meta = find_meta(artname)
-
         if meta.nil?
-            # meta cannot be locally found try to delegate search to owner container
-            # if owner exists and artifact name doesn't identify environment artifact
             unless owner.nil?
-                unless artname.env_path?
-                    return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
-                end
+                # puts "Container '#{@name}' delegate '#{artname.path}' to owner"
+                # if !artname.path.nil? && artname.path.start_with?('../')
+                #     return owner.artifact(artname.path_up(), &block)
+                # end
+
+                # meta cannot be locally found try to delegate search to owner container
+                # if owner exists and artifact name doesn't identify environment artifact
+                #unless artname.env_path?
+                    # puts "artname.path.nil? = #{artname.path.nil?} !match('#{homedir}', '#{artname.path}') = #{!match(artname.path)}"
+                    # return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
+                #end
             end
 
             meta = _meta_from_owner(name)
-
             unless meta.nil?
                 # attempt to handle situation when an artifact meta the container has been
                 # created is going to be applied to artifact creation. It can indicate we
@@ -1781,3 +1770,5 @@ class GroupByExtension < FileMask
         }
     end
 end
+
+

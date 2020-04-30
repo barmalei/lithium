@@ -13,7 +13,8 @@ class JavaCheckStyle < FileMask
         super
         @checkstyle_home = File.join($lithium_code, 'tools', 'java', 'checkstyle')  unless @checkstyle_home
         raise "Checkstyle home '#{@checkstyle_home}' is incorrect"                  unless File.directory?(@checkstyle_home)
-        @checkstyle_config = "#{@checkstyle_home}/jnet.xml"                         unless @checkstyle_config
+
+        @checkstyle_config = File.join(@checkstyle_home, "default.xml")             unless @checkstyle_config
         raise "Checkstyle config '#{@checkstyle_config}' cannot be found"           unless File.exists?(@checkstyle_config)
 
         puts "Checkstyle home  : '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
@@ -30,6 +31,13 @@ class JavaCheckStyle < FileMask
     def what_it_does() "Check '#{@name}' java code style" end
 
     def self.abbr() 'CHS' end
+end
+
+class UnusedJavaCheckStyle < JavaCheckStyle
+    def initialize(*args)
+        super
+        @checkstyle_config = File.join(@checkstyle_home, "unused.xml")
+    end
 end
 
 #  PMD code analyzer
@@ -49,10 +57,14 @@ class PMD < FileMask
     def build_item(path, mt)
         fp = fullpath(path)
         raise "PMD target '#{fp}' cannot be found" unless File.exists?(fp)
-        raise "PMD failed for '#{fp}'" if Artifact.exec(File.join(@pmd_path, 'bin', @pmd_cmd),
-                                                        'pmd', '-d', "\"#{fp}\"",
-                                                        '-format', @pmd_format,
-                                                        '-R', @pmd_rules) != 0
+
+        status = Artifact.exec(File.join(@pmd_path, 'bin', @pmd_cmd),
+                            'pmd', '-d', "\"#{fp}\"",
+                            '-format', @pmd_format,
+                            '-R', @pmd_rules)
+
+        ecode = status.exitstatus
+        raise "PMD failed for '#{fp}' code = #{ecode}" if ecode != 0 && ecode != 4
     end
 
     def what_it_does() "Validate '#{@name}' code applying PMD:#{@pmd_rules}" end

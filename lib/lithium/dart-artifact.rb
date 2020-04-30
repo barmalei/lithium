@@ -4,10 +4,8 @@ require 'lithium/core'
 require 'lithium/file-artifact/command'
 require 'lithium/misc-artifact'
 
-#
-# Python home
-#
-class PYTHON < EnvArtifact
+# DART
+class DART < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
@@ -56,14 +54,12 @@ class PYTHON < EnvArtifact
     def what_it_does() "Initialize python environment '#{@name}'" end
 end
 
-#
-#  Run python
-#
-class RunPythonScript < FileCommand
+#  Run dart
+class RunDartCode < FileCommand
     include OptionsSupport
 
     def initialize(*args)
-        REQUIRE PYTHON
+        REQUIRE DART
         OPT '-u'
         super
     end
@@ -78,17 +74,8 @@ class RunPythonScript < FileCommand
     def self.abbr() 'RPS' end
 end
 
-class RunPythonString < StringRunner
-    def initialize(*args)
-        REQUIRE PYTHON
-        super
-    end
 
-    def cmd() [ @python.python,  '-' ] end
-end
-
-
-class ValidatePythonCode < FileMask
+class LintDartCode < FileMask
     include OptionsSupport
 
     def build_item(path, mt)
@@ -96,20 +83,3 @@ class ValidatePythonCode < FileMask
     end
 end
 
-class ValidatePythonScript < FileCommand
-    def build() raise 'Validation failed' unless ValidatePythonScript.validate(fullpath) end
-    def what_it_does() "Validate '#{@name}' script" end
-
-    def self.validate(path)
-script = "
-import py_compile, sys\n
-
-try:\n
-    py_compile.compile('#{path}', doraise=True)\n
-except py_compile.PyCompileError:\n
-    print sys.exc_info()[1]\n
-    exit(1)
-"
-        exec "python", "-c", "\"#{script}\""
-    end
-end

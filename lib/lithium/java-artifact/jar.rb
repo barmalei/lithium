@@ -77,7 +77,7 @@ class FindInZip < FileMask
         puts_warning "No a class whose name matches '#{@pattern}' was found" if c == 0
     end
 
-    def FindInZip.find_width_jar(jar, jar_path, match)
+    def FindInZip.find_with_jar(jar, jar_path, match)
         `#{jar} -ft '#{jar_path}'`.each_line { |item|
             yield item.chomp unless item.chomp.index(match).nil?
         }

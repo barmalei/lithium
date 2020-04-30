@@ -19,9 +19,9 @@ Predefined classifiers:
 Options:
   -std=[none|sublime] - std out mode
   -v=[0,1,2] - verbosity level 
-  -i:p=propertyName1[,propertyNameN] - inspect property
-  -i:m=methodName1[,methodNameN] - inspect method
-
+  -basedir=<path> - custom project home directory
+  -i:p=[@]name1[.[@]nameN][,[@]name1[.[@]nameN]] - inspect property
+  
 Samples:
     lithium compile:src/**/*.java  
     lithium run:lib/test.py 

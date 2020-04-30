@@ -80,8 +80,8 @@ class PomFile < PermanentFile
         REQUIRE MVN
         name = args.length > 0 && !args[0].nil? ? args[0] : homedir
         fp   = fullpath(name)
-        pom = FileArtifact.look_file_up(fp, 'pom.xml', homedir)
-        raise "POM cannot be detetced by '#{fp}' path" if pom.nil?
+        pom  = FileArtifact.look_file_up(fp, 'pom.xml', homedir)
+        raise "POM cannot be detected by '#{fp}' path" if pom.nil?
         super(pom, &block)
     end
 
@@ -102,7 +102,11 @@ class MavenClasspath < InFileClasspath
 
     log_attr :excludeGroupIds, :excludeTransitive
 
+    default_name(".li_maven_class_path")
+
     def initialize(*args, &block)
+        puts "homedir = #{homedir}, #{owner} "
+
         REQUIRE MVN
         @excludeTransitive = false
         super(*args, &block)
@@ -112,16 +116,18 @@ class MavenClasspath < InFileClasspath
 
     def build()
         Dir.chdir(File.dirname(@pom.fullpath))
-        raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(@mvn.mvn,
-                                                                       "dependency:build-classpath",
-                                                                       "-DexcludeTransitive=#{@excludeTransitive}",
-                                                                       @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
-                                                                       "-Dmdep.outputFile=#{fullpath}")
+        raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
+            @mvn.mvn,
+            "dependency:build-classpath",
+            "-DexcludeTransitive=#{@excludeTransitive}",
+            @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
+            "-Dmdep.outputFile=\"#{fullpath}\""
+        )
         super
     end
 
     def what_it_does()
-        "Build maven classpath by '#{@pom.fullpath}' in '#{fp}'"
+#        "Build maven classpath by '#{@pom.fullpath}' in '#{fullpath}'"
     end
 end
 
@@ -193,6 +199,13 @@ class RunMaven < PomFile
     def self.abbr() 'RMV' end
 end
 
+class RunMavenTest < RunMaven
+    def initialize(name, &block)
+        super
+        TARGETS('test')
+    end
+end
+
 class MavenCompiler < RunMaven
     def initialize(*args)
         super
@@ -214,3 +227,4 @@ class MavenCompiler < RunMaven
         }
     end
 end
+
