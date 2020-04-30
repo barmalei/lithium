@@ -25,7 +25,7 @@
 
     {
         "keys": ["super+shift+b"],
-        "command": "li_show_paths"
+        "command": "li_show_locations"
     },
 
     {
@@ -45,18 +45,30 @@
         "command": "li_show_doc",
         "args": { "type" : "dash"}
     },
+
     {
         "keys": [ "f10" ],
-        "command": "li_go",
+        "command": "li_go_to_location",
         "context": [
             { "key": "selector", "operator": "equal", "operand": "source.lithium" }
         ]
     },
 
     {
-        "keys": [ "ctrl+i" ],
-        "command": "li_show_classes",
-        "args"   : { "auto_apply": true, "pattern": "import %s;" }
-    }
+        "keys": [ "alt+super+enter" ],
+        "command": "li",
+        "args" : { "command": "check:{file}" }
+    },
 
+    {
+        "keys": [ "ctrl+i" ],
+        "command": "li_complete_import",
+        "args"   : { "auto_apply": true }
+    },
+
+    {
+        "keys": [ "ctrl+shift+i" ],
+        "args": { "inline": true },
+        "command": "li_complete_import"
+    }
 ]

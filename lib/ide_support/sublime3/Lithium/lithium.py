@@ -1,22 +1,24 @@
 import sublime, sublime_plugin
 
 import subprocess, threading
-import os, io, platform, json, re
+import os, io, platform, json, re, sys
 import webbrowser
+from itertools import groupby
+
+from datetime import datetime
 
 from   urllib.request import urlopen
 from   urllib.parse   import quote
 
 # in-line settings
 settings = {
-    'path'          : "lithium",
-    'li_opts'       : "-verbosity=2",
+    'path'          : "ruby /Users/brigadir/projects/.lithium/lib/lithium.rb",
+    'li_opts'       : { "verbosity" : "2",  "std": "SublimeStd"},
     'output_panel'  : "lithium",
     'output_font_size'  : 11,
     'debug'         : False,
-    'std_formatter' : "SublimeStd",
     'output_syntax' : 'Packages/Lithium/lithium.tmLanguage',
-    'place_detector': [
+    'place_detectors': [
         r"\[\[([^\[\]\(\)\{\}\?\!\<\>\^\,\~\`]+)\:([0-9]+)\]\][\:]*(.*)"
     ],
 
@@ -140,15 +142,18 @@ def  li_view_to_s(view):
         wid = win.id()
     return "view [ id = " + str(view.id()) + ", name = '" + view.name() + "', winid = " + str(wid) + ", path = " + name + "]"
 
-# detect lithium project home folder by looking lithium folder up
-def detect_li_project_home(pt):
+# Detect lithium project home folder by looking lithium folder up
+# Input: pt is initial path
+# Input: folder_name a folder name to be detected
+# Output: folder that contains folder_name
+def li_detect_host_folder(pt, folder_name = ".lithium"):
     if pt != None and os.path.abspath(pt) and os.path.exists(pt):
         if os.path.isfile(pt):
             pt = os.path.dirname(pt)
 
         cnt = 0
         while pt != "/" and pt != None and cnt < 100:
-            if os.path.exists(os.path.join(pt, ".lithium")):
+            if os.path.exists(os.path.join(pt, folder_name)):
                 return pt
             else:
                 pt = os.path.dirname(pt)
@@ -156,17 +161,32 @@ def detect_li_project_home(pt):
 
     return None
 
-#
-# return array that contains list of detected files and lines in the files:
-# [ [path, lineNumber ], ...  ]
-def li_paths_by_output(view):
+# Return lithium output view.
+# Output: lithium output view
+def li_output_view():
+    return sublime.active_window().find_output_panel(settings.get('output_panel'))
+
+# Append text to output view
+# Input: text, view (optional)
+def li_append_output_view(text, view = None):
+    if view is None:
+        view = li_output_view()
+    view.run_command('append', { 'characters' :  text, 'force': True, 'scroll_to_end': True })
+
+# Parse output view text to detect locations tuples in.
+# Input : view
+# Output: [ (filename, line, description), ... ]
+def li_parse_output_view(view = None):
     if li_is_debug():
-        print("li_paths_by_output() >> ")
+        print("li_parse_output_view() >> ")
+
+    if view is None:
+        view = li_output_view()
 
     paths = []
     delim = "<!<*>!>"
-    place_detector = settings.get('place_detector')
-    for r in place_detector:
+    place_detectors = settings.get('place_detectors')
+    for r in place_detectors:
         res = []
         view.find_all(r, sublime.IGNORECASE, "\\1" + delim + "\\2" + delim + "\\3", res)
         for p in res:
@@ -177,87 +197,105 @@ def li_paths_by_output(view):
             ms = e[2].strip() # message
 
             if li_is_debug():
-                print("li_paths_by_output() Detected fn = '" + e[0].strip() + "', line = " + e[1])
+                print("li_parse_output_view() Detected fn = '" + e[0].strip() + "', line = " + e[1])
 
             paths.append([ fn, ln, ms ])
 
     if li_is_debug():
-        print("li_paths_by_output() res = " + str(paths))
-        print("li_paths_by_output() << ")
+        print("li_parse_output_view() res = " + str(paths))
+        print("li_parse_output_view() << ")
 
     return paths
 
-def li_path_by_region(view, region):
-    if region == None:
+# Parse output text to detect locations tuples in.
+# Input: text
+# Output:  [ (filename, line, description), ... ]
+def li_parse_output(text):
+    place_detectors = settings.get('place_detectors')
+    paths = []
+    for r in place_detectors:
+        res = re.findall(r, text) # array of (file, line, desc) tuples are expected
+        for path in res:
+            paths.append(path)
+    return paths
+
+# Detect place(s) by output view region
+def li_parse_output_region(view, region):
+    if view is None:
+        view = li_output_view()
+
+    if region is None:
         return None
-    n = view.scope_name(region.a)
-    path = [None, "-1"]
-    if n:
-        n = n.strip()
-        if n == u'source.lithium li.path li.path.name':
-            nr = view.extract_scope(region.a)
-            path[0] = view.substr(nr)
-            path[1] = view.substr(view.extract_scope(nr.b + 2))
-        elif n == u'source.lithium li.path li.path.line':
-            nr = view.extract_scope(region.a)
-            path[1] = view.substr(nr)
-            path[0] = view.substr(view.extract_scope(nr.a - 2))
-    if path[0] == None:
-        return None
-    return path
+    else:
+        line   = view.substr(view.line(region))
+        places = li_parse_output(line)
 
-def li_show_paths(view, win=None):
-    if li_is_debug():
-        print("li_show_paths() : Show paths : " + li_view_to_s(view))
+        if li_is_debug():
+            print("li_parse_output_region(): detected places = %s" % str(places))
 
-    if view != None:
-        if win == None:
-            win = sublime.active_window()
+        return places
 
-        paths = li_paths_by_output(view)
-        l     = len(paths)
+# Show items
+# Input: array of items
+def li_show_items(items, done = None):
+    l = len(items)
+    if l > 0:
+        if li_is_debug():
+            print("li_show_items() : number of items to be shown: " + str(l))
+            for i in range(l):
+                item = items[i]
+                print("li_show_items() : item[" + str(i) + "] = " + str(item))
 
-        if l > 0:
-            if li_is_debug():
-                print("li_show_paths() : number of paths found : " + str(l))
-                for i in range(l):
-                    path = paths[i]
-                    print("li_show_paths() : path[" + str(i) + "] = " + path[0])
+        sublime.active_window().show_quick_panel(items, done)
+    else:
+        if li_is_debug():
+            print("li_show_items() : No items have been passed")
 
-            def done(i):
-                if i >= 0:
-                    win.open_file(paths[i][0] + ":" + paths[i][1], sublime.ENCODED_POSITION)
+# show textual message
+def li_show_message(msg):
+    sublime.message_dialog(msg)
 
-            win.show_quick_panel([ [ v[0] + ":" + v[1], v[2]] for v in paths], done)
-        else:
-            if li_is_debug():
-                print("li_show_paths() : No paths have been found")
-
-def LI_HOME():
+# Detect project home directory
+def li_project_home():
     active_view = sublime.active_window().active_view()
 
-    li_home = None
+    home = None
     if active_view.file_name() != None:
-        li_home = detect_li_project_home(active_view.file_name())
-    if li_home == None:
+        home = li_detect_host_folder(active_view.file_name())
+
+    if home is None:
         folders = active_view.window().folders()
         if len(folders) > 0:
             for folder in folders:
-                li_home = detect_li_project_home(folder)
-                if li_home != None:
+                home = li_detect_host_folder(folder)
+                if home != None:
                     break
-    return li_home
 
-
-def EXEC_LI(command, handler, error_handler, async = True):
-    panel         = LI_PANEL()
-    script_path   = settings.get("path")
-    std_formatter = settings.get("std_formatter")
+    if home is not None:
+        home = os.path.realpath(home) # resolve sym link to real path
 
     if li_is_debug():
-        print("liCommand.run(): subprocess.Popen = " + script_path + " -std=" + std_formatter + " " + command)
+        print("li_project_home(): detected home '%s'" % home)
 
-    process = subprocess.Popen(script_path + " -std=" + std_formatter + " " + settings.get("li_opts") + " " + command,
+    return home
+
+# Run lithium command
+def li_run(command, output_handler = None, error_handler = None, run_async = True, options = None):
+    script_path = settings.get("path")
+
+    if options is None:
+        options = dict(settings.get("li_opts")) # ctreate a copy of the object
+
+    if 'basedir' not in options:
+        options['basedir'] = li_project_home()
+
+    options_str = ' '.join("-{!s}={!r}".format(key, val) for (key, val) in options.items())
+
+    if li_is_debug():
+        print("liCommand.run(): subprocess.Popen = " + script_path + ", opts = " + options_str + ", command = " + command)
+
+    # Python 3.3
+    process = subprocess.Popen(script_path + " " + options_str  + " " + command ,
                                shell  = True,
                                stdin  = subprocess.PIPE,
                                stdout = subprocess.PIPE,
@@ -265,45 +303,63 @@ def EXEC_LI(command, handler, error_handler, async = True):
                                universal_newlines = False,
                                bufsize = 0)
 
+    # TODO: re-work to python 3.8
+    # process = subprocess.run( [script_path , options_str, command],
+    #                            shell  = True,
+    #                            capture_output = False,
+    #                            stdin  = subprocess.PIPE,
+    #                            stdout = subprocess.PIPE,
+    #                            stderr = subprocess.STDOUT,
+    #                            encoding ='utf-8'.
+    #                            universal_newlines = False,
+    #                            bufsize = 0)
+
     # show lithium output panel
+    # TODO: ???
     sublime.active_window().run_command("show_panel", { "panel": "output.lithium" })
 
-    if async:
-        def WRITES(process, panel, handler, error_handler):
+    if run_async:
+        def WRITES(process, output_handler, error_handler):
             try:
                 for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
-                    panel.run_command('append', { 'characters' :  line, 'force': True, 'scroll_to_end': True })
-                    handler(process, panel, line)
+                    if output_handler is not None:
+                        output_handler(process, line)
 
                 # tell the last line has been handled
                 process.stdout.close()
-                handler(process, panel, None)
+                if output_handler is not None:
+                    output_handler(process, None)
             except Exception as ex:
                 print(ex)
-                error_handler(command, ex)
-
+                if error_handler is not None:
+                    error_handler(command, ex)
 
         threading.Thread(
             target = WRITES,
-            args   = (process, panel, handler, error_handler)
+            args   = (process, output_handler, error_handler)
         ).start()
     else:
         while True:
             data = process.stdout.read().decode('utf-8')
             try:
-                panel.run_command('append', { 'characters' :  data, 'force': True, 'scroll_to_end': True })
+                # TODO: ???
+                # if panel is not None:
+                #     panel.run_command('append', { 'characters' :  data, 'force': True, 'scroll_to_end': True })
 
-                for line in data.split("\n"):
-                    handler(process, panel, line)
+                if output_handler is not None:
+                    for line in data.split("\n"):
+                        output_handler(process, line)
 
                 if process.poll() is not None:
                     # notify the process has been completed
-                    handler(process, panel, None)
+                    if output_handler is not None:
+                        output_handler(process, None)
                     break
             except Exception as ex:
                 print(ex)
                 try:
-                    error_handler(command, ex)
+                    if error_handler is not None:
+                        output_error_handler(command, ex)
                 except Exception as ex2:
                     print(ex2)
                 break
@@ -311,7 +367,7 @@ def EXEC_LI(command, handler, error_handler, async = True):
     return process
 
 
-def LI_PANEL():
+def li_init_output_view():
     name  = settings.get('output_panel')
     panel = sublime.active_window().create_output_panel(name)
     panel.settings().set("gutter", False)
@@ -322,7 +378,119 @@ def LI_PANEL():
     panel.set_scratch(True)
     panel.set_read_only(False)
     panel.set_syntax_file(settings.get('output_syntax'))
+
+    if li_is_debug():
+        print("li_init_output_view(): panel = " + str(panel))
+
     return panel
+
+# Collect imports
+# Output: [ [ region, "import <package>"], ... ]
+def java_collect_imports(view, syntax = 'java'):
+    # if syntax == 'java':
+    #     regions = view.find_by_selector("meta.import.java")
+    #     if regions is None or len(regions) == 0:
+    #         return None
+    #     else:
+    #         return [ [ region, re.sub("\s\s+" , " ", view.substr(region)).strip().strip(';') ] for region in regions ]
+    # else:
+    # this code probably will be required for other JVM languages since they may
+    # not define a specific scope name for import sections
+    region    = sublime.Region(0, view.size())
+    hold      = False
+    import_re = r"^import\s+(static\s+)?([^ :;\-]+)\s*"
+    imports   = []
+    for line_region in view.lines(region):
+        line = view.substr(line_region).strip()
+
+        if len(line) > 0:
+            if hold:
+                idx = line.find("*/")
+                if idx >= 0:
+                    hold = False
+                if (idx == 0):
+                    continue
+                line = line[0:idx]
+
+            if line.startswith("//"):
+                continue
+
+            if line.startswith("/*"):
+                hold = True
+                continue
+
+            mt = re.match(import_re, line)
+            if mt is not None:
+                static_str = mt.group(1)
+                if static_str is not None:
+                    imports.append([ line_region, "import static %s" % mt.group(2) ])
+                else:
+                    imports.append([ line_region, "import %s" % mt.group(2) ])
+            else:
+                if not line.startswith("package"):
+                    break
+
+    if len(imports) > 0:
+        return imports
+    else:
+        return None
+
+# output: [ [ String:import, int:line ] ]
+def java_detect_unused_imports(view):
+    try:
+        paths = []
+        def collect(process, line):
+            if line is not None:
+                res = li_parse_output(line)
+                for r in res:
+                    paths.append(r)
+
+        li_run("UnusedJavaCheckStyle:\"%s\" " % view.file_name(), collect, None, False)
+
+        if li_is_debug():
+            print("java_detect_unused_imports(): detected paths %s" % str(paths))
+
+        re_unused_import = r"\s+([^;:,?!!%^&()|+=></-]+)\s+\[UnusedImports\]$"
+        res = []
+        for path in paths:
+            match = re.search(re_unused_import, path[2])
+            if match is not None:
+               res.append([ match.group(1), int(path[1]) ])
+
+        if li_is_debug():
+            print("java_detect_unused_imports(): detected unused imports %s" % str(res))
+
+        return res
+    except Exception as ex:
+        sublime.error_message("Lithium command execution has failed('%s')" % ((ex),))
+
+
+def java_collect_methods(view, symbol):
+    imports = java_collect_imports(view)
+    detected_package = [ x[1] for x in imports if x[1].endswith("." + symbol)]
+    if len(detected_package) > 0:
+        symbol = detected_package[0].split(' ')[1]
+
+    methods = []
+    def output(process, line):
+        if line is not None:
+            print(line)
+        if line is not None:
+            mt = re.search(r'\{([^\{\}]+)\}', line)
+            if mt is not None:
+                method   = mt.group(1).strip()
+                th_index = method.find(' throws ')
+                # if th_index > 0:
+                #     methods.append(method[0:th_index] + "\n" + method[th_index:])
+                # else:
+                methods.append( method )
+
+    def error(process, err):
+        print("Unexpected error")
+        print(err)
+
+    li_run("ShowClassMethods:%s" % symbol, output, error, False, { "std": "none" })
+    return methods
 
 class liCommand(sublime_plugin.WindowCommand):
     #panel_lock = threading.Lock()
@@ -335,7 +503,7 @@ class liCommand(sublime_plugin.WindowCommand):
 
     def run(self, **args):
         if self.process is not None:
-            print("Terminating process")
+            print("liCommand(): terminating process")
             self.process.terminate()
             return
 
@@ -356,11 +524,11 @@ class liCommand(sublime_plugin.WindowCommand):
             print("liCommand.run(): command = " + command + "," + li_view_to_s(active_view))
 
         # detect home folder
-        li_home = LI_HOME()
+        li_home = li_project_home()
 
         # collect place holders values in dictionary
         placeholders = {}
-        if li_home == None:
+        if li_home is None:
             if li_is_debug():
                 print("liCommand.run(): project home directory cannot be detected")
         else:
@@ -377,8 +545,16 @@ class liCommand(sublime_plugin.WindowCommand):
             fn = active_view.file_name()
             # wrap with quotas path that contains spaces
             if fn[0] != "\"" and fn.find(" ") > 0:
-                fn = "\"" + fn + "\""
-            placeholders['file'] = fn
+                placeholders['file'] = "\"" + fn + "\""
+            else:
+                placeholders['file'] = fn
+
+            if fn is not None and os.path.exists(fn):
+                src_folder = li_detect_host_folder(fn, 'src')
+                if src_folder is None:
+                    placeholders['src_home'] = os.path.join(fn, 'src')
+                else:
+                    placeholders['src_home'] = os.path.join(src_folder, 'src')
 
         # apply placeholders to command line
         try:
@@ -387,7 +563,8 @@ class liCommand(sublime_plugin.WindowCommand):
             sublime.error_message("Lithium command '%s' cannot be interpolated with %s" % (command, str(placeholders)))
 
         try:
-            self.process = EXEC_LI(command, self.output, self.error)
+            self.panel   = li_init_output_view()
+            self.process = li_run(command, self.output, self.error)
         except Exception as ex:
             self.process = None
             sublime.error_message("Lithium '%s' command execution has failed('%s')" % (command, str(ex)))
@@ -395,9 +572,13 @@ class liCommand(sublime_plugin.WindowCommand):
     def error(self, command, err):
         sublime.error_message("Lithium '%s' command execution failed: ('%s')" % (command, str(err)))
 
-    def output(self, process, panel, line):
+    def output(self, process, line):
         if line is None:
             self.process = None
+            self.panel = None
+        else:
+            li_append_output_view(line, self.panel)
+
         #else:
             # regions = panel.find_by_selector("li.exception")
             # if len(regions) == 0:
@@ -407,44 +588,113 @@ class liCommand(sublime_plugin.WindowCommand):
             #else:
                 #panel.show_at_center(panel.size())
 
-class liPrintScopeCommand(sublime_plugin.TextCommand):
-    def run(self, edit):
-        v = sublime.active_window().active_view()
-        n = v.scope_name(v.sel()[0].a)
-        print("Scope: " + n)
-
-
-class liShowClassesCommand(sublime_plugin.TextCommand):
-    found_items = []
-    edit        = None
-    region      = None
-
-    def is_enabled(self):
-        syntax = self.syntax()
-        return syntax == 'kotlin' or syntax == 'java' or syntax == 'scala' or syntax == 'groovy'
-
+class liTextCommand(sublime_plugin.TextCommand):
     def syntax(self):
         syntax = os.path.basename(self.view.settings().get('syntax'))
         syntax = os.path.splitext(syntax)[0]
         syntax = syntax.lower()
         return syntax
 
+    def is_enabled(self):
+        syntaxes = self.enabled_syntaxes()
+        if syntaxes is None or len(syntaxes) == 0:
+            return True
+
+        syn = self.syntax()
+        return syn is not None and syn in syntaxes
+
+    def enabled_syntaxes(self):
+        return None
+
+class  liJavaTextCommand(liTextCommand):
+    def enabled_syntaxes(self):
+        return ( 'kotlin', 'java', 'scala', 'groovy' )
+
+# the command kill comments in Java import sections
+class liSortImportsCommand(liJavaTextCommand):
     def run(self, edit, **args):
+        #  [ [Region, String:<import [static]? [package];>], ... ]
+        imports = java_collect_imports(self.view)
+
+        if imports is not None:
+            imports_str = ""
+            groups = self.group_imports(imports)
+
+            for index, group in enumerate(groups):
+                if index > 0:
+                    imports_str = imports_str + "\n\n"
+
+                import_items = [ x[1] for x in group ]
+                # for group_item in group
+                imports_str = imports_str + ";\n".join(import_items) + ";"
+
+            if len(imports_str) > 0:
+                # more gentle clean, but it preserves empty lines between imports
+                # for import_item in reversed(imports):
+                #     new_reg = self.view.line(import_item[0])
+                #     new_reg.b = new_reg.b + 1
+                #     self.view.erase(edit, new_reg)
+
+                a = imports[0][0].a
+                b = self.view.line(imports[len(imports) - 1][0]).b
+                self.view.replace(edit, sublime.Region(a, b), imports_str)
+
+    # input: [ [ Region, String ], ... ]
+    # output:[ [ group ], [ group ] ]  where group: [ region, String ], [ region, String ] ..,
+    def group_imports(self, imports): # return [ [], [], ... ] grouped by package prefix
+        imports = sorted(imports, key = lambda x : x[1])
+        groups  = []
+        for k, g in groupby(imports, lambda x : x[1][:x[1].rfind('.')] ):
+            groups.append(list(g))
+
+        return groups
+
+class liRemoveUnusedImportsCommand(liJavaTextCommand):
+    def run(self, edit, **args):
+        li_append_output_view("(I) [SUB]  %s: Remove un-used imports\n" % self.__class__.__name__)
+        # [ [ String:imp, int:line ] ]
+        imports = java_detect_unused_imports(self.view)
+
+        if imports is None or len(imports) == 0:
+            li_append_output_view("(W) [SUB]  %s: Un-used imports have not been detected\n" % self.__class__.__name__)
+
+        for imp in reversed(imports):
+            line = imp[1]
+            region = self.view.full_line((self.view.text_point(line - 1, 0)));
+            self.view.show(region)
+            self.view.erase(edit, region)
+            li_append_output_view("(W) [SUB]  %s: Remove unused import '%s' at line %i\n" % ( self.__class__.__name__, imp[0],line))
+
+class liValidateImportsCommand(liJavaTextCommand):
+    def run(self, edit, **args):
+        self.view.run_command("li_remove_unused_imports")
+        self.view.run_command("li_sort_imports")
+
+class liCompleteImportCommand(liJavaTextCommand):
+    found_items = []
+    edit        = None
+    region      = None
+    word        = None
+
+    def run(self, edit, **args):
+        li_append_output_view("(I) [SUB]  %s: Completing JAVA import\n" % self.__class__.__name__)
 
         regions = self.view.sel()
         if regions is not None and len(regions) == 1:
             word = None
             for region in regions:
                 self.region = self.view.word(region) # get extended to the current word region
-                word = self.view.substr(self.region)
+                self.word = self.view.substr(self.region)
 
-            if word is not None and len(word.strip()) > 1:
+            li_append_output_view("(I) [SUB]  %s: completing '%s' word\n" % (self.__class__.__name__,self.word))
+
+            if self.word is not None and len(self.word.strip()) > 1:
                 # detect home folder
-                li_home = LI_HOME()
+                li_home = li_project_home()
 
-                self.pattern = "%s"
-                if 'pattern' in args:
-                    self.pattern = args['pattern']
+                self.inline = False
+                if 'inline' in args:
+                    self.inline = args['inline']
 
                 self.auto_apply = False
                 if 'auto_apply' in args:
@@ -454,12 +704,13 @@ class liShowClassesCommand(sublime_plugin.TextCommand):
                 try:
                     self.found_items = []
                     self.edit        = edit
-                    self.process     = EXEC_LI("FindClassInClasspath:\"%s\" %s.class" % (li_home, word), self.output, self.error, False)
+                    self.process     = li_run("FindClassInClasspath:\"%s\" %s.class" % (li_home, self.word), self.output, self.error, False)
+
                 except Exception as ex:
                     self.process = None
                     sublime.error_message("Lithium command execution has failed('%s')" % ((ex),))
 
-    def output(self, process, panel, line):
+    def output(self, process, line):
         # None means end of LI process
         if line is not None:
             rx = r"\[(.*)\s*=>\s*(.*)\]"
@@ -472,47 +723,108 @@ class liShowClassesCommand(sublime_plugin.TextCommand):
         else:
             l = len(self.found_items)
             if l > 20:
-                sublime.message_dialog("To many variants (more than 20) have been found ")
+                sublime.message_dialog("To many variants (more than 20) have been found")
             elif l > 0:
                 if l == 1 and self.auto_apply:
-                    #print("Scope name: " + self.region.)
                     self.class_name_selected(0)
                 else:
                     self.found_items.sort(),
                     self.view.show_popup_menu(
                         self.found_items,
                         self.class_name_selected)
+            else:
+                li_append_output_view("(W) [SUB]  No class has been found for '%s' word" % self.word)
+                #sublime.message_dialog("Import '%s' is already declared" % item)
+
 
     def class_name_selected(self, index):
         if index >= 0:
-            item = self.found_items[index]
+            item    = self.found_items[index]
+            syntax  = self.syntax()
+            imports = java_collect_imports(self.view, syntax)
+            if imports is not None and next((x[1] for x in imports if x[1].endswith(item)), None) is not None:
+                li_append_output_view("(W) [SUB]  %s: Import '%s' is already declared\n" % (self.__class__.__name__,item))
+            else:
+                scopes = self.view.scope_name(self.region.begin()).strip().split(" ")
 
-            sn = self.view.scope_name(self.region.begin())
-            sn = sn.strip()
-            scopes = sn.split(" ")
+                if li_is_debug():
+                    print("liCompleteImportCommand.class_name_selected(): detected syntax '%s' " % syntax)
 
-            syntax = self.syntax()
-
-            print("SYN = " + syntax)
-            if syntax == 'java':
-                if len(scopes) == 2 and scopes.index('source.java') >= 0 and scopes.index('support.class.java') >= 0:
-                    item = 'import %s;' % item
-            elif syntax == 'kotlin':
-                if len(scopes) == 1 and scopes.index('source.Kotlin') >= 0:
-                    item = 'import %s' % item
-            elif syntax == 'scala':
-                if len(scopes) == 2 and scopes.index('source.scala') >= 0 and scopes.index('support.constant.scala') >= 0:
-                    item = 'import %s' % item
-            elif syntax == 'groovy':
-                if len(scopes) == 1 and scopes.index('source.groovy') >= 0:
-                    item = 'import %s' % item
-
-            self.view.replace(self.edit, self.region, item)
+                if self.inline:
+                    self.view.replace(self.edit, self.region, item)
+                else:
+                    if syntax == 'java':
+                        if imports is not None:
+                            self.view.insert(self.edit, imports[0][0].a, "import %s;\n" % item)
+                        elif len(scopes) == 2 and scopes.index('source.java') >= 0 and scopes.index('support.class.java') >= 0:
+                            self.view.replace(self.edit, self.region, 'import %s;' % item)
+                        else:
+                            self.view.replace(self.edit, self.region, item)
+                    elif syntax == 'kotlin':
+                        if imports is not None:
+                            self.view.insert(self.edit, imports[0][0].a, "import %s\n" % item)
+                        elif len(scopes) == 1 and scopes.index('source.Kotlin') >= 0:
+                            self.view.replace(self.edit, self.region, 'import %s' % item)
+                        else:
+                            self.view.replace(self.edit, self.region, item)
+                    elif syntax == 'scala':
+                        if imports is not None:
+                            self.view.insert(self.edit, imports[0][0].a, "import %s\n" % item)
+                        elif len(scopes) == 2 and scopes.index('source.scala') >= 0 and scopes.index('support.constant.scala') >= 0:
+                            self.view.replace(self.edit, self.region, 'import %s' % item)
+                        else:
+                            self.view.replace(self.edit, self.region, item)
+                    elif syntax == 'groovy':
+                        if len(scopes) == 1 and scopes.index('source.groovy') >= 0:
+                            self.view.replace(self.edit, self.region, 'import %s' % item)
+                        elif imports is not None:
+                            self.view.insert(self.edit, imports[0][0].a, "import %s\n" % item)
+                        else:
+                            self.view.replace(self.edit, self.region, item)
 
     def error(self, command, err):
         sublime.error_message("Lithium class detection has failed: ('%s')" % (str(err), ))
 
-# Pattern  InputStream
+class liShowClassMethodsCommand(liJavaTextCommand):
+    detected_methods = []
+    selected_method  = None
+
+    def run(self, edit, **args):
+        if "paste" in args:
+            regions = self.view.sel()
+            if len(regions) > 0:
+                region = regions[0]
+                word   = self.view.substr(self.view.word(region))
+                mt     = re.search(r"([a-zA-Z_][a-zA-Z0-9_]*\s*\([^()]*\))", self.selected_method)
+                self.view.insert(edit, region.a, mt.group(1))
+            else:
+                li_show_message("No region has been detected to place ")
+        else:
+            word   = None
+            for region in self.view.sel():
+                word = self.view.substr(self.view.word(region))
+                break
+
+            if word is not None and word != '':
+                self.detected_methods = []
+                self.selected_method = None
+
+                self.detected_methods = java_collect_methods(self.view, word)
+                if len(self.detected_methods) > 0:
+                    li_show_items(self.detected_methods, self.method_name_selected)
+                else:
+                    li_show_message("No method has been discovered for %s" % word)
+            else:
+                li_show_message("Nothing has been selected")
+
+    def method_name_selected(self, index):
+        if index >= 0:
+            self.selected_method = self.detected_methods[index]
+        else:
+            self.selected_method = None
+
+
+# Pattern  InputStr.aeam
 class liShowDocCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
         file_name, extension = os.path.splitext(self.view.file_name())
@@ -548,7 +860,7 @@ class liShowDocCommand(sublime_plugin.TextCommand):
         elif platform.system() == 'Linux':
             subprocess.call([ '/usr/bin/xdg-open', query ])
         else:
-            print("Call dash %s" % query)
+            print("liShowDocCommand(): Open dash %s" % query)
             subprocess.call([ '/usr/bin/open', '-g', query ])
 
     # fetch list of available links to an api doc for the given word  InputStream
@@ -592,40 +904,61 @@ class liShowDocCommand(sublime_plugin.TextCommand):
         else:
             self.view.set_status('apidoc', '%s search criteria is empty' % syntax)
 
-class liGoCommand(sublime_plugin.TextCommand):
+class liShowLocationsCommand(sublime_plugin.TextCommand):
+    locations = []
+
     def run(self, edit):
-        li_active_output_view = sublime.active_window().find_output_panel(settings.get('output_panel'))
+        self.locations = li_parse_output_view()
+
+        if len(self.locations) > 0:
+            locs = [ ["%s:%s" % (location[0], location[1]), location[2]] for location in self.locations ]
+            li_show_items(locs, self.done)
+        else:
+            li_show_message("No locations have been detected ")
+
+    def done(self, i):
+        if i >= 0:
+            self.go_to_location(self.locations[i])
+
+    def go_to_location(self, loc):
+        if loc is not None:
+            win = sublime.active_window()
+            win.open_file(loc[0] + ":" + loc[1], sublime.ENCODED_POSITION)
+        else:
+            li_show_message("No location has been passed")
+
+
+class liGoToLocationCommand(liShowLocationsCommand):
+    def run(self, edit):
+        output_view = li_output_view()
 
         if li_is_debug():
-            print("liGoCommand.run() : GO to text command : " + li_view_to_s(li_active_output_view))
+            print("liGoToLocationCommand.run() : GO to text command : " + li_view_to_s(output_view))
 
-        if li_active_output_view is not None:
+        if output_view is not None:
             if li_is_debug():
-                print("liGoCommand.run(): found active output : " + li_view_to_s(li_active_output_view))
+                print("liGoToLocationCommand.run(): found active output : " + li_view_to_s(output_view))
 
-            rset = li_active_output_view.sel()
+            rset = output_view.sel()
             if len(rset) > 0:
-                p = li_path_by_region(li_active_output_view, rset[0])
-                if p == None:
+                p = li_parse_output_region(output_view, rset[0])
+                if p == None or len(p) == 0:
                     if li_is_debug():
-                        print("liGoCommand.run() : No path to go was found")
-                    li_show_paths(li_active_output_view)
+                        print("liGoToLocationCommand.run() : Path to go could not be detected")
+
+                    super().run(edit)
                 else:
                     if li_is_debug():
-                        print("liGoCommand.run() : Path to go was found " + p[0])
-                    view = li_active_output_view.window().open_file(p[0] + ":" + p[1], sublime.ENCODED_POSITION)
-                    li_active_output_view.window().focus_view(view)
+                        print("liGoToLocationCommand.run() : Path to go was found " + str(p))
+
+                    self.go_to_location(p[0])
+                    output_view.window().focus_view(view)
         else:
-            # global li_output_view
             if li_is_debug():
-                print("liGoCommand.run() : No active view was found")
+                print("liGoToLocationCommand.run() : No active view was found")
 
-class liShowPathsCommand(sublime_plugin.TextCommand):
-    def run(self, edit):
-        li_active_output_view = sublime.active_window().find_output_panel(settings.get('output_panel'))
 
-        if li_is_debug():
-            print("liShowPathsCommand.run() : Show paths : " + li_view_to_s(li_active_output_view))
 
-        if li_active_output_view is not None:
-            li_show_paths(li_active_output_view)
+
+
+

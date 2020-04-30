@@ -1,25 +1,25 @@
-{ 
+{
   "name": "lithium",
   "scopeName": "source.lithium",
   "fileTypes": ["lithium"],
   "patterns": [
         {
-          "match": "\\(INF\\)[ ]+Z",
+          "match": "\\(I\\)",
           "name": "li.info",
           "comment": " "
         },
         {
-          "match": "\\(WAR\\)[ ]+\\!",
+          "match": "\\(W\\)[ ]+[ ]\\[",
           "name": "li.warning",
           "comment": " "
         },
         {
-          "match": "\\(EXC\\)[ ]+\\?",
+          "match": "\\(X\\)[ ]+[ ]\\[",
           "name": "li.exception",
           "comment": " "
         },
         {
-          "match": "\\(ERR\\)[ ]+\\?",
+          "match": "\\(E\\)[ ]+[ ]\\[",
           "name": "li.error",
           "comment": " "
         },

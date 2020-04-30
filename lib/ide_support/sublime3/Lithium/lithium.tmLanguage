@@ -14,7 +14,7 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>^(\(INF\)[ ]+Z)|(\[INFO\][ ]*)</string>
+			<string>^\(I\)[ ]+\[[a-zA-Z_]+\]|(\[INFO\][ ]*)</string>
 			<key>name</key>
 			<string>li.info</string>
 		</dict>
@@ -23,7 +23,7 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>^\(WAR\)[ ]+\!|(\[WARNING\][ ]*)</string>
+			<string>^\(W\)[ ]+\[[a-zA-Z_]+\]|(\[WARNING\][ ]*)</string>
 			<key>name</key>
 			<string>li.warning</string>
 		</dict>
@@ -31,7 +31,7 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>^\(EXC\)[ ]+\?</string>
+			<string>^\(X\)[ ]+\[[a-zA-Z_]+\]</string>
 			<key>name</key>
 			<string>li.exception</string>
 		</dict>
@@ -39,7 +39,7 @@
 			<key>comment</key>
 			<string> </string>
 			<key>match</key>
-			<string>^\(ERR\)[ ]+\?|(\[ERROR\][ ]*)</string>
+			<string>^\(E\)[ ]+\[[a-zA-Z_]+\]|(\[ERROR\][ ]*)</string>
 			<key>name</key>
 			<string>li.error</string>
 		</dict>
