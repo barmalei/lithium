@@ -288,23 +288,3 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
 
     puts "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact}' has been done"
 end
-
-
-st = StdPattern.new() {
-        num(); dot(); spaces(); group(:message, 'WARNING|ERROR'); spaces(); any('in'); spaces(); group(:location) {
-            file('java')
-            spaces()
-            rbrackets {
-                any("at line ")
-                line()
-            }
-        }
-    }
-
-msg = '10. WARNING in /Users/brigadir/projects/.lithium/lib/JavaTools.java (at line 102)'
-
-
-mt = st.match(msg)
-
-
-puts mt[:message]

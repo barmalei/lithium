@@ -23,6 +23,8 @@
 
     ARTIFACT("run:*") {
         ARTIFACT('.lithium/**/*.java') {
+
+            puts ">>>>>>>>>>>>>>>>>>>>>>>>>>"
             DefaultClasspath {
                 PATH('.lithium/classes')
             }
@@ -61,8 +63,14 @@
     }
 
     ARTIFACT("compile:*") {
-        JavaCompiler('.lithium/**/*.java') {
-            @destination = '.lithium/classes'
+        ARTIFACT('.lithium/**/*.java') {
+            DefaultClasspath {
+                PATH('.lithium/classes')
+            }
+
+            JDTCompiler('**/*.java') {
+                @destination = '.lithium/classes'
+            }
         }
 
         JavaCompiler('**/*.java')  { OPT '-Xlint:deprecation' }
