@@ -47,8 +47,7 @@ class JavaCompiler < FileMask
                 }
                 pp = pp.project
             end
-
-            raise 'Destination cannot be detected'
+            return nil
         end
     end
 
@@ -70,19 +69,21 @@ class JavaCompiler < FileMask
 
     def list_dest_paths()
         dest = destination()
-        list_source_paths { | path |
-            pkg = JVM.grep_package(path)
+        unless dest.nil?
+            list_source_paths { | path |
+                pkg = JVM.grep_package(path)
 
-            cn  = File.basename(path)
-            cn[/\.java$/] = '' if cn.end_with?('.java')
-            raise 'Class name cannot be identified' if cn.nil?
+                cn  = File.basename(path)
+                cn[/\.java$/] = '' if cn.end_with?('.java')
+                raise 'Class name cannot be identified' if cn.nil?
 
-            fp = File.join(dest, pkg.gsub('.', '/'), "#{cn}.class")
-            yield fp, pkg if File.exists?(fp)
-            FileArtifact.dir(File.join(dest, pkg.gsub('.', '/'), "#{cn}$*.class")) { | item |
-                yield item, pkg
+                fp = File.join(dest, pkg.gsub('.', '/'), "#{cn}.class")
+                yield fp, pkg if File.exists?(fp)
+                FileArtifact.dir(File.join(dest, pkg.gsub('.', '/'), "#{cn}$*.class")) { | item |
+                    yield item, pkg
+                }
             }
-        }
+        end
     end
 
     def source()
@@ -116,10 +117,13 @@ class JavaCompiler < FileMask
     def cmd(src)
         cp  = classpath()
         src = src.kind_of?(Tempfile) || src.kind_of?(File) ? "@\"#{src.path}\"" : src
+        dst = destination()
+        raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
+
         if cp
-            [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', destination(), src ]
+            [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', dst, src ]
         else
-            [ compile_with, OPTS(), '-d', destination(), src ]
+            [ compile_with, OPTS(), '-d', dst, src ]
         end
     end
 

@@ -71,7 +71,7 @@ class MavenRepoArtifact < FileArtifact
     end
 end
 
-class PomFile < PermanentFile
+class PomFile < ExistentFile
     include LogArtifactState
     include StdFormater
     include AssignableDependency
@@ -176,7 +176,7 @@ class RunMaven < PomFile
         @targets ||= [ 'clean', 'install' ]
     end
 
-    def expired?
+    def expired?()
         true
     end
 
@@ -187,7 +187,7 @@ class RunMaven < PomFile
         }
     end
 
-    def build
+    def build()
         path = fullpath()
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
         Dir.chdir(File.dirname(path));

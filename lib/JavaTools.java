@@ -91,7 +91,6 @@ public class JavaTools {
             }
 
             for (Class clazz : classByShortName(suffix)) {
-                count++;
                 System.out.println("[JAVA/rt.jar => " + clazz.getName() + "]");
             }
         } else if ("methods".equals(prefix)) {

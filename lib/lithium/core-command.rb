@@ -5,13 +5,8 @@ require 'lithium/core'
 class CLEAN < Artifact
     def build()
         # firstly let's create tree that resolves static dependencies (for instance set environment variables)
-        name = @name
-        tree = Project.current.new_artifact {
-            ArtifactTree.new(name)
-        }
 
-        tree.build()
-        tree.root_node.art.clean
+        Project.build(@name).clean
     end
 
     def what_it_does() "Cleanup '#{@name}', #{Project.artifact(@name).class}" end
@@ -106,7 +101,6 @@ end
 
 class REQUIRE < Artifact
     def build()
-
         puts "Artifact '#{@shortname}' dependencies list {"
         Project.artifact(@name).requires { | dep, assignTo, is_own, block |
             printf("    %-20s : '%s' (assignTo = %s)\n", dep.name, ArtifactName.new(dep, &block), (assignTo.nil? ? '<none>' : assignTo))
@@ -118,13 +112,49 @@ class REQUIRE < Artifact
 end
 
 class TREE < Artifact
-    def build()
-        tree = ArtifactTree.new(@name)
-        tree.build()
+    def initialize(*args)
+        @show_id, @show_owner, @show_mtime = true, true, true
+        super
+    end
 
-        #TODO: makes sense to support the flag on the level of ArtifactTree class
-        #tree.norm_tree() #if @normalize_tree
-        tree.show_tree()
+    def build()
+        show_tree(ArtifactTree.new(@name))
+    end
+
+    def show_tree(root) puts tree2string(nil, root) end
+
+    def tree2string(parent, root, shift=0)
+        pshift, name = shift, root.art.to_s
+
+        e = (root.expired ? '*' : '') +
+            (@show_id ? " #{root.art.object_id}" : '') +
+            (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
+            (@show_mtime ? ":#{root.art.mtime}" : '') +
+            (@show_owner ? ":<#{root.art.owner}>" : '')
+
+        s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name} (#{root.art.class})"  + e
+        b = parent && root != parent.children.last
+        if b
+            s, k = "#{s}\n#{' '*shift}|", name.length/2 + 1
+            s = "#{s}#{' '*k}|" if root.children.length > 0
+        else
+            k = shift + name.length / 2 + 2
+            s = "#{s}\n#{' '*k}|" if root.children.length > 0
+        end
+
+        shift = shift + name.length / 2 + 2
+        root.children.each { | node |
+            rs, s = tree2string(root, node, shift), s + "\n"
+            if b
+                rs.each_line { | line |
+                    line[pshift] = '|'
+                    s = s + line
+                }
+            else
+                s = s + rs
+            end
+        }
+        return s
     end
 
     def what_it_does() "Show '#{@name}' dependencies tree" end

@@ -692,6 +692,22 @@ class Artifact
     #
     def method_missing(meth, *args, &block)
         return if meth == :build_done || meth == :build_failed || meth == :pre_build
+
+        # if artifact class is detected add it as required
+        if meth.length > 2
+            begin
+                clazz = Module.const_get(meth)
+                if clazz < Artifact
+                    if args.length > 0
+                        return REQUIRE(clazz.new(*args, &block))
+                    else
+                        return REQUIRE(*args, clazz, &block)
+                    end
+                end
+            rescue NameError
+            end
+        end
+
         super(meth, *args, &block)
     end
 
@@ -808,10 +824,14 @@ class Artifact
         }
     end
 
+    # build artifact including all its dependencies
     def Artifact.build(name, &block)
+        # !!! instantiate tree artifact in a context of an artifact that calls it
+        # !!! the caller artifact is set as an owner of the created artifact
         art = self.new(name, &block)
-        art.build()
-        return art
+        tree = ArtifactTree.new(art)
+        tree.build()
+        return tree.art
     end
 
     def DONE(&block)
@@ -821,60 +841,29 @@ end
 
 # Artifact tree. Provides tree of artifacts that is built basing
 # on resolving artifacts dependencies
-class ArtifactTree < Artifact
-    attr_reader :root_node
+class ArtifactTree
+    attr_accessor :art, :parent, :children, :expired, :expired_by_kid
 
-    # tree node structure
-    class Node
-        attr_accessor :art, :parent, :children, :expired, :expired_by_kid
+    def initialize(art, parent = nil, &block)
+        raise 'Artifact cannot be nil' if art.nil?
 
-        def initialize(art, parent = nil, &block)
-            raise 'Artifact cannot be nil' if art.nil?
-
-            p = parent.nil? ? Project : parent.art.owner
-            if !art.kind_of?(Artifact)
-                art = p.artifact(art, &block)
-            elsif !block.nil?
-                art.instance_eval(&block)
-            end
-
-            @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
+        p = parent.nil? ? Project : parent.art.owner
+        if !art.kind_of?(Artifact)
+            art = p.artifact(art, &block)
+        elsif !block.nil?
+            art.instance_eval(&block)
         end
 
-        # traverse tree with the given block starting from the tree node
-        def traverse(&block)
-            traverse_(self, 0, &block)
-        end
-
-        def traverse_kids(&block)
-            @children.each { |n| traverse_(n, 0, &block) }
-        end
-
-        def traverse_(root, level, &block)
-            root.children.each { |n|
-                traverse_(n, level+1, &block)
-            }
-            block.call(root, level)
-        end
-    end
-
-    def initialize(*args)
-        @show_id, @show_owner, @show_mtime = true, true, true
-        super
+        @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
+        build_tree() if parent.nil?
     end
 
     # build tree starting from the root artifact (identified by @name)
-    def build()
-        @root_node = Node.new(@name)
-        map = []
-        build_tree(@root_node, map)
-    end
+    def build_tree(map = [])
+        bt = @art.mtime()
 
-    def build_tree(root, map = [])
-        bt = root.art.mtime()
-
-        root.art.requires { | dep, assignMeTo, is_own, block |
-            foundNode, node = nil, Node.new(dep, root, &block)
+        @art.requires { | dep, assignMeTo, is_own, block |
+            foundNode, node = nil, ArtifactTree.new(dep, self, &block)
 
             if block.nil?  # requires with a custom block cannot be removed from build tree
                 # optimize tree to exclude dependencies that are already in the tree
@@ -885,28 +874,28 @@ class ArtifactTree < Artifact
             end
 
             # cyclic dependency detection
-            parent = root
+            parent = self
             while parent && parent.art != node.art
                 parent = parent.parent
             end
-            raise "#{root.art.class}:'#{root.art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
+            raise "#{@art.class}:'#{art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
             # build subtree to evaluate expiration
-            build_tree(node, map)
-            if !root.expired && (node.expired || bt.nil? || (bt > 0 && node.art.mtime() > bt))
-                root.expired = true
-                root.expired_by_kid = node.art
+            node.build_tree(map)
+            if !@expired && (node.expired || bt.nil? || (bt > 0 && node.art.mtime() > bt))
+                @expired = true
+                @expired_by_kid = node.art
             end
 
             # add the new node to tree and process it only if doesn't already exist
-            root.children << node if foundNode.nil?
+            @children << node if foundNode.nil?
 
             # we have to check if the artifact is assignable to
             # its parent and assign it despite if the artifact has
             # been excluded from the tree
 
             # has to be placed before recursive build tree method call
-            node.art.owner = root.art.owner  if is_own == true
+            node.art.owner = @art.owner if is_own == true
 
             if node.art.class < AssignableDependency
                 # call special method that is declared with AssignableDependency module
@@ -917,56 +906,59 @@ class ArtifactTree < Artifact
                 raise "Invalid assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
 
                 asn = "@#{assignMeTo.to_s}".to_sym
-                av  = root.art.instance_variable_get(asn)
+                av  = @art.instance_variable_get(asn)
                 if av.kind_of?(Array)
                     # check if the artifact is already in
                     found = av.detect { | art | node.art.object_id == art.object_id }
 
                     if found.nil?
                         av.push(node.art)
-                        root.art.instance_variable_set(asn, av)
+                        @art.instance_variable_set(asn, av)
                     end
                 else
-                    root.art.instance_variable_set(asn, node.art)
+                    @art.instance_variable_set(asn, node.art)
                 end
             end
         }
     end
 
-    def show_tree() puts tree2string(nil, @root_node) end
-
-    def tree2string(parent, root, shift=0)
-        pshift, name = shift, root.art.to_s
-
-        e = (root.expired ? '*' : '') +
-            (@show_id ? " #{root.art.object_id}" : '') +
-            (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
-            (@show_mtime ? ":#{root.art.mtime}" : '') +
-            (@show_owner ? ":<#{root.art.owner}>" : '')
-
-        s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name} (#{root.art.class})"  + e
-        b = parent && root != parent.children.last
-        if b
-            s, k = "#{s}\n#{' '*shift}|", name.length/2 + 1
-            s = "#{s}#{' '*k}|" if root.children.length > 0
+    def build()
+        unless @expired
+            puts_warning "'#{@art.name}' : #{@art.class} is not expired", 'There is nothing to be done!'
         else
-            k = shift + name.length/2 + 2
-            s = "#{s}\n#{' '*k}|" if root.children.length > 0
-        end
+            @children.each { | node | node.build() }
+            if @art.respond_to?(:build)
+                prev_art = $current_artifact
+                begin
+                    $current_artifact = @art
+                    wid = @art.what_it_does()
+                    puts wid unless wid.nil?
+                    @art.pre_build()
 
-        shift = shift + name.length / 2 + 2
-        root.children.each { | i |
-            rs, s = tree2string(root, i, shift), s + "\n"
-            if b
-                rs.each_line { | l |
-                    l[pshift] = '|'
-                    s = s + l
-                }
+                    @art.build()
+                    @art.instance_eval(&@art.done) unless @art.done.nil?
+
+                    @art.build_done()
+                rescue
+                    @art.build_failed()
+                    level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
+                    puts_exception($!, 0) if level == 0
+                    puts_exception($!, 3) if level == 1
+                    raise                 if level == 2
+                ensure
+                    $current_artifact = prev_art
+                end
             else
-                s = s + rs
+                puts_warning "'#{@art.name}' does not declare build() method"
             end
+        end
+    end
+
+    def traverse(level = 0, &block)
+        @children.each { | node |
+            node.traverse(level + 1, &block)
         }
-        return s
+        block.call(self, level)
     end
 
     def what_it_does() "Build '#{@name}' artifact dependencies tree" end
@@ -974,15 +966,12 @@ end
 
 #  Base file artifact
 class FileArtifact < Artifact
-    attr_reader :is_absolute, :is_permanent
+    attr_reader :is_absolute
 
     def initialize(name, &block)
-        name = Pathname.new(name)
-        name = name.cleanpath
-        @is_absolute  = name.absolute?
-        @is_permanent = false
-        super(name.to_s, &block)
-        assert_existence()
+        path = Pathname.new(name).cleanpath
+        @is_absolute  = path.absolute?
+        super(path.to_s, &block)
     end
 
     def _contains_path?(base, path)
@@ -1086,14 +1075,11 @@ class FileArtifact < Artifact
         return _contains_path?(home.to_s, path.to_s)
     end
 
-    def build
-        assert_existence()
+    def expired?()
+        File.exists?(fullpath) == false
     end
 
-    def expired?() false end
-
     def mtime()
-        assert_existence()
         f = fullpath()
         return File.exists?(f) ? File.mtime(f).to_i() : -1
     end
@@ -1109,13 +1095,6 @@ class FileArtifact < Artifact
 
     def search(path)
         return FileArtifact.search(path, self)
-    end
-
-    def assert_existence()
-        if @is_permanent
-            fp = fullpath()
-            raise "File '#{fp}' doesn't exist" unless File.exists?(fp)
-        end
     end
 
     def self.which(cmd)
@@ -1319,15 +1298,33 @@ class FileArtifact < Artifact
 end
 
 # Permanent file shortcut
-class PermanentFile < FileArtifact
+class ExistentFile < FileArtifact
     def initialize(*args)
-        @is_permanent = true
         super
+        assert_existence()
+    end
+
+    def build()
+        assert_existence()
+    end
+
+    def mtime()
+        assert_existence()
+        return super()
+    end
+
+    def expired?()
+        return false
+    end
+
+    def assert_existence()
+        fp = fullpath()
+        raise "File '#{fp}' doesn't exist" unless File.exists?(fp)
     end
 end
 
 # Perform and action on a file artifact
-class FileCommand < PermanentFile
+class FileCommand < ExistentFile
     def expired?() true end
 
     def self.abbr() 'FCM' end
@@ -1335,7 +1332,15 @@ end
 
 # Directory artifact
 class Directory < FileArtifact
-    def initialize(*args)
+    def build()
+        super
+        fp = fullpath
+        raise "File '#{fp}' is not a directory" if File.exists?(fp) && !File.directory?(fp)
+    end
+end
+
+class ExistentDirectory < FileArtifact
+    def build()
         super
         fp = fullpath
         raise "File '#{fp}' is not a directory" unless File.directory?(fp)
@@ -1625,14 +1630,18 @@ class FileMaskContainer < FileMask
     include ArtifactContainer
 end
 
-
 # project artifact
-class Project < Directory
+class Project < ExistentDirectory
     attr_reader :desc
 
     include ArtifactContainer
 
     @@curent_project = nil
+
+    def self.new(*args, &block)
+        @@curent_project = super
+        return @@curent_project
+    end
 
     def self.current=(prj)
         @@curent_project = prj
@@ -1646,12 +1655,8 @@ class Project < Directory
         @@curent_project.artifact(name, &block)
     end
 
-    def self.create(home, owner = nil)
-        @@curent_project = Project.new(home, owner) {
-            conf = File.join(home, '.lithium', 'project.rb')
-            self.instance_eval(File.read(conf)).call if File.exists? conf
-        }
-        return @@curent_project
+    def self.build(name, &block)
+       return @@curent_project.build(name, &block)
     end
 
     def initialize(*args, &block)
@@ -1659,12 +1664,13 @@ class Project < Directory
         self.owner = args[1] if args.length > 1
         super(args[0], &block)
         @desc ||= File.basename(args[0])
-    end
 
-    # TODO: comment it
-    def new_artifact(&block)
-        art = block.call
-        return art
+        conf = File.join(homedir, '.lithium', 'project.rb')
+        if File.file?(conf)
+            self.instance_eval(File.read(conf)).call
+        else
+            puts_warning "Project '#{@desc}' configuration '#{conf}' cannot be found"
+        end
     end
 
     def homedir()
@@ -1674,7 +1680,11 @@ class Project < Directory
 
     def expired?() true end
 
-    def build() end
+    def build(name, &block)
+        tree = ArtifactTree.new(name, &block)
+        tree.build()
+        return tree.art
+    end
 
     def what_it_does()
         nil
@@ -1770,5 +1780,3 @@ class GroupByExtension < FileMask
         }
     end
 end
-
-

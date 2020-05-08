@@ -91,7 +91,7 @@
 
         GroupByExtension('**/*') {
             DO { | ext |
-                BUILD_ARTIFACT("compile:#{@name}#{ext}")
+                Project.build("compile:#{@name}#{ext}")
             }
         }
     }
@@ -102,7 +102,7 @@
 
         GroupByExtension('**/*') {
             DO { | ext |
-                BUILD_ARTIFACT("check:#{@name}#{ext}")
+                Project.build("check:#{@name}#{ext}")
             }
         }
     }
