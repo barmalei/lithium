@@ -191,18 +191,32 @@ class RunMaven < PomFile
         path = fullpath()
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
         Dir.chdir(File.dirname(path));
-        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(), @targets.join(' ')) != 0
+        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')) != 0
     end
 
-    def what_it_does() "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{@mvn.OPTS()}'" end
+    def what_it_does() 
+        "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}', '#{@mvn.OPTS()}'"
+    end
 
     def self.abbr() 'RMV' end
 end
 
 class RunMavenTest < RunMaven
     def initialize(name, &block)
+        fp = fullpath(name)
         super
         TARGETS('test')
+
+        puts "FP = #{fp}"
+
+        if fp.end_with?('.java')
+            pkg = JVM.grep_package(fp)
+            fp  = File.basename(fp)
+            fp[/\.java$/] = ''
+            cls = pkg + '.' + fp
+            OPT("-Dtest=#{cls}")
+            puts "Single maven test case '#{cls}' is detected"
+        end
     end
 end
 

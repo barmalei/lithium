@@ -903,20 +903,24 @@ class ArtifactTree
                 # to be stored
                 assignMeTo = node.art.assign_me_to if assignMeTo.nil?
 
-                raise "Invalid assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
+                raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
 
-                asn = "@#{assignMeTo.to_s}".to_sym
-                av  = @art.instance_variable_get(asn)
-                if av.kind_of?(Array)
-                    # check if the artifact is already in
-                    found = av.detect { | art | node.art.object_id == art.object_id }
-
-                    if found.nil?
-                        av.push(node.art)
-                        @art.instance_variable_set(asn, av)
-                    end
+                if @art.respond_to?(assignMeTo.to_sym)
+                    @art.send(assignMeTo.to_sym, node.art)
                 else
-                    @art.instance_variable_set(asn, node.art)
+                    asn = "@#{assignMeTo}".to_sym
+                    av  = @art.instance_variable_get(asn)
+                    if av.kind_of?(Array)
+                        # check if the artifact is already in
+                        found = av.detect { | art | node.art.object_id == art.object_id }
+
+                        if found.nil?
+                            av.push(node.art)
+                            @art.instance_variable_set(asn, av)
+                        end
+                    else
+                        @art.instance_variable_set(asn, node.art)
+                    end
                 end
             end
         }
@@ -924,7 +928,7 @@ class ArtifactTree
 
     def build()
         unless @expired
-            puts_warning "'#{@art.name}' : #{@art.class} is not expired", 'There is nothing to be done!'
+            puts_warning "'#{@art.name}' : #{@art.class} is not expired"
         else
             @children.each { | node | node.build() }
             if @art.respond_to?(:build)
@@ -1564,6 +1568,11 @@ module ArtifactContainer
 
         # sort meta array
         _meta.sort
+    end
+
+    def MATCH(file_mask, &block)
+        raise "Block is expected for Match '#{file_mask}'" if block.nil?
+        ARTIFACT(file_mask, FileMaskContainer, &block)
     end
 
     def method_missing(meth, *args, &block)

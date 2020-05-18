@@ -96,15 +96,27 @@ public class JavaTools {
         } else if ("methods".equals(prefix)) {
             Class clazz = null;
             try {
+                System.out.println("JavaTools.main(): Class.forName(" + suffix + ")");
                 clazz = Class.forName(suffix);
             } catch (ClassNotFoundException e) {
-                List<Class> classes = classByShortName(suffix);
 
-                System.out.println(classes);
-                if (classes.size() == 1) {
-                    clazz = classes.get(0);
-                } else {
-                    throw e;
+                if (args.length > 1 && suffix.indexOf('.') <= 0) {
+                    String pkg_name = args[1].trim();
+                    System.out.println("JavaTools.main(): Class.forName(" + pkg_name + "." + suffix + ")");
+                    try {
+                        clazz = Class.forName(pkg_name + "." + suffix);
+                    } catch (ClassNotFoundException ee) { }
+                }
+
+                if (clazz == null) {
+                    System.out.println("JavaTools.main(): classByShortName(" + suffix + ")");
+                    List<Class> classes = classByShortName(suffix);
+                    System.out.println(classes);
+                    if (classes.size() == 1) {
+                        clazz = classes.get(0);
+                    } else {
+                        throw e;
+                    }
                 }
             }
 

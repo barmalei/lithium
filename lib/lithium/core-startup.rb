@@ -46,18 +46,28 @@ PATTERNS ({
     [ JavaCompiler, PMD ] => [
         # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
         StdPattern.new() {
-            location('java'); spaces(); group(:message, '.*$')
+            location('java'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
         }
     ],
 
     JDTCompiler => [
         StdPattern.new() {
-            num(); dot(); spaces(); group(:message, 'WARNING|ERROR'); spaces(); any('in'); spaces(); group(:location) {
+            num(); dot(); spaces(); group(:level, 'WARNING|ERROR'); spaces(); any('in'); spaces(); group(:location) {
                 file('java')
                 spaces()
                 rbrackets {
                     any("at line ")
                     line()
+                }
+            }
+
+            MATCHED {
+                convert?(:level) { | b |
+                    if b == 'WARNING'
+                        'warning'
+                    elsif b == 'ERROR'
+                        'error'
+                    end
                 }
             }
         }

@@ -18,6 +18,20 @@ class JavaClasspath < Artifact
         return res
     end
 
+    def JavaClasspath.has?(cp, path)
+        # cut last slash
+        path     = path[0..-2] if path[-1] == '/'
+        path_ext = File.extname(path)
+        path     = File.basename(path) if path_ext == '.jar' || path_ext == '.zip'
+
+        cp.split(File::PATH_SEPARATOR).each { | cp_path |
+            cp_path_ext = File.extname(cp_path)
+            cp_path     = File.basename(cp_path) if cp_path_ext == '.jar' || cp_path_ext == '.zip'
+            return true if cp_path == path
+        }
+        return false
+    end
+
     # split classpath and remove duplicated libs
     def JavaClasspath.norm_classpath(cp)
         res   = []
@@ -330,7 +344,6 @@ class JVM < EnvArtifact
 
         File.join(pkg.gsub('.', '/'), cn + '.class')
     end
-
 end
 
 class JAVA < JVM
@@ -486,4 +499,3 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
-

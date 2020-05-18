@@ -58,9 +58,15 @@ class ShowClassMethods < EnvArtifact
     end
 
     def build()
-        cn = @shortname
-        cp = JavaClasspath.join(@java.classpath, File.join($lithium_code, 'classes'))
-        raise "Failed " if Artifact.exec(@java.java, '-classpath', "\"#{cp}\"", 'lithium.JavaTools', "methods:#{cn}") != 0
+        cn  = @shortname
+        cp  = JavaClasspath.join(@java.classpath, File.join($lithium_code, 'classes'))
+        
+        res = Artifact.exec(
+            @java.java,
+            '-classpath', "\"#{cp}\"",
+            'lithium.JavaTools', "methods:#{cn}", $lithium_args[0])
+
+        raise "#{self.class.name} failed" if res != 0
     end
 end
 

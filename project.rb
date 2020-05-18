@@ -16,15 +16,8 @@
         @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
     }
 
-    # TODO: should be removed
-    CopyOfFile(".lithium/lib/test.jar") {
-        @source = "jnc-easy/jnc-easy-1.1.1/test.jar"
-    }
-
-    ARTIFACT("run:*") {
-        ARTIFACT('.lithium/**/*.java') {
-
-            puts ">>>>>>>>>>>>>>>>>>>>>>>>>>"
+    MATCH("run:*") {
+        MATCH('.lithium/**/*.java') {
             DefaultClasspath {
                 PATH('.lithium/classes')
             }
@@ -44,33 +37,20 @@
         RunScalaCode     ('**/*.scala')
         RunJavaClass     ('**/*.class')
         RunHtml          ('**/*.html')
-        RunRubyScript    ('**/*.rb') {
-            # TODO: remove after documenting
-            DONE { | art |
-                Touch.build('dsdsd')
-            }
-        }
+        RunRubyScript    ('**/*.rb') 
     }
 
-    ARTIFACT("test:*") {
-        RunJavaTestCode('**/*.java')
-        RunJavaTestClass('**/*.class')
-        RunScalaTestCode('**/*.scala')
-        RunKotlinTestCode('**/*.kt')
+    MATCH("test:*") {
+        RunJavaCodeWithJUnit('**/*.java')
+        RunJavaClassWithJUnit('**/*.class')
         RunMaven('**/pom.xml') {
             TARGETS('test')
         }
     }
 
-    ARTIFACT("compile:*") {
-        ARTIFACT('.lithium/**/*.java') {
-            DefaultClasspath {
-                PATH('.lithium/classes')
-            }
-
-            JDTCompiler('**/*.java') {
-                @destination = '.lithium/classes'
-            }
+    MATCH("compile:*") {
+        JDTCompiler('.lithium/**/*.java') {
+            @destination = '.lithium/classes'
         }
 
         JavaCompiler('**/*.java')  { OPT '-Xlint:deprecation' }
@@ -96,7 +76,7 @@
         }
     }
 
-    ARTIFACT('check:*') {
+    MATCH('check:*') {
         JavaCheckStyle('**/*.java')
         JavaScriptHint('**/*.js')
 

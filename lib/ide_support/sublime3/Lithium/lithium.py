@@ -1,7 +1,7 @@
 import sublime, sublime_plugin
 
 import subprocess, threading
-import os, io, platform, json, re, sys
+import os, io, platform, json, re, sys, json
 import webbrowser
 from itertools import groupby
 
@@ -15,6 +15,7 @@ settings = {
     'path'          : "ruby /Users/brigadir/projects/.lithium/lib/lithium.rb",
     'li_opts'       : { "verbosity" : "2",  "std": "SublimeStd"},
     'output_panel'  : "lithium",
+    'output_error_panel'  : "lithium_errors",
     'output_font_size'  : 11,
     'debug'         : False,
     'output_syntax' : 'Packages/Lithium/lithium.tmLanguage',
@@ -166,11 +167,19 @@ def li_detect_host_folder(pt, folder_name = ".lithium"):
 def li_output_view():
     return sublime.active_window().find_output_panel(settings.get('output_panel'))
 
+def li_output_error_view():
+    return sublime.active_window().find_output_panel(settings.get('output_error_panel'))
+
 # Append text to output view
 # Input: text, view (optional)
 def li_append_output_view(text, view = None):
     if view is None:
         view = li_output_view()
+    view.run_command('append', { 'characters' :  text, 'force': True, 'scroll_to_end': True })
+
+def li_append_output_error_view(text, view = None):
+    if view is None:
+        view = li_output_error_view()
     view.run_command('append', { 'characters' :  text, 'force': True, 'scroll_to_end': True })
 
 # Parse output view text to detect locations tuples in.
@@ -218,6 +227,37 @@ def li_parse_output(text):
         for path in res:
             paths.append(path)
     return paths
+
+# load deteceted problem
+def li_load_problems(path):
+    data = []
+    with open(path) as file:
+        data = json.load(file)
+        for entity in data:
+            if 'file' in entity:
+                ac = entity['artifactClass']
+
+                status = 'I'
+                if 'level' in entity:
+                    if entity['level'] == 'error':
+                        status = 'E'
+                    elif entity['level'] == 'warning':
+                        status = 'E'
+
+                msg = ''
+                if 'message' in entity:
+                    msg = entity['message']
+
+                line = '1'
+                if 'line' in entity:
+                    line = entity['line']
+
+                fp = entity['file']
+
+                #msg = "(%s) [%s] [[%s:%s]]\n(%s) [%s] %s\n" % (status, ac, fp, line, status, ac, msg)
+                data.append([ file, line, msg ])
+    return data
+
 
 # Detect place(s) by output view region
 def li_parse_output_region(view, region):
@@ -370,6 +410,25 @@ def li_run(command, output_handler = None, error_handler = None, run_async = Tru
 def li_init_output_view():
     name  = settings.get('output_panel')
     panel = sublime.active_window().create_output_panel(name)
+
+    panel.settings().set("gutter", False)
+    panel.settings().set("font_size", settings.get('output_font_size'))
+    panel.settings().set("line_numbers", False)
+    panel.settings().set("scroll_past_end", False)
+    panel.set_name(name)
+    panel.set_scratch(True)
+    panel.set_read_only(False)
+    panel.set_syntax_file(settings.get('output_syntax'))
+    panel.settings().set("color_scheme", "lithium.sublime-color-scheme")
+
+    if li_is_debug():
+        print("li_init_output_view(): panel = " + str(panel))
+
+    return panel
+
+def li_init_output_error_view():
+    name  = settings.get('output_error_panel')
+    panel = sublime.active_window().create_output_panel(name)
     panel.settings().set("gutter", False)
     panel.settings().set("font_size", settings.get('output_font_size'))
     panel.settings().set("line_numbers", False)
@@ -380,9 +439,17 @@ def li_init_output_view():
     panel.set_syntax_file(settings.get('output_syntax'))
 
     if li_is_debug():
-        print("li_init_output_view(): panel = " + str(panel))
+        print("li_init_output_error_view(): panel = " + str(panel))
 
     return panel
+
+# return string
+def java_package(view):
+    regs = view.find_by_selector('source.java meta.package-declaration.java meta.path.java entity.name.namespace.java')
+    if regs is not None and len(regs) > 0:
+        return view.substr(regs[0])
+    return None
+
 
 # Collect imports
 # Output: [ [ region, "import <package>"], ... ]
@@ -489,12 +556,19 @@ def java_collect_methods(view, symbol):
         print("Unexpected error")
         print(err)
 
-    li_run("ShowClassMethods:%s" % symbol, output, error, False, { "std": "none" })
+    pkg_name = java_package(view)
+    if pkg_name is None or symbol.find('.') > 0:
+        li_run("ShowClassMethods:%s" % symbol, output, error, False, { "std": "none" })
+    else:
+        li_run("ShowClassMethods:%s %s" % (symbol, pkg_name), output, error, False, { "std": "none" })
+
     return methods
 
 class liCommand(sublime_plugin.WindowCommand):
     #panel_lock = threading.Lock()
     process = None
+    err_panel = None
+    std_entities_path = None
 
     def is_enabled(self, **args):
         return True
@@ -562,9 +636,16 @@ class liCommand(sublime_plugin.WindowCommand):
         except KeyError:
             sublime.error_message("Lithium command '%s' cannot be interpolated with %s" % (command, str(placeholders)))
 
+        self.std_entities_path = None
+        if li_home is not None:
+            self.std_entities_path = os.path.join(li_home, '.lithium', 'std-out-entities.json')
         try:
-            self.panel   = li_init_output_view()
-            self.process = li_run(command, self.output, self.error)
+            if self.std_entities_path is not None and os.path.exists(self.std_entities_path):
+                os.remove(self.std_entities_path)
+            
+            self.panel     = li_init_output_view()
+            self.err_panel = li_init_output_error_view()
+            self.process   = li_run(command, self.output, self.error)
         except Exception as ex:
             self.process = None
             sublime.error_message("Lithium '%s' command execution has failed('%s')" % (command, str(ex)))
@@ -576,6 +657,9 @@ class liCommand(sublime_plugin.WindowCommand):
         if line is None:
             self.process = None
             self.panel = None
+            if self.std_entities_path is not None and os.path.exists(self.std_entities_path):
+                li_load_problems(self.std_entities_path)
+            self.std_entities_path = None
         else:
             li_append_output_view(line, self.panel)
 
@@ -930,18 +1014,23 @@ class liShowLocationsCommand(sublime_plugin.TextCommand):
 
 class liGoToLocationCommand(liShowLocationsCommand):
     def run(self, edit):
-        output_view = li_output_view()
+        pan_name = sublime.active_window().active_panel()
+        panel    = None
+        if pan_name == 'output.' + settings.get('output_panel'):
+            panel = li_output_view()
+        elif pan_name == 'output.' + settings.get('output_error_panel'):
+            panel = panel = li_output_error_view()
 
         if li_is_debug():
-            print("liGoToLocationCommand.run() : GO to text command : " + li_view_to_s(output_view))
+            print("liGoToLocationCommand.run() : GO to text command : " + li_view_to_s(panel))
 
-        if output_view is not None:
+        if panel is not None:
             if li_is_debug():
-                print("liGoToLocationCommand.run(): found active output : " + li_view_to_s(output_view))
+                print("liGoToLocationCommand.run(): found active output : " + li_view_to_s(panel))
 
-            rset = output_view.sel()
+            rset = panel.sel()
             if len(rset) > 0:
-                p = li_parse_output_region(output_view, rset[0])
+                p = li_parse_output_region(panel, rset[0])
                 if p == None or len(p) == 0:
                     if li_is_debug():
                         print("liGoToLocationCommand.run() : Path to go could not be detected")
@@ -952,13 +1041,7 @@ class liGoToLocationCommand(liShowLocationsCommand):
                         print("liGoToLocationCommand.run() : Path to go was found " + str(p))
 
                     self.go_to_location(p[0])
-                    output_view.window().focus_view(view)
+                    panel.window().focus_view(view)
         else:
             if li_is_debug():
                 print("liGoToLocationCommand.run() : No active view was found")
-
-
-
-
-
-

@@ -7,8 +7,8 @@ class StdPattern
     FILENAME_PATTERN = '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%\[\]]+'
 
     class StdMatch
-        def initialize(msg, groups)
-            @msg, @groups, @variables = msg, [], {}
+        def initialize(msg, groups, level)
+            @msg, @groups, @variables, @level = msg, [], {}, level
             groups.each_index { | i |
                 group       = groups[i]
                 name, value = group[:name], group[:value]
@@ -61,6 +61,14 @@ class StdPattern
 
         def convert(name, &block)
             _convert(name, &block)
+        end
+
+        def level()
+            if has_group?(:level)
+                return 2 if @level < 2 && self[:level][:value] == 'error'
+                return 1 if @level < 1 && self[:level][:value] == 'warning'
+            end
+            return @level
         end
 
         def _convert(name, group_should_exist = true,  &block)
@@ -138,9 +146,13 @@ class StdPattern
 
     def initialize(level = 0, &block)
         raise "Invalid level" if level.nil?
-        @level, @stack = level, []
+        @level, @stack, @matched = level, [], nil
         flush()
         instance_eval(&block) unless block.nil?
+    end
+
+    def MATCHED(&block)
+        @matched = block
     end
 
     # TODO: not clear if the method shoul be here
@@ -160,7 +172,6 @@ class StdPattern
             next FileArtifact.search(path)[0]
         }
     end
-
 
     def _add_group(name, &block)
         @groups.push({
@@ -439,7 +450,9 @@ class StdPattern
                     end
                 end
             }
-            return StdMatch.new(msg, @groups)
+            stdMatch = StdMatch.new(msg, @groups, level)
+            stdMatch.instance_eval(&@matched) unless @matched.nil?
+            return stdMatch
         else
             return nil
         end

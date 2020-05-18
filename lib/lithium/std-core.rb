@@ -150,7 +150,7 @@ class Std
 
                     unless mt.nil?
                         msg   = pattern_matched(msg, pt, mt)
-                        level = pt.level if pt.level > level
+                        level = mt.level if mt.level > level
                     end
                 }
                 break

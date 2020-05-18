@@ -49,6 +49,7 @@ class LithiumStd < Std
             entry = {
                 :patternClass  =>  pattern.class.name,
                 :artifactClass =>  $current_artifact.nil? ? nil : $current_artifact.class.name,
+                :artifactClassAbbr => $current_artifact.nil? ? nil : $current_artifact.class.abbr,
                 :errorLevel    =>  pattern.level
             }
 
@@ -87,4 +88,3 @@ class VSCodeStd < LithiumStd
         return msg
     end
 end
-

@@ -120,6 +120,7 @@ class JavaCompiler < FileMask
         dst = destination()
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
 
+        cp = JavaClasspath.join(cp, dst) unless JavaClasspath.has?(cp, dst)
         if cp
             [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', dst, src ]
         else
@@ -173,12 +174,11 @@ class JDTCompiler < JavaCompiler
     end
 
     def what_it_does()
-        "Compile JAVA '#{@name}' code with JDT"
+        "Compile JAVA '#{@name}' code with JDT\n        to:  '#{destination()}'"
     end
 
     def self.abbr() 'JDT' end
 end
-
 
 #
 # Groovy compile_with
@@ -231,7 +231,7 @@ class KotlinCompiler < JavaCompiler
     # end
 
     def what_it_does()
-        "Compile Kotlin '#{@name}' code"
+        "Compile Kotlin '#{@name}' code\n            to '#{destination()}'"
     end
 
     def self.abbr() 'KTC' end

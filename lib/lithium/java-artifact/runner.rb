@@ -60,7 +60,6 @@ class RunJavaCode < JavaFileRunner
 
     def target()
         pkgname = grep_package()
-
         clname  = File.basename(fullpath)
         clname[/\.java$/] = '' if clname.end_with?('.java')
         raise 'Class name cannot be identified' if clname.nil?
@@ -69,6 +68,62 @@ class RunJavaCode < JavaFileRunner
     end
 
     def what_it_does() "Run JAVA '#{@name}' code" end
+end
+
+
+module RunJavaTestCase
+    def target()
+        st = super
+        st.sub(/(([a-zA-Z_$][a-zA-Z0-9_$]*\.)*)([a-zA-Z_$][a-zA-Z0-9_$]*)/, '\1Test\3')
+    end
+
+    def what_it_does()
+       "Run Java test-cases '#{target}'\n                for '#{@name}'"
+    end
+end
+
+module JUnitTestRunner
+    def classpath()
+        JavaClasspath.join(super, File.join($lithium_code, 'tools', 'java', 'junit', 'junit-4.11.jar'))
+    end
+
+    def target()
+        if @name.end_with?('.java') &&
+            nm = File.basename(@name)
+            nm[/\.java$/] = ''
+
+            res = FileArtifact.grep(fullpath, '@Test')
+            if res.nil? || res.length == 0
+                if nm.end_with?('Test')
+                    raise "Test case cannot be detected by '#{name}' name"
+                else
+                    return "#{@junit_runner_class} #{super}Test"
+                end
+            end
+        end
+
+        "#{@junit_runner_class} #{super}"
+    end
+
+    def what_it_does() "Run JAVA '#{@name}' with JUnit code" end
+
+    def abbr() 'JUN' end
+end
+
+class RunJavaCodeWithJUnit < RunJavaCode
+    include JUnitTestRunner
+
+    def initialize(*args)
+        super
+        @junit_runner_class ||= 'org.junit.runner.JUnitCore'
+    end
+end
+
+class RunJavaClassWithJUnit < RunJavaClass
+    def initialize(*args)
+        super
+        @junit_runner_class ||= 'org.junit.runner.JUnitCore'
+    end
 end
 
 class RunJAR < JavaFileRunner
@@ -104,25 +159,6 @@ class RunGroovyScript < JavaFileRunner
     end
 end
 
-module RunJavaTestCase
-    def target()
-        st = super
-        st.sub(/(([a-zA-Z_$][a-zA-Z0-9_$]*\.)*)([a-zA-Z_$][a-zA-Z0-9_$]*)/, '\1Test\3')
-    end
-
-    def what_it_does()
-       "Run Java test-cases '#{target}'\n                for '#{@name}'"
-    end
-end
-
-class RunJavaTestCode < RunJavaCode
-    include RunJavaTestCase
-end
-
-class RunJavaTestClass < RunJavaClass
-    include RunJavaTestCase
-end
-
 class RunKotlinCode < JavaFileRunner
     def initialize(*args)
         REQUIRE KOTLIN
@@ -151,11 +187,6 @@ class RunKotlinCode < JavaFileRunner
         "Run Kotlin '#{@name}' code"
     end
 end
-
-class RunKotlinTestCode < RunKotlinCode
-    include RunJavaTestCase
-end
-
 
 class RunScalaCode < JavaFileRunner
     def initialize(*args)
@@ -191,8 +222,4 @@ class RunScalaCode < JavaFileRunner
     def what_it_does()
         "Run Scala '#{@name}' code"
     end
-end
-
-class RunScalaTestCode < RunScalaCode
-    include RunJavaTestCase
 end
