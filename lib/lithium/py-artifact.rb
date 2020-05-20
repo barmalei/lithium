@@ -46,10 +46,12 @@ class PYTHON < EnvArtifact
             raise "Invalid lib path - '#{lib}'" unless File.directory?(lib)
             @pypath = @pypath ? lib + File::PATH_SEPARATOR + @pypath : lib
         }
-        ENV['PYTHONPATH'] = @python_path
+        ENV['PYTHONPATH'] = @pypath
+
+        puts "---- #{@pypath}"
     end
 
-    def python
+    def python()
         File.join(@python_home, 'bin', @pyname)
     end
 
@@ -91,25 +93,34 @@ end
 class ValidatePythonCode < FileMask
     include OptionsSupport
 
+    def initialize(*args)
+        REQUIRE PYTHON
+        super
+    end
+
     def build_item(path, mt)
         raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', OPTS(), "\"#{fullpath(path)}\"") != 0
     end
 end
 
 class ValidatePythonScript < FileCommand
-    def build() raise 'Validation failed' unless ValidatePythonScript.validate(fullpath) end
-    def what_it_does() "Validate '#{@name}' script" end
+    def initialize(*args)
+        REQUIRE PYTHON
+        super
+    end
 
-    def self.validate(path)
+    def build()
 script = "
 import py_compile, sys\n
 
 try:\n
-    py_compile.compile('#{path}', doraise=True)\n
+    py_compile.compile('#{fullpath}', doraise=True)\n
 except py_compile.PyCompileError:\n
     print sys.exc_info()[1]\n
     exit(1)
 "
-        exec "python", "-c", "\"#{script}\""
+        raise 'Validation failed' unless exec(@python.python, '-c', "\"#{script}\"")
     end
+
+    def what_it_does() "Validate '#{@name}' script" end
 end
