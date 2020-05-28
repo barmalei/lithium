@@ -105,8 +105,6 @@ class MavenClasspath < InFileClasspath
     default_name(".li_maven_class_path")
 
     def initialize(*args, &block)
-        puts "homedir = #{homedir}, #{owner} "
-
         REQUIRE MVN
         @excludeTransitive = false
         super(*args, &block)

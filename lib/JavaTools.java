@@ -115,7 +115,8 @@ public class JavaTools {
                     if (classes.size() == 1) {
                         clazz = classes.get(0);
                     } else {
-                        throw e;
+                        System.err.println("Class '" + suffix + "' cannot be found");
+                        System.exit(1);
                     }
                 }
             }

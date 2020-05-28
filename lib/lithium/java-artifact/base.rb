@@ -8,94 +8,18 @@ require 'rexml/document'
 class JavaClasspath < Artifact
     include AssignableDependency
     include LogArtifactState
+    include PATH
 
     log_attr :paths
 
-    # join class paths and normalize it
-    def JavaClasspath.join(*parts)
-        cl = parts.select { | part | !part.nil? && parts.length > 0 }.join(File::PATH_SEPARATOR)
-        res = JavaClasspath::norm_classpath(cl)
-        return res
-    end
-
-    def JavaClasspath.has?(cp, path)
-        # cut last slash
-        path     = path[0..-2] if path[-1] == '/'
-        path_ext = File.extname(path)
-        path     = File.basename(path) if path_ext == '.jar' || path_ext == '.zip'
-
-        cp.split(File::PATH_SEPARATOR).each { | cp_path |
-            cp_path_ext = File.extname(cp_path)
-            cp_path     = File.basename(cp_path) if cp_path_ext == '.jar' || cp_path_ext == '.zip'
-            return true if cp_path == path
-        }
-        return false
-    end
-
-    # split classpath and remove duplicated libs
-    def JavaClasspath.norm_classpath(cp)
-        res   = []
-        paths = {}
-        cp.split(File::PATH_SEPARATOR).each { | path |
-            ext = File.extname(path)
-            key = path
-            key = File.basename(path) if ext == '.jar' || ext == '.zip'
-
-            if paths[key].nil?
-                paths[key] = path
-            else
-                puts_error "Duplicate '#{key}' in class path has detected"
-                puts_error "   ? '#{paths[key]}'"
-                puts_error "   ? '#{path}'"
-            end
-
-            res.push(path) unless res.include?(path)
-        }
-        return res.join(File::PATH_SEPARATOR)
-    end
-
-    # expand directory to a classpath that contains all JARs filed found in the directory
-    def JavaClasspath.expand_classpath_dir(path) ### Array
-        if File.directory?(path)
-            classpath_items = []
-            Dir[File.join(path, '*.jar')].each { | item |
-                classpath_items.push(item)
-            }
-
-            return classpath_items
-        else
-            raise "Invalid classpath directory '#{path}'"
-        end
-    end
-
-    def initialize(*args, &block)
-        @paths = []
-        super
-    end
-
-    # add JARs to classpath
-    def JARS(*args)
-        args.each { | path |
-            @paths.push({
-                :path   => path,
-                :type   => :jar,
-                :expand => false
-            })
-        }
-    end
-
     # add path to classpath
-    def PATH(path, expand_path = false)
-        @paths.push({
-            :path   => path,
-            :type   => :path,
-            :expand => expand_path
-        })
+    def PATH(*paths)
+        add_paths(*paths)
     end
 
     # clear classpath
     def CLEAR()
-        @paths = []
+       clear_path()
     end
 
     def assign_me_to()
@@ -110,19 +34,6 @@ class JavaClasspath < Artifact
     def build()
     end
 
-    def classpath()
-        hd        = project.homedir
-        classpath = []
-        @paths.each { | entry |
-            path = entry[:path]
-            path = File.join(hd, path) unless (Pathname.new path).absolute?
-            classpath.concat(JavaClasspath.expand_classpath_dir(path)) if entry[:expand] == true
-            classpath.push(path)
-        }
-
-        return classpath.join(File::PATH_SEPARATOR)
-    end
-
     def what_it_does()
         "Build '#{name}' class path "
     end
@@ -134,9 +45,9 @@ class DefaultClasspath < JavaClasspath
 
         # if a user defines its own customization block ignore classpath auto-detection
         if block.nil?
-            hd = project.homedir
+            hd = path_base_dir
             PATH('classes')   if File.exists?(File.join(hd, 'classes'))
-            PATH('lib', true) if File.exists?(File.join(hd, 'lib'))
+            PATH('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
         end
     end
 end
@@ -144,11 +55,9 @@ end
 class WarClasspath < JavaClasspath
     def initialize(*args, &block)
         super
-
-        hd = project.homedir
-        base_lib = File.join(hd, 'WEB-INF')
+        base_lib = File.join(path_base_dir, 'WEB-INF')
         PATH(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
-        PATH(File.join('WEB-INF', 'lib'), true) if File.exists?(File.join(base_lib, 'lib'))
+        PATH(File.join('WEB-INF', 'lib/*.jar')) if File.exists?(File.join(base_lib, 'lib'))
     end
 end
 
@@ -157,6 +66,7 @@ class WildflyWarClasspath < WarClasspath
 
     def initialize(*args, &block)
         @modules_path = FileArtifact.look_directory_up(project.homedir, 'modules')
+        raise 'Invalid NIL WildFly module path' if modules_path.nil?
         raise "Invalid WildFly module path '#{@modules_path}'" unless File.directory?(@modules_path)
 
         super
@@ -176,7 +86,7 @@ class WildflyWarClasspath < WarClasspath
                     name = name.gsub('.', '/')
                     root = File.join(_addon_module_root, '**', name, 'main', '*.jar')
                     FileArtifact.dir(root) { | jar |
-                        JARS(jar)
+                        PATH(jar)
                     }
                 end
             }
@@ -192,7 +102,7 @@ class WildflyWarClasspath < WarClasspath
     end
 
     def SYSTEM_MODULE(path)
-        JARS(*_MODULE(_system_module_root, path))
+        PATHS(*_MODULE(_system_module_root, path))
     end
 
     def ADDON_MODULES(*paths)
@@ -202,7 +112,7 @@ class WildflyWarClasspath < WarClasspath
     end
 
     def ADDON_MODULE(path)
-        JARS(*_MODULE(_addon_module_root, path))
+        PATHS(*_MODULE(_addon_module_root, path))
     end
 
     def _MODULE(root, path)
@@ -234,12 +144,13 @@ end
 class InFileClasspath < FileArtifact
     include AssignableDependency
     include LogArtifactState
+    include PATH
 
     default_name(".li_classpath")
 
     def initialize(*args, &block)
+        @is_classpah_loaded = false
         super
-        @read_as_lines ||= false
     end
 
     def assign_me_to()
@@ -250,48 +161,28 @@ class InFileClasspath < FileArtifact
         super
         fp = fullpath
         raise "Classpath file/directory '#{fp}' doesn't exist" unless File.exists?(fp)
+        @is_classpah_loaded = false
     end
 
-    def list_items()
-        fp = fullpath
-        if File.directory?(fp)
-            FileArtifact.dir(File.join(fp, '/*')) { | path |
-                yield path, File.mtime(path).to_i
-            }
-        else
-            super
-        end
-    end
+    def paths()
+        super
 
-    def classpath()
-        fp = fullpath
-        return nil unless File.exists?(fp)
-
-        cp = nil
-        if File.directory?(fp)
-            cp = []
-            FileArtifact.dir(File.join(fp, '/*')) { | path |
-                cp.push(read_classpath_file(path))
-            }
-            cp = cp.join(File::PATH_SEPARATOR)
-        else
-            cp = read_classpath_file(fp)
+        unless @is_classpah_loaded
+            add_paths(*read_classpath_file(fullpath))
+            @is_classpah_loaded = true
         end
 
-        return cp if cp.nil?
-        return JavaClasspath.norm_classpath(cp)
+        return @paths
     end
 
     def read_classpath_file(path)
-        return File.read(path).strip unless @read_as_lines
-
-        cp = []
+        lines = []
         File.readlines(path).each { | line |
             line = line.strip
             next if line.length == 0 || line[0] == '#'
-            cp.push(line)
+            lines.push(line)
         }
-        return cp.join(File::PATH_SEPARATOR)
+        return lines
     end
 end
 
@@ -304,9 +195,9 @@ class JVM < EnvArtifact
     end
 
     def classpath()
-        classpath = @classpaths.map { | art | art.classpath }.select { | cp | !cp.nil? && cp.length > 0 }.join(File::PATH_SEPARATOR)
-        classpath = classpath.nil? || classpath.length == 0 ? nil : JavaClasspath.norm_classpath(classpath)
-        return classpath
+        paths = PATH.new(project.homedir)
+        @classpaths.each { | cp | paths.add_paths(cp) }
+        return paths
     end
 
     def list_classpaths()
@@ -447,7 +338,7 @@ class KotlinClasspath < JavaClasspath
         raise "Kotlin home '#{@kotlin_home}' is invalid" unless File.directory?(@kotlin_home)
 
         lib = File.join(@kotlin_home, 'lib')
-        JARS(File.join(lib, 'kotlin-stdlib.jar' ),
+        PATH(File.join(lib, 'kotlin-stdlib.jar' ),
              File.join(lib, 'kotlin-reflect.jar'))
     end
 end
@@ -499,3 +390,4 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
+

@@ -120,7 +120,7 @@ class JavaCompiler < FileMask
         dst = destination()
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
 
-        cp = JavaClasspath.join(cp, dst) unless JavaClasspath.has?(cp, dst)
+        cp = cp.join_path(dst) unless cp.include_path?(dst)
         if cp
             [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', dst, src ]
         else
@@ -158,8 +158,6 @@ end
 
 class JDTCompiler < JavaCompiler
     def initialize(*args)
-        REQUIRE JAVA
-
         super
         @description = 'JDT'
         @jdt_jar_path = File.join($lithium_code, 'tools', 'java', 'jdt', 'ecj-4.15.jar') unless @jdt_jar_path
@@ -196,7 +194,7 @@ class GroovyCompiler < JavaCompiler
     end
 
     def classpath()
-        JavaClasspath::join(@groovy.classpath, @java.classpath)
+        @groovy.classpath.join_path(@java.classpath)
     end
 
     def what_it_does()
@@ -220,7 +218,7 @@ class KotlinCompiler < JavaCompiler
     end
 
     def classpath()
-        JavaClasspath::join(@kotlin.classpath, @java.classpath)
+        @kotlin.classpath.join_path(@java.classpath)
     end
 
     # TODO: not clear what it is
@@ -252,7 +250,7 @@ class ScalaCompiler < JavaCompiler
     end
 
     def classpath()
-        JavaClasspath::join(@scala.classpath, @java.classpath)
+        @scala.classpath.join_path(@java.classpath)
     end
 
     def what_it_does()

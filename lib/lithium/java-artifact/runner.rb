@@ -84,7 +84,8 @@ end
 
 module JUnitTestRunner
     def classpath()
-        JavaClasspath.join(super, File.join($lithium_code, 'tools', 'java', 'junit', 'junit-4.11.jar'))
+        cp = super()
+        return cp.join_path(File.join($lithium_code, 'tools', 'java', 'junit', 'junit-4.11.jar'))
     end
 
     def target()
@@ -143,7 +144,7 @@ class RunGroovyScript < JavaFileRunner
     end
 
     def classpath()
-        JavaClasspath::join(@groovy.classpath, @java.classpath)
+        @groovy.classpath.join_path(@java.classpath)
     end
 
     def target()
@@ -167,7 +168,7 @@ class RunKotlinCode < JavaFileRunner
     end
 
     def classpath()
-        JavaClasspath::join(@kotlin.classpath, @java.classpath)
+        @kotlin.classpath.join_path(@java.classpath)
     end
 
     def target()
@@ -196,7 +197,7 @@ class RunScalaCode < JavaFileRunner
     end
 
     def classpath()
-        JavaClasspath::join(@scala.classpath, @java.classpath)
+        @scala.classpath.join_path(@java.classpath)
     end
 
     def target()

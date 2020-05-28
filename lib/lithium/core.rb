@@ -1054,6 +1054,9 @@ class FileArtifact < Artifact
         end
     end
 
+    def build()
+    end
+
     # test if the given path is in a context of the given file artifact
     def match(path)
         raise 'Invalid empty or nil path' if path.nil? || path.length == 0
@@ -1081,11 +1084,18 @@ class FileArtifact < Artifact
 
     def expired?()
         File.exists?(fullpath) == false
+        return false
     end
 
     def mtime()
         f = fullpath()
         return File.exists?(f) ? File.mtime(f).to_i() : -1
+    end
+
+    def puts_items()
+        list_items { | p, t |
+            puts "logged item = '#{p}' : #{t}"
+        }
     end
 
     def list_items()
@@ -1765,6 +1775,148 @@ class EnvArtifact < Artifact
     def build() end
 end
 
+# The base class to support classpath / path like artifact
+module PATH
+    def path_valid?
+        @is_path_valid ||= false
+        return @is_path_valid
+    end
+
+    def include_path?(path)
+        is_file = false
+
+        bd   = path_base_dir()
+        path = File.join(bd, path) if !bd.nil? && !Pathname.new(path).absolute?
+
+        if path[-1] == '/'
+            path = path[0..-2]
+        elsif File.file?(path)
+            is_file = true
+            path = File.basename(path)
+        end
+
+        paths().each { | path_item |
+            path_item = File.basename(path_item) if is_file && File.file?(path_item)
+            return true if path_item == path
+        }
+
+        return false
+    end
+
+    # TODO: think if the code is valid for this particular module
+    def path_base_dir
+        return project.homedir if respond_to?(project)
+        retun nil
+    end
+
+    def add_path(path)
+        add_paths(path)
+    end
+
+    # add path item
+    def add_paths(*parts)
+        @paths ||= []
+
+        parts.each { | path |
+            if path.kind_of?(PATH)
+                @paths.concat(path.paths())
+            elsif path.kind_of?(String)
+                hd = path_base_dir
+                path.split(File::PATH_SEPARATOR).each { | path_item |
+                    path_item = File.join(hd, path_item) if !hd.nil? && !(Pathname.new path_item).absolute?
+
+                    # TODO: copy paste ArtifactName initialize()
+                    mask_index = path_item.index(/[\[\]\?\*\{\}]/)
+                    unless mask_index.nil?
+                        @paths.concat(FileArtifact.dir(path_item))
+                        path_item = path_item[0, mask_index] # remove mask
+                    end
+
+                    @paths.push(path_item)
+                }
+                @is_path_valid = false
+            else
+                raise "Invalid path type '#{path.class}'"
+            end
+        }
+    end
+
+    def join_path(path)
+        return join_paths(path)
+    end
+
+    def join_paths(*parts)
+        p = PATH.new(path_base_dir())
+        p.add_paths(*(paths()))
+        p.add_paths(*parts)
+        return p
+    end
+
+    # clear path
+    def clear_path
+        @paths = []
+        @is_path_valid = true
+    end
+
+    def validate_path
+        unless path_valid?
+            res   = []
+            files = {}
+            @paths ||= []
+
+            @paths.each { | path |
+                puts_warning "File '#{path}' doesn't exists (#{@paths.length})" unless File.exists?(path)
+
+                path = path[0..-2] if path[-1] == '/'
+                key = path
+                key = File.basename(path) if File.file?(path) # check if the path is file
+
+                if files[key].nil?
+                    files[key] = path
+                    res.push(path)
+                else
+                    path_x = files[key]
+                    if path_x == path
+                        puts_warning "Duplicated '#{path}' path is detected"
+                    else
+                        puts_warning "Duplicated file is detected:"
+                        puts_warning "   ? '#{path_x}'"
+                        puts_warning "   ? '#{path}'"
+                    end
+                end
+            }
+
+            @paths = res
+            @is_path_valid = true
+        end
+    end
+
+    def paths
+        @paths ||= []
+        validate_path()
+        return @paths
+    end
+
+    def path_empty?
+        paths().length == 0
+    end
+
+    def to_s
+        return path_empty?() ? nil : paths().join(File::PATH_SEPARATOR)
+    end
+end
+
+
+class PathClass
+    include PATH
+
+    def initialize()
+        @dir = nil
+        super
+    end
+end
+
+
 class GroupByExtension < FileMask
     def initialize(*args, &block)
         @callback = nil
@@ -1789,3 +1941,6 @@ class GroupByExtension < FileMask
         }
     end
 end
+
+
+

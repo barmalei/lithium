@@ -166,31 +166,34 @@ end
 class EXPIRED < Artifact
     def build()
         a = Project.artifact(@name)
-        raise "Artifact '#{@name}' doesn't track its state" unless a.kind_of?(LogArtifactState)
 
-        unless a.expired?
-            ei = 0
-            puts "Detected expired items for '#{@name}':"
-            a.list_expired_items { | path, tm |
-                puts "   '#{path}': #{tm}"
-                ei += 1
-            }
-            puts '    <No expired items have been detected !' if ei == 0
+        name = "Artifact '#{a.class}:#{a.shortname}'"
+        if a.kind_of?(LogArtifactState)
+            if a.original_expired?()
+                puts "#{name} is expired: 'expire?' => true"
+                return
+            else
+                ei = 0
+                a.list_expired_items { | path, tm |
+                    puts "#{name} is expired: '#{path}' => #{tm} : #{File.mtime(path).to_i}"
+                    ei += 1
+                }
 
-            ei = 0
-            puts "\nDetected expired properties for '#{@name}':"
-            a.list_expired_attrs { |n, ov|
-                puts "    '#{n}' = #{ov}"
-                ei += 1
-            }
-            puts '    <No an expired property has been detected !' if ei == 0
-            puts ''
-        else
-            puts "Artifact '#{@name}' is not expired"
+                a.list_expired_attrs { |n, ov|
+                    puts "#{name} is expired: '#{n}' => #{ov}"
+                    ei += 1
+                }
+
+                return if ei > 0
+            end
+        elsif a.expired?
+            puts "#{name} is expired: 'expire?' => true"
+            return
         end
+        puts "#{name} is not expired"
     end
 
-    def what_it_does() "List of expired items of '#{@name}' artifact" end
+    def what_it_does() "Explain expiration state of '#{@name}' artifact" end
 end
 
 class INFO < Artifact

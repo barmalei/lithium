@@ -4,9 +4,7 @@ require 'lithium/core'
 require 'lithium/file-artifact/command'
 require 'lithium/misc-artifact'
 
-#
 # Python home
-#
 class PYTHON < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
@@ -47,8 +45,6 @@ class PYTHON < EnvArtifact
             @pypath = @pypath ? lib + File::PATH_SEPARATOR + @pypath : lib
         }
         ENV['PYTHONPATH'] = @pypath
-
-        puts "---- #{@pypath}"
     end
 
     def python()

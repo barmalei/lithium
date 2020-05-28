@@ -59,7 +59,7 @@ class ShowClassMethods < EnvArtifact
 
     def build()
         cn  = @shortname
-        cp  = JavaClasspath.join(@java.classpath, File.join($lithium_code, 'classes'))
+        cp  = @java.classpath.join_path(File.join($lithium_code, 'classes'))
         
         res = Artifact.exec(
             @java.java,
