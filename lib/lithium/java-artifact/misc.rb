@@ -57,7 +57,7 @@ class ShowClassMethods < EnvArtifact
         super
     end
 
-    def build()
+    def build
         cn  = @shortname
         cp  = @java.classpath().to_s(File.join($lithium_code, 'classes'))
         
@@ -129,7 +129,7 @@ class FindClassInClasspath < FindInClasspath
         @target = @target + '.class' unless @target.end_with?('.class')
     end
 
-    def build()
+    def build
         Artifact.exec(
             @java.java, 
             '-classpath',
@@ -153,4 +153,25 @@ class FindClassInClasspath < FindInClasspath
     end
 
     def self.abbr() 'FCC' end
+end
+
+
+def SyncWarClasses(art, war_path)
+    war_dir  = File.dirname(war_path)
+    war_path = File.join($lithium_options['app_server_root'], war_path) if war_dir.nil? || war_dir == '.'
+
+    raise "Invalid WAR path '#{war_path}'" unless File.directory?(war_path)
+    dest = File.join(war_path, 'WEB-INF', 'classes')
+    raise "Invalid WAR classpath path '#{dest}'" unless File.directory?(dest)
+
+    art.list_dest_paths { | path, pkg |
+        puts "Copy '#{path}' to '#{dest}'"
+
+        FileArtifact.cpfile(path,
+            File.join(dest, pkg.gsub('.', '/'))
+        )
+    }
+
+    Touch.touch(File.join(war_path, 'WEB-INF', 'web.xml'))
+    Touch.touch(File.join(war_path, '..', "#{File.basename(war_path)}.deployed"))
 end

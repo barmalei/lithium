@@ -3,7 +3,7 @@ require 'fileutils'
 require 'lithium/core'
 
 #  Touch file - change the file updated time stamp
-class Touch < FileCommand
+class Touch < FileArtifact
     def build()
         super
 
@@ -14,6 +14,8 @@ class Touch < FileCommand
             puts_warning "File '#{path}' cannot be found to be touched"
         end
     end
+
+    def expired?() true end
 
     def self.touch(path)
         Touch.new(path).build
