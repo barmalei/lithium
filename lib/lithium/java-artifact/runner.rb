@@ -9,12 +9,12 @@ class JavaFileRunner < FileCommand
         @arguments ||= []
     end
 
-    def build()
+    def build
         go_to_homedir()
         raise "Running '#{@name}' failed" if Artifact.exec(*cmd()) != 0
     end
 
-    def cmd()
+    def cmd
         clpath = classpath()
         cmd = [ run_with() ]
         cmd.push('-classpath', "\"#{clpath}\"") unless clpath.nil?
@@ -22,15 +22,15 @@ class JavaFileRunner < FileCommand
         return cmd
     end
 
-    def target()
+    def target
         @name
     end
 
-    def classpath()
-        @java.classpath
+    def classpath
+        return @java.classpath
     end
 
-    def run_with()
+    def run_with
         @java.java
     end
 
@@ -42,7 +42,7 @@ class JavaFileRunner < FileCommand
 end
 
 class RunJavaClass < JavaFileRunner
-    def target()
+    def target
         n = @name.dup
         n[/[.]class$/] = '' if n.end_with?('.class')
         n
@@ -58,7 +58,7 @@ class RunJavaCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def target()
+    def target
         pkgname = grep_package()
         clname  = File.basename(fullpath)
         clname[/\.java$/] = '' if clname.end_with?('.java')
@@ -72,23 +72,27 @@ end
 
 
 module RunJavaTestCase
-    def target()
+    def target
         st = super
         st.sub(/(([a-zA-Z_$][a-zA-Z0-9_$]*\.)*)([a-zA-Z_$][a-zA-Z0-9_$]*)/, '\1Test\3')
     end
 
-    def what_it_does()
+    def what_it_does
        "Run Java test-cases '#{target}'\n                for '#{@name}'"
     end
 end
 
-module JUnitTestRunner
-    def classpath()
-        cp = super()
-        return cp.join_path(File.join($lithium_code, 'tools', 'java', 'junit', 'junit-4.11.jar'))
+class RunJavaCodeWithJUnit < RunJavaCode
+    def initialize(*args)
+        super
+        @junit_runner_class ||= 'org.junit.runner.JUnitCore'
     end
 
-    def target()
+    def classpath
+        super.JOIN(File.join($lithium_code, 'tools', 'java', 'junit', 'junit-4.11.jar'))
+    end
+
+    def target
         if @name.end_with?('.java') &&
             nm = File.basename(@name)
             nm[/\.java$/] = ''
@@ -109,15 +113,6 @@ module JUnitTestRunner
     def what_it_does() "Run JAVA '#{@name}' with JUnit code" end
 
     def abbr() 'JUN' end
-end
-
-class RunJavaCodeWithJUnit < RunJavaCode
-    include JUnitTestRunner
-
-    def initialize(*args)
-        super
-        @junit_runner_class ||= 'org.junit.runner.JUnitCore'
-    end
 end
 
 class RunJavaClassWithJUnit < RunJavaClass
@@ -143,8 +138,8 @@ class RunGroovyScript < JavaFileRunner
         super
     end
 
-    def classpath()
-        @groovy.classpath.join_path(@java.classpath)
+    def classpath
+        return super.JOIN(@groovy.classpaths)
     end
 
     def target()
@@ -167,8 +162,8 @@ class RunKotlinCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def classpath()
-        @kotlin.classpath.join_path(@java.classpath)
+    def classpath
+        super.JOIN(@kotlin.classpaths)
     end
 
     def target()
@@ -196,8 +191,8 @@ class RunScalaCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def classpath()
-        @scala.classpath.join_path(@java.classpath)
+    def classpath
+        super.JOIN(@scala.classpaths)
     end
 
     def target()

@@ -22,7 +22,7 @@ class JarFileContent < FileArtifact
         raise 'Invalid source file' if @source.nil?
 
         source_path = @source
-        source_path = fullpath(source_path) unless Pathname.new(source_path).absolute?
+        source_path = fullpath(source_path) unless File.absolute_path?(source_path)
         raise "Source file '#{source_path}' is invalid" if !File.exists?(source_path) || File.directory?(source_path)
 
         fp = fullpath

@@ -993,7 +993,7 @@ class FileArtifact < Artifact
         if @is_absolute
             unless owner.nil?
                 home = owner.homedir
-                if Pathname.new(home).absolute?
+                if File.absolute_path?(home)
                     home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
                     return home #if _contains_path?(home, @name)
                 end
@@ -1776,17 +1776,33 @@ class EnvArtifact < Artifact
 end
 
 # The base class to support classpath / path like artifact
-module PATH
+module PATHS
+    class CombinedPath
+        include PATHS
+
+        def initialize(dir = nil)
+            @path_base_dir = dir
+        end
+
+        def path_base_dir
+            return @path_base_dir
+        end
+    end
+
+    def self.new(dir = nil)
+        CombinedPath.new(dir)
+    end
+
     def path_valid?
         @is_path_valid ||= false
         return @is_path_valid
     end
 
-    def include_path?(path)
+    def INCLUDE?(path)
         is_file = false
 
         bd   = path_base_dir()
-        path = File.join(bd, path) if !bd.nil? && !Pathname.new(path).absolute?
+        path = File.join(bd, path) if !bd.nil? && !File.absolute_path?(path)
 
         if path[-1] == '/'
             path = path[0..-2]
@@ -1805,25 +1821,25 @@ module PATH
 
     # TODO: think if the code is valid for this particular module
     def path_base_dir
-        return project.homedir if respond_to?(project)
-        retun nil
-    end
-
-    def add_path(path)
-        add_paths(path)
+        return project.homedir if respond_to?(:project)
+        return nil
     end
 
     # add path item
-    def add_paths(*parts)
+    def JOIN(*parts)
         @paths ||= []
 
+        return JOIN(*(parts[0])) if parts.length == 1 && parts[0].kind_of?(Array)
+
         parts.each { | path |
-            if path.kind_of?(PATH)
+            if path.kind_of?(PATHS)
                 @paths.concat(path.paths())
             elsif path.kind_of?(String)
                 hd = path_base_dir
                 path.split(File::PATH_SEPARATOR).each { | path_item |
-                    path_item = File.join(hd, path_item) if !hd.nil? && !(Pathname.new path_item).absolute?
+                    if !hd.nil? && !File.absolute_path?(path_item)
+                        path_item = File.join(hd, path_item)
+                    end
 
                     # TODO: copy paste ArtifactName initialize()
                     mask_index = path_item.index(/[\[\]\?\*\{\}]/)
@@ -1834,28 +1850,19 @@ module PATH
 
                     @paths.push(path_item)
                 }
-                @is_path_valid = false
             else
                 raise "Invalid path type '#{path.class}'"
             end
         }
-    end
-
-    def join_path(path)
-        return join_paths(path)
-    end
-
-    def join_paths(*parts)
-        p = PATH.new(path_base_dir())
-        p.add_paths(*(paths()))
-        p.add_paths(*parts)
-        return p
+        @is_path_valid = false if parts.length > 0
+        return self
     end
 
     # clear path
-    def clear_path
+    def CLEAR
         @paths = []
         @is_path_valid = true
+        return self
     end
 
     def validate_path
@@ -1897,22 +1904,22 @@ module PATH
         return @paths
     end
 
-    def path_empty?
-        paths().length == 0
+    def EMPTY?
+        return paths().length == 0
     end
 
-    def to_s
-        return path_empty?() ? nil : paths().join(File::PATH_SEPARATOR)
-    end
-end
+    def to_s(*args)
+        #return "#{self.class}" if args.length == 0
 
 
-class PathClass
-    include PATH
-
-    def initialize()
-        @dir = nil
-        super
+        if EMPTY?
+            return nil if args.length == 0
+            return args.join(File::PATH_SEPARATOR)
+        else
+            pp = paths()
+            return pp.join(File::PATH_SEPARATOR) if args.length == 0
+            return [].concat(pp).concat(args).join(File::PATH_SEPARATOR)
+        end
     end
 end
 
@@ -1941,6 +1948,3 @@ class GroupByExtension < FileMask
         }
     end
 end
-
-
-

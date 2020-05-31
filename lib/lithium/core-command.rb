@@ -124,7 +124,7 @@ class TREE < Artifact
     def show_tree(root) puts tree2string(nil, root) end
 
     def tree2string(parent, root, shift=0)
-        pshift, name = shift, root.art.to_s
+        pshift, name = shift, root.art.shortname
 
         e = (root.expired ? '*' : '') +
             (@show_id ? " #{root.art.object_id}" : '') +

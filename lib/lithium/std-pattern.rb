@@ -1,4 +1,3 @@
-require 'pathname'
 require 'json'
 
 require 'lithium/core'
@@ -158,7 +157,7 @@ class StdPattern
     # TODO: not clear if the method shoul be here
     def COMPLETE_PATH()
         BLOCK(:file) { | path |
-            break path if Pathname.new(path).absolute?
+            break path if File.absolute_path?(path)
             if $current_artifact.kind_of?(FileArtifact)
                 fp = $current_artifact.fullpath
                 if fp.end_with?(path)

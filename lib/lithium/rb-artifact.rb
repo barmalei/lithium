@@ -1,8 +1,6 @@
 require 'lithium/file-artifact/command'
 require 'lithium/misc-artifact'
 
-require 'pathname'
-
 # Ruby environment
 class RUBY < EnvArtifact
     include LogArtifactState
@@ -26,7 +24,7 @@ class RUBY < EnvArtifact
     def rpath()
         rpath = []
         @libs.each { | path |
-            path = File.join(homedir, path) unless Pathname.new(path).absolute?
+            path = File.join(homedir, path) unless File.absolute_path?(path)
             if File.directory?(path)
                 rpath.push("-I\"#{path}\"")
             else

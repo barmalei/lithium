@@ -13,11 +13,11 @@ class BuildVaadinSass < JavaFileRunner
         @arguments.push("'#{@inputFile}'", "'#{@outputFile}'")
     end
 
-    def target()
+    def target
         'com.vaadin.sass.SassCompiler'
     end
 
-    def what_it_does()
+    def what_it_does
         "Generate CSS:\n    from '#{@outputFile}'\n    to   '#{@inputFile}'"
     end
 end

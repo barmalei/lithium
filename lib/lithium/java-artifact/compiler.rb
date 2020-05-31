@@ -18,15 +18,18 @@ class JavaCompiler < FileMask
         @destination        = nil
         @list_expired       = false
         @source_as_file     = false  # store target files into tmp file
-
         super
+    end
+
+    def classpath
+        return @java.classpath
     end
 
     def expired?() false end
 
-    def destination()
+    def destination
         unless @destination.nil?
-            @destination = File.join(homedir, @destination) unless Pathname.new(@destination).absolute?
+            @destination = File.join(homedir, @destination) unless File.absolute_path?(@destination)
             if !File.exists?(@destination) && @create_destination
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
@@ -53,10 +56,6 @@ class JavaCompiler < FileMask
 
     def compile_with()
         @java.javac
-    end
-
-    def classpath()
-        @java.classpath
     end
 
     def list_source_paths()
@@ -116,19 +115,20 @@ class JavaCompiler < FileMask
 
     def cmd(src)
         cp  = classpath()
+
         src = src.kind_of?(Tempfile) || src.kind_of?(File) ? "@\"#{src.path}\"" : src
         dst = destination()
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
 
-        cp = cp.join_path(dst) unless cp.include_path?(dst)
-        if cp
+        cp = cp.JOIN(dst) unless cp.INCLUDE?(dst)
+        unless cp.EMPTY?
             [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', dst, src ]
         else
             [ compile_with, OPTS(), '-d', dst, src ]
         end
     end
 
-    def build()
+    def build
         super
 
         src, length = source()
@@ -184,20 +184,19 @@ end
 class GroovyCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE GROOVY
-
         super
         @description = 'Groovy'
     end
 
-    def compile_with()
+    def classpath
+        return super.JOIN(@groovy.classpaths)
+    end
+
+    def compile_with
         @groovy.groovyc
     end
 
-    def classpath()
-        @groovy.classpath.join_path(@java.classpath)
-    end
-
-    def what_it_does()
+    def what_it_does
         "Compile groovy '#{@name}' code"
     end
 
@@ -213,12 +212,12 @@ class KotlinCompiler < JavaCompiler
         @description = 'Kotlin'
     end
 
-    def compile_with()
-        @kotlin.kotlinc
+    def classpath
+        return super.JOIN(@kotlin.classpaths)
     end
 
-    def classpath()
-        @kotlin.classpath.join_path(@java.classpath)
+    def compile_with
+        @kotlin.kotlinc
     end
 
     # TODO: not clear what it is
@@ -228,7 +227,7 @@ class KotlinCompiler < JavaCompiler
     #     return super
     # end
 
-    def what_it_does()
+    def what_it_does
         "Compile Kotlin '#{@name}' code\n            to '#{destination()}'"
     end
 
@@ -245,15 +244,15 @@ class ScalaCompiler < JavaCompiler
         @description = 'Scala'
     end
 
-    def compile_with()
+    def compile_with
         @scala.scalac
     end
 
-    def classpath()
-        @scala.classpath.join_path(@java.classpath)
+    def classpath
+        return super.JOIN(@scala.classpaths)
     end
 
-    def what_it_does()
+    def what_it_does
         "Compile Scala '#{@name}' code"
     end
 

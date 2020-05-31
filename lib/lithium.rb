@@ -42,8 +42,7 @@ unless artifact_path.nil?
     artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil # store mask
     artifact_path = artifact_path[0, i] if !i.nil? && i >= 0             # cut mask from path
 
-    path  = Pathname.new(artifact_path)
-    if path.absolute?
+    if File.absolute_path?(artifact_path)
         # resolve link to real path for absolute paths
         artifact_path = File.realpath(artifact_path)
         unless $lithium_options.has_key?('basedir')

@@ -1,5 +1,3 @@
-require 'pathname'
-
 require 'lithium/core'
 require 'lithium/file-artifact/command'
 require 'lithium/misc-artifact'
@@ -40,7 +38,7 @@ class PYTHON < EnvArtifact
 
         # setup pypath
         @libs.each { | lib |
-            lib = File.join(homedir, lib)       unless Pathname.new(lib).absolute?()
+            lib = File.join(homedir, lib)       unless File.absolute_path?(lib)
             raise "Invalid lib path - '#{lib}'" unless File.directory?(lib)
             @pypath = @pypath ? lib + File::PATH_SEPARATOR + @pypath : lib
         }

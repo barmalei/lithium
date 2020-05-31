@@ -59,7 +59,7 @@ class ShowClassMethods < EnvArtifact
 
     def build()
         cn  = @shortname
-        cp  = @java.classpath.join_path(File.join($lithium_code, 'classes'))
+        cp  = @java.classpath().to_s(File.join($lithium_code, 'classes'))
         
         res = Artifact.exec(
             @java.java,
@@ -80,7 +80,7 @@ class FindInClasspath < FileCommand
     end
 
     def build()
-        unless @java.classpath.nil?
+        unless @java.classpath.EMPTY?
             count = 0
             FindInClasspath.find(@use_zipinfo, @java.classpath, @target) { | path, item, is_jar |
                 item_found(path, item, is_jar)

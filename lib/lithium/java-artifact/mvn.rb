@@ -1,7 +1,6 @@
 require 'lithium/file-artifact/remote'
 
 require 'fileutils'
-require 'pathname'
 require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
 require 'lithium/std-core'
@@ -125,7 +124,7 @@ class MavenClasspath < InFileClasspath
     end
 
     def what_it_does()
-#        "Build maven classpath by '#{@pom.fullpath}' in '#{fullpath}'"
+        "Build maven classpath by '#{@pom.fullpath}' in '#{fullpath}'"
     end
 end
 
@@ -164,7 +163,6 @@ class MavenDependenciesDir < FileArtifact
         )
     end
 end
-
 
 class RunMaven < PomFile
     include OptionsSupport

@@ -1,5 +1,3 @@
-require "pathname"
-
 require 'lithium/std-core' # help to run it as a code, since puts_warning is expected
 require 'lithium/core'
 
@@ -8,22 +6,12 @@ require 'rexml/document'
 class JavaClasspath < Artifact
     include AssignableDependency
     include LogArtifactState
-    include PATH
+    include PATHS
 
     log_attr :paths
 
-    # add path to classpath
-    def PATH(*paths)
-        add_paths(*paths)
-    end
-
-    # clear classpath
-    def CLEAR()
-       clear_path()
-    end
-
     def assign_me_to()
-        'classpaths'
+        :add_classpath
     end
 
     # keep it to track the artifact logged expiration state
@@ -46,8 +34,8 @@ class DefaultClasspath < JavaClasspath
         # if a user defines its own customization block ignore classpath auto-detection
         if block.nil?
             hd = path_base_dir
-            PATH('classes')   if File.exists?(File.join(hd, 'classes'))
-            PATH('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
+            JOIN('classes')   if File.exists?(File.join(hd, 'classes'))
+            JOIN('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
         end
     end
 end
@@ -56,8 +44,8 @@ class WarClasspath < JavaClasspath
     def initialize(*args, &block)
         super
         base_lib = File.join(path_base_dir, 'WEB-INF')
-        PATH(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
-        PATH(File.join('WEB-INF', 'lib/*.jar')) if File.exists?(File.join(base_lib, 'lib'))
+        JOIN(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
+        JOIN(File.join('WEB-INF', 'lib/*.jar')) if File.exists?(File.join(base_lib, 'lib'))
     end
 end
 
@@ -86,7 +74,7 @@ class WildflyWarClasspath < WarClasspath
                     name = name.gsub('.', '/')
                     root = File.join(_addon_module_root, '**', name, 'main', '*.jar')
                     FileArtifact.dir(root) { | jar |
-                        PATH(jar)
+                        JOIN(jar)
                     }
                 end
             }
@@ -102,7 +90,7 @@ class WildflyWarClasspath < WarClasspath
     end
 
     def SYSTEM_MODULE(path)
-        PATHS(*_MODULE(_system_module_root, path))
+        JOIN(*_MODULE(_system_module_root, path))
     end
 
     def ADDON_MODULES(*paths)
@@ -112,13 +100,13 @@ class WildflyWarClasspath < WarClasspath
     end
 
     def ADDON_MODULE(path)
-        PATHS(*_MODULE(_addon_module_root, path))
+        JOIN(*_MODULE(_addon_module_root, path))
     end
 
     def _MODULE(root, path)
         raise 'Empty WildFly module path'                   if     path.nil? || path.length == 0
-        raise "Absolute WildFly module '#{path}' detected"  if     Pathname.new(path).absolute?
-        raise "Modules root path '#{root}' is invalid"      unless Pathname.new(root).directory?
+        raise "Absolute WildFly module '#{path}' detected"  if     File.absolute_path?(path)
+        raise "Modules root path '#{root}' is invalid"      unless File.directory?(root)
 
         path = File.join(root, path)
         raise "WildFly module path '#{path}' is invalid" unless File.exists?(path)
@@ -144,35 +132,25 @@ end
 class InFileClasspath < FileArtifact
     include AssignableDependency
     include LogArtifactState
-    include PATH
+    include PATHS
 
     default_name(".li_classpath")
 
     def initialize(*args, &block)
-        @is_classpah_loaded = false
         super
+        fp = fullpath
+        JOIN(read_classpath_file(fp)) if File.exists?(fp)
     end
 
     def assign_me_to()
-        'classpaths'
+        :add_classpath
     end
 
     def build()
         super
         fp = fullpath
         raise "Classpath file/directory '#{fp}' doesn't exist" unless File.exists?(fp)
-        @is_classpah_loaded = false
-    end
-
-    def paths()
-        super
-
-        unless @is_classpah_loaded
-            add_paths(*read_classpath_file(fullpath))
-            @is_classpah_loaded = true
-        end
-
-        return @paths
+        CLEAR().JOIN(read_classpath_file(fp))
     end
 
     def read_classpath_file(path)
@@ -189,25 +167,30 @@ end
 class JVM < EnvArtifact
     include LogArtifactState
 
+    attr_reader :classpaths
+
     def initialize(*args, &block)
         @classpaths = []
         super
     end
 
-    def classpath()
-        paths = PATH.new(project.homedir)
-        @classpaths.each { | cp | paths.add_paths(cp) }
-        return paths
+    def add_classpath(cp)
+        raise "Invalid class path type: '#{cp.class}'" unless cp.kind_of?(PATHS)
+        @classpaths.push(cp)
     end
 
-    def list_classpaths()
+    def list_classpaths
         return 'None' if @classpaths.length == 0
         @classpaths.map { | clz |
             clz.name
         }.join(',')
     end
 
-    def what_it_does()
+    def classpath
+        return PATHS.new(project.homedir).JOIN(@classpaths)
+    end
+
+    def what_it_does
         "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
     end
 
@@ -338,7 +321,7 @@ class KotlinClasspath < JavaClasspath
         raise "Kotlin home '#{@kotlin_home}' is invalid" unless File.directory?(@kotlin_home)
 
         lib = File.join(@kotlin_home, 'lib')
-        PATH(File.join(lib, 'kotlin-stdlib.jar' ),
+        JOIN(File.join(lib, 'kotlin-stdlib.jar' ),
              File.join(lib, 'kotlin-reflect.jar'))
     end
 end

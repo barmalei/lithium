@@ -1,5 +1,4 @@
 require 'fileutils'
-require 'pathname'
 
 require 'lithium/core'
 
@@ -58,7 +57,7 @@ class CopyOfFile < FileArtifact
 
     def validate_source()
         raise 'Source path is not defined' if @source.nil?
-        src = Pathname.new(@source).absolute? ? @source : fullpath(@source)
+        src = File.absolute_path?(@source) ? @source : fullpath(@source)
         raise "Source '#{src}' doesn't exist or points to a directory"  if !File.exists?(src) || File.directory?(src)
         return src
     end

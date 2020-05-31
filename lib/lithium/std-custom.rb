@@ -1,5 +1,4 @@
 require 'lithium/std-core'
-require 'pathname'
 
 class LithiumStd < Std
     @@signs_map = ['INF', 'WAR', 'ERR', 'EXC']

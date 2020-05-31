@@ -1,5 +1,3 @@
-require 'fileutils'
-
 require 'lithium/file-artifact/command'
 require 'lithium/rb-artifact'
 

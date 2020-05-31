@@ -55,7 +55,7 @@ class NodejsModule < FileArtifact
         puts "1)    ------ #{name}"
         puts "2)    ------ #{project.homedir}"
 
-        unless Pathname.new(name).absolute?
+        unless File.absolute_path?(name)
 
             bn = File.basename(File.dirname(name))
             name = File.join($NODEJS_MODULES_DIR, name) if bn != $NODEJS_MODULES_DIR

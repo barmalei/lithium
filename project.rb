@@ -1,4 +1,7 @@
 -> {
+
+    $lithium_options['v'] = 2
+
     Touch('touch:*')
 
     UglifiedJSFile('minjs:**/*.min.js')
@@ -19,7 +22,7 @@
     MATCH("run:*") {
         MATCH('.lithium/**/*.java') {
             DefaultClasspath {
-                PATH('.lithium/classes')
+                JOIN('.lithium/classes')
             }
 
             RunJavaCode('**/*.java')
