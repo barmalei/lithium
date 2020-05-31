@@ -176,7 +176,9 @@ class JVM < EnvArtifact
 
     def add_classpath(cp)
         raise "Invalid class path type: '#{cp.class}'" unless cp.kind_of?(PATHS)
-        @classpaths.push(cp)
+        # the method can call multiple time for the same instance of the artifact
+        # if there are more than 1 artifact that depends on the artifact
+        @classpaths.push(cp) if @classpaths.index(cp).nil?
     end
 
     def list_classpaths

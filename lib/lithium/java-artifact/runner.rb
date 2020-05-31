@@ -11,6 +11,9 @@ class JavaFileRunner < FileCommand
 
     def build
         go_to_homedir()
+
+        puts "JavaFileRunner.build(): #{self.class}  #{@java.list_classpaths}"
+
         raise "Running '#{@name}' failed" if Artifact.exec(*cmd()) != 0
     end
 

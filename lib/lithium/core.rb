@@ -1909,9 +1909,6 @@ module PATHS
     end
 
     def to_s(*args)
-        #return "#{self.class}" if args.length == 0
-
-
         if EMPTY?
             return nil if args.length == 0
             return args.join(File::PATH_SEPARATOR)
