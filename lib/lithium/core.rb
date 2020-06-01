@@ -1819,9 +1819,15 @@ module PATHS
         return false
     end
 
-    # TODO: think if the code is valid for this particular module
     def path_base_dir
-        return project.homedir if respond_to?(:project)
+        if respond_to?(:project)
+            prj = project
+            unless prj.nil?
+                return project.homedir
+            else
+                puts_warning "Project cannot be detected for #{self.class}"
+            end
+        end
         return nil
     end
 

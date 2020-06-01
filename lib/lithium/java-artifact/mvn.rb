@@ -51,12 +51,12 @@ class MavenRepoArtifact < FileArtifact
         return !File.exists?(File.join(fullpath, "#{@id}-#{@ver}.jar"))
     end
 
-    def clean()
+    def clean
         path = File.join(fullpath, "#{@id}-#{@ver}.jar")
         File.delete(path) if File.file?(path)
     end
 
-    def build()
+    def build
         raise "Artifact '#{@group}:#{@id}:#{@ver}' cannot be copied" if 0 != Artifact.exec(
             @mvn.mvn,
             "dependency:copy",
@@ -84,11 +84,11 @@ class PomFile < ExistentFile
         super(pom, &block)
     end
 
-    def assign_me_to()
+    def assign_me_to
         return 'pom'
     end
 
-    def list_items()
+    def list_items
         f = fullpath
         yield f, File.mtime(f).to_i
     end
@@ -111,7 +111,7 @@ class MavenClasspath < InFileClasspath
         @excludeGroupIds ||= []
     end
 
-    def build()
+    def build
         Dir.chdir(File.dirname(@pom.fullpath))
         raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
             @mvn.mvn,
@@ -123,7 +123,7 @@ class MavenClasspath < InFileClasspath
         super
     end
 
-    def what_it_does()
+    def what_it_does
         "Build maven classpath by '#{@pom.fullpath}' in '#{fullpath}'"
     end
 end

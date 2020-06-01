@@ -10,16 +10,6 @@
 
     RunMaven('mvn:*')
 
-    # TODO: ?
-    RunPythonString('runpystr:')  {
-        @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
-    }
-
-    # TODO: ?
-    RunRubyString('runrbstr:') {
-        @script = $lithium_args.length > 0 ? $lithium_args.join(' ') : $stdin.read.strip
-    }
-
     MATCH("run:*") {
         MATCH('.lithium/**/*.java') {
             DefaultClasspath {

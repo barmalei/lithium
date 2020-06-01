@@ -155,7 +155,6 @@ class FindClassInClasspath < FindInClasspath
     def self.abbr() 'FCC' end
 end
 
-
 def SyncWarClasses(art, war_path)
     war_dir  = File.dirname(war_path)
     war_path = File.join($lithium_options['app_server_root'], war_path) if war_dir.nil? || war_dir == '.'

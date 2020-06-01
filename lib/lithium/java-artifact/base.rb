@@ -10,7 +10,7 @@ class JavaClasspath < Artifact
 
     log_attr :paths
 
-    def assign_me_to()
+    def assign_me_to
         :add_classpath
     end
 
@@ -19,10 +19,10 @@ class JavaClasspath < Artifact
         false
     end
 
-    def build()
+    def build
     end
 
-    def what_it_does()
+    def what_it_does
         "Build '#{name}' class path "
     end
 end
@@ -34,8 +34,10 @@ class DefaultClasspath < JavaClasspath
         # if a user defines its own customization block ignore classpath auto-detection
         if block.nil?
             hd = path_base_dir
-            JOIN('classes')   if File.exists?(File.join(hd, 'classes'))
-            JOIN('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
+            unless hd.nil?
+                JOIN('classes')   if File.exists?(File.join(hd, 'classes'))
+                JOIN('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
+            end
         end
     end
 end
@@ -189,7 +191,7 @@ class JVM < EnvArtifact
     end
 
     def classpath
-        return PATHS.new(project.homedir).JOIN(@classpaths)
+        PATHS.new(project.homedir).JOIN(@classpaths)
     end
 
     def what_it_does
@@ -228,7 +230,7 @@ class JAVA < JVM
     log_attr :java_home, :jdk_home, :java_version, :java_version_low, :java_version_high
 
     def initialize(*args)
-        REQUIRE(DefaultClasspath)
+        REQUIRE(DefaultClasspath) # define class path here to let re-define it with a custom code super calls
 
         super
 
@@ -375,4 +377,3 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
-

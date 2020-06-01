@@ -2,17 +2,43 @@ require 'lithium/core'
 require 'lithium/file-artifact/command'
 require 'lithium/misc-artifact'
 
+class PYPATH < Artifact
+    include AssignableDependency
+    include LogArtifactState
+    include PATHS
+
+    log_attr :paths
+
+    def assign_me_to
+       :add_pypath
+    end
+
+    def expired?
+        false
+    end
+
+    def build
+    end
+end
+
+class DefaultPypath < PYPATH
+    def initialize(*args, &block)
+        super
+        JOIN('lib') if block.nil? && File.exists?(File.join(path_base_dir, 'lib'))
+    end
+end
+
 # Python home
 class PYTHON < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
-    log_attr :libs, :pypath, :python_home, :pyname
+    log_attr :python_home, :pyname
 
     def initialize(*args)
+        @pypaths = []
+        REQUIRE(DefaultPypath)
         super
-        @libs   ||= []
-        @pypath ||= ENV['PYTHONPATH']
 
         if !@python_home
             if @pyname
@@ -35,14 +61,14 @@ class PYTHON < EnvArtifact
         raise "Python ('#{python()}') cannot be found"             if !File.exists?(python()) || File.directory?(python())
 
         puts "Python home '#{@python_home}', pyname = #{@pyname}"
+    end
 
-        # setup pypath
-        @libs.each { | lib |
-            lib = File.join(homedir, lib)       unless File.absolute_path?(lib)
-            raise "Invalid lib path - '#{lib}'" unless File.directory?(lib)
-            @pypath = @pypath ? lib + File::PATH_SEPARATOR + @pypath : lib
-        }
-        ENV['PYTHONPATH'] = @pypath
+    def add_pypath(pp)
+        @pypaths.push(pp)  if @pypaths.index(pp).nil?
+    end
+
+    def pypath
+        @pypaths.length == 0 ? nil : PATHS.new(project.homedir).JOIN(@pypaths)
     end
 
     def python()
@@ -52,9 +78,7 @@ class PYTHON < EnvArtifact
     def what_it_does() "Initialize python environment '#{@name}'" end
 end
 
-#
 #  Run python
-#
 class RunPythonScript < FileCommand
     include OptionsSupport
 
@@ -64,8 +88,14 @@ class RunPythonScript < FileCommand
         super
     end
 
-    def build()
+    def pypath
+        @python.pypath
+    end
+
+    def build
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
+        pp = pypath()
+        ENV['PYTHONPATH'] = pp.to_s unless pp.EMPTY?
         raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, OPTS(), "\"#{fullpath}\"") != 0
     end
 
@@ -73,16 +103,6 @@ class RunPythonScript < FileCommand
 
     def self.abbr() 'RPS' end
 end
-
-class RunPythonString < StringRunner
-    def initialize(*args)
-        REQUIRE PYTHON
-        super
-    end
-
-    def cmd() [ @python.python,  '-' ] end
-end
-
 
 class ValidatePythonCode < FileMask
     include OptionsSupport

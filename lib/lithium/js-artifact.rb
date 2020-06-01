@@ -25,11 +25,11 @@ class JS < EnvArtifact
         raise 'Node JS npm cannot be detected' if @npm.nil?
     end
 
-    def nodejs()
+    def nodejs
         return @nodejs
     end
 
-    def npm()
+    def npm
         return @npm
     end
 
@@ -70,7 +70,7 @@ class NodejsModule < FileArtifact
         end
     end
 
-    def build()
+    def build
         project.go_to_homedir
         puts "Install module in #{Dir.pwd} hd = #{project.go_to_homedir}"
         raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'install', File.basename(fullpath)) != 0
@@ -88,7 +88,7 @@ class NodejsModule < FileArtifact
         end
     end
 
-    def what_it_does()
+    def what_it_does
         return "Install '#{File.basename(fullpath)}' nodejs module"
     end
 end
@@ -108,11 +108,11 @@ class RunNodejs < FileCommand
         super
     end
 
-    def build()
+    def build
         raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), "\"#{fullpath}\"") != 0
     end
 
-    def what_it_does()
+    def what_it_does
         "Run JS '#{@name}' script with nodejs"
     end
 
@@ -137,11 +137,11 @@ class UglifiedJSFile < ArchiveFile
         return Artifact.exec(File.join(@uglify.fullpath, 'bin', 'uglifyjs'), OPTS(), list.join(' '), '-o', fullpath)
     end
 
-    def expired?()
+    def expired?
        return !File.exists?(fullpath)
     end
 
-    def clean()
+    def clean
         validate_extension()
         File.delete(fullpath()) if File.exists?(fullpath())
     end
@@ -163,12 +163,12 @@ class UglifiedJSFile < ArchiveFile
         end
     end
 
-    def what_it_does()
+    def what_it_does
         "Uglifyjs (nodejs) #{@name}' JS script"
     end
 
     # to avoid name clash with JS source code
-    def validate_extension()
+    def validate_extension
         bn  = File.basename(fullpath)
         ext = File.extname(bn)
         return if ext.downcase != '.js'
@@ -196,11 +196,11 @@ class CombinedJSFile < ArchiveFile
         return 0;
     end
 
-    def expired?()
+    def expired?
        return !File.exists?(fullpath)
     end
 
-    def clean()
+    def clean
        File.delete(fullpath()) if File.exists?(fullpath())
     end
 
@@ -219,11 +219,11 @@ class JavaScriptDoc < FileArtifact
         REQUIRE('npm:yuidocjs')
     end
 
-    def expired?()
+    def expired?
        return !File.exists?(fullpath)
     end
 
-    def clean()
+    def clean
         FileUtils.rmtree(fullpath()) if File.exists?(fullpath()) && File.directory?(fullpath())
     end
 
@@ -262,7 +262,7 @@ class JavaScriptDoc < FileArtifact
         FileUtils.rmtree(i) if istmp
     end
 
-    def what_it_does()
+    def what_it_does
         "Generate '#{@name}' JavaScript doc by '#{@input}'"
     end
 end
@@ -275,12 +275,12 @@ class TypeScriptCompiler < FileMask
         super
     end
 
-    def build()
+    def build
         go_to_homedir
         raise "Compilation of '#{@name}' has failed" if Artifact.exec('tsc', OPTS(), "\"#{fullpath}\"") != 0
     end
 
-    def what_it_does()
+    def what_it_does
         "Compile typescript'#{@name}'"
     end
 end
@@ -292,11 +292,11 @@ class JavaScriptHint < FileMask
         super
     end
 
-    def build()
+    def build
         raise "Linting of '#{@name}' failed" if Artifact.exec('jshint', fullpath) != 0
     end
 
-    def what_it_does()
+    def what_it_does
         return "JavaScript lint '#{@name}'"
     end
 end

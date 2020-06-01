@@ -34,7 +34,7 @@ class JarFileContent < FileArtifact
     end
 
     def what_it_does()
-        "Extract'#{@source}' JAR content into '#{@name}' directory"
+        "Extract '#{@source}' JAR content into '#{@name}' directory"
     end
 end
 
