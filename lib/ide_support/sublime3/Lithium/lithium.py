@@ -726,9 +726,11 @@ class liSortImportsCommand(liJavaTextCommand):
     # input: [ [ Region, String ], ... ]
     # output:[ [ group ], [ group ] ]  where group: [ region, String ], [ region, String ] ..,
     def group_imports(self, imports): # return [ [], [], ... ] grouped by package prefix
-        imports = sorted(imports, key = lambda x : x[1])
+        # add "a." prefix to key to sort java package first
+        imports = sorted(imports, key = lambda x : 'a.' + x[1] if x[1].startswith('import java.') or x[1].startswith('import javax.') else x[1])
         groups  = []
-        for k, g in groupby(imports, lambda x : x[1][:x[1].rfind('.')] ):
+        #for k, g in groupby(imports, lambda x : x[1][:x[1].rfind('.')] ):
+        for k, g in groupby(imports, lambda x : x[1][:x[1].find('.')] ):
             groups.append(list(g))
 
         return groups

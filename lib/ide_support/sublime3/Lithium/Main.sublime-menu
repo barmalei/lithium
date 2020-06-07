@@ -29,7 +29,7 @@
                     ,{ "caption": "-" }
 
                     ,{ "caption": "Complete Import",       "command": "li_complete_import" }
-                    ,{ "caption": "Build Imports",      "command": "li_validate_imports" }
+                    ,{ "caption": "Organize Imports",      "command": "li_validate_imports" }
                     ,{ "caption": "Show methods",      "command": "li_show_class_methods" }
 
                     ,{ "caption": "-" }
