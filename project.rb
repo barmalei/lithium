@@ -1,6 +1,5 @@
 -> {
-
-    $lithium_options['v'] = 2
+    #$lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
     Touch('touch:*')
@@ -11,12 +10,10 @@
     RunMaven('mvn:*')
 
     MATCH("run:*") {
-        MATCH('.lithium/**/*.java') {
+        RunJavaCode('.lithium/lib/JavaTools.java') {
             DefaultClasspath {
                 JOIN('.lithium/classes')
             }
-
-            RunJavaCode('**/*.java')
         }
 
         RunJavaCode      ('**/*.java')
@@ -43,12 +40,11 @@
     }
 
     MATCH("compile:*") {
-        JDTCompiler('.lithium/**/*.java') {
+        JavaCompiler('.lithium/lib/JavaTools.java') {
             @destination = '.lithium/classes'
         }
 
-        JavaCompiler('**/*.java')  { OPT '-Xlint:deprecation' }
-
+        JavaCompiler        ('**/*.java')
         GroovyCompiler      ('**/*.groovy')
         KotlinCompiler      ('**/*.kt')
         ScalaCompiler       ('**/*.scala')
@@ -87,13 +83,5 @@
     # TODO: grep class already fetch lithium arguments
     GREP('grep:') {
         @grep = $lithium_args[0] if $lithium_args.length > 0
-    }
-
-    JavaCompiler() {
-        DONE { |a|
-            SyncWAR.build("hello.war", a.list_dest_paths) {
-
-            }
-        }
     }
 }
