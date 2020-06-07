@@ -57,14 +57,14 @@ class PYTHON < EnvArtifact
             @pyname ||= 'python'
         end
 
-        raise "Python home ('#{@python_home}') cannot be detected" if !@python_home || !File.exists?(@python_home) || !File.directory?(@python_home)
-        raise "Python ('#{python()}') cannot be found"             if !File.exists?(python()) || File.directory?(python())
+        raise "Python home ('#{@python_home}') cannot be detected" if !@python_home || !File.directory?(@python_home)
+        raise "Python ('#{python()}') cannot be found"             unless File.file?(python())
 
         puts "Python home '#{@python_home}', pyname = #{@pyname}"
     end
 
     def add_pypath(pp)
-        @pypaths.push(pp)  if @pypaths.index(pp).nil?
+        @pypaths.push(pp) if @pypaths.index(pp).nil?
     end
 
     def pypath

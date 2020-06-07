@@ -27,7 +27,7 @@ $: << File.join($lithium_code, 'lib')
 if $lithium_options.has_key?('basedir')
     bd = $lithium_options['basedir']
     basedir = File.realpath(bd)
-    raise "Invalid project base directory '#{basedir}' has been passed" if !File.exists?(basedir) || !File.directory?(basedir)
+    raise "Invalid project base directory '#{basedir}' has been passed" unless File.directory?(basedir)
     Dir.chdir basedir
 else
     basedir = Dir.pwd

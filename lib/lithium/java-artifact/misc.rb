@@ -98,7 +98,7 @@ class FindInClasspath < FileCommand
     end
 
     def FindInClasspath.find(use_zipinfo, classpath, target)
-        classpath.split(File::PATH_SEPARATOR).each { | path |
+        classpath.paths.each { | path |
             if File.directory?(path)
                 Dir.glob(File.join(path, '**', target)).each  { | item |
                     yield path, item, false

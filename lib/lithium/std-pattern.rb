@@ -168,7 +168,13 @@ class StdPattern
                     next fp if File.exists?(fp)
                 end
             end
-            next FileArtifact.search(path)[0]
+
+            res = FileArtifact.search(path)
+            if res.length > 0
+                next res[0] # return first found file
+            else
+                next path
+            end
         }
     end
 
@@ -542,3 +548,5 @@ class URLPattern < StdPattern
         group(:scheme, '(http|https|ftp|ftps|sftp)')
     end
 end
+
+

@@ -47,7 +47,7 @@ class PMD < FileMask
     def initialize(*args)
         super
         @pmd_path = File.join($lithium_code, 'tools', 'java', 'pmd')
-        raise "Path cannot be found '#{@pmd_path}'" if !File.exists?(@pmd_path) || !File.directory?(@pmd_path)
+        raise "Path cannot be found '#{@pmd_path}'" unless File.directory?(@pmd_path)
 
         @pmd_rules  ||= File.join('rulesets', 'java', 'quickstart.xml')
         @pmd_format ||= 'text'

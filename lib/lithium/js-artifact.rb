@@ -156,7 +156,7 @@ class UglifiedJSFile < ArchiveFile
             raise "JS minified file '#{bn}' cannot be used to detect input JS file" if i.nil? || i != (bn.length - suffix.length)
             bn = bn[0, i + 1] + 'js'
             fp = File.join(File.dirname(fp), bn);
-            raise "Auto-detected input JS file '#{fp}' doesn't exists or points to directory" if !File.exists?(fp) || File.directory?(fp)
+            raise "Auto-detected input JS file '#{fp}' doesn't exists or points to directory" unless File.file?(fp)
             yield fp, File.mtime(fp).to_i, nil
         else
             super(rel)
@@ -214,7 +214,7 @@ class JavaScriptDoc < FileArtifact
         @config   ||= nil
         @template ||= nil
         @input    ||= '.'
-        raise 'Name has to be directory' if File.exists?(fullpath) && !File.directory?(fullpath)
+        raise 'Name has to be directory' unless File.directory?(fullpath)
 
         REQUIRE('npm:yuidocjs')
     end
@@ -224,30 +224,30 @@ class JavaScriptDoc < FileArtifact
     end
 
     def clean
-        FileUtils.rmtree(fullpath()) if File.exists?(fullpath()) && File.directory?(fullpath())
+        FileUtils.rmtree(fullpath()) if File.directory?(fullpath())
     end
 
     def build
         p = fullpath()
-        raise "Invalid artifact path '#{p}'" if File.exists?(p) && !File.directory?(p)
+        raise "Invalid artifact path '#{p}'" unless File.directory?(p)
 
         args = [ File.join(@js.module_home('yuidoc'), 'bin', 'yuidoc') , '-o ', p, '-n', '-C' ]
 
         unless @template.nil?
             t = fullpath(@template)
-            raise "Invalid template path '#{t}'" if !File.exists?(t) || !File.directory?(t)
+            raise "Invalid template path '#{t}'" unless File.directory?(t)
             args << '-t ' << t
         end
 
         unless @config.nil?
             c = fullpath(@config)
-            raise "Invalid template path '#{c}'" if !File.exists?(c) || File.directory?(c)
+            raise "Invalid template path '#{c}'" unless File.file?(c)
             args << '-c ' << c
         end
 
         istmp = false
         i = fullpath(@input)
-        raise "Invalid input path '#{i}'" if !File.exists?(i)
+        raise "Invalid input path '#{i}'" unless File.exists?(i)
         unless File.directory?(i)
             tmp = Dir.mktmpdir()
             FileUtils.cp(i, tmp.to_s)

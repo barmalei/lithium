@@ -165,6 +165,9 @@ module LogArtifactState
         return false unless can_artifact_be_tracked?
 
         if is_items_log_enabled?
+            # if there is no items but the items are expected consider it as expired case
+            return true if self.class.method_defined?(:list_items) && !File.exists?(items_log_path())
+
             # check items expiration
             list_expired_items { |n, t|
                 return true
@@ -248,7 +251,9 @@ module LogArtifactState
 
         # save log if necessary
         path = items_log_path()
-        if d || r.length != e.length
+        if r.length == 0    # no items means no log
+            File.delete(path) if File.exists?(path)
+        elsif d || r.length != e.length
             File.open(path, 'w') { |f|
                 r.each_pair { |name, time|
                     f.printf("%s %i\n", name, time)
@@ -813,10 +818,22 @@ class Artifact
             stdin.close
             stdout.set_encoding(Encoding::UTF_8)
             if  block.nil?
-                Artifact.read_exec_output(stdin, stdout, thread) { | line |
-                    $stdout.puts line
-                    $stdout.flush
-                }
+                # this code has been tested on Win10. It works and can replace
+                # read_exec_output() call (see the code below)
+                while line = stdout.gets do
+                   $stdout.puts line
+                end
+
+                # TODO: the code below can read not all lines from the process output
+                # because the output processing can take time (detecting file location)
+                # The problem is output disappears when the process is terminated. But
+                # the code below has tested on Won. The code above should be tested on WIn
+                # to make sure it works.
+                #
+                # Artifact.read_exec_output(stdin, stdout, thread) { | line |
+                #     $stdout.puts line
+                #     $stdout.flush
+                # }
             else
                 block.call(stdin, stdout, thread)
             end
@@ -1113,10 +1130,15 @@ class FileArtifact < Artifact
 
     def self.which(cmd)
         exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
-        ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+        ENV['PATH'].split(File::PATH_SEPARATOR).each do | path |
+            path = path.sub('\\', '/') if File::PATH_SEPARATOR == ';'
             exts.each { | ext |
                 exe = File.join(path, "#{cmd}#{ext}")
-                return exe if File.executable?(exe) && !File.directory?(exe)
+
+                # checking file is mandatory, since for example folder
+                # '/Users/brigadir/projects/.lithium/lib/lithium' is
+                # executable because 'lithium' script exists
+                return exe if File.executable?(exe) && File.file?(exe)
             }
         end
         return nil
@@ -1165,7 +1187,7 @@ class FileArtifact < Artifact
         prev_path = nil
 
         #raise "Path '#{path}' doesn't exist" unless File.exists?(path)
-        #raise "Path '#{path}' has to be a directory" if !File.directory?(path)
+        #raise "Path '#{path}' has to be a directory" unless File.directory?(path)
 
         while path && prev_path != path && (top_path.nil? || prev_path != top_path)
             marker = File.join(path, fname)
@@ -1178,28 +1200,56 @@ class FileArtifact < Artifact
         return nil
     end
 
+    # track not found items
     @search_cache = {}
 
-    def self.search(path, art = $current_artifact)
-        return [ File.expand_path(path) ] if File.exists?(path)
+    # searchthe given  path
+    def self.search(path, art = $current_artifact, &block)
+        if File.exists?(path)
+            if block.nil?
+                return [ File.expand_path(path) ] 
+            else
+                return block.call(path)
+            end
+        end
 
         art = Project.current if art.nil? || !art.kind_of?(FileArtifact)
-        return [] if art.nil?
+        if art.nil?
+            if block.nil?
+                return []
+            else
+                return
+            end
+        end
 
         fp = art.fullpath
         fp = File.dirname(fp) unless File.directory?(fp)
         if File.exists?(fp)
             path = Pathname.new(path).cleanpath.to_s
-            return [] if @search_cache[fp] && @search_cache[fp][path]
+            if @search_cache[fp] && @search_cache[fp][path]
+                if block.nil?
+                    return []
+                else
+                    return
+                end
+            end
 
             res = Dir.glob(File.join(fp, '**', path))
-            return res if res.length > 0
+            if res.length > 0
+                if block.nil?
+                    return res
+                else
+                    res.each { | found_item |
+                        block.call(found_item)
+                    }
+                end
+            end
 
             @search_cache[fp] = {} unless @search_cache[fp]
             @search_cache[fp][path] = true
         end
 
-        return art.kind_of?(Project) ? [] : FileArtifact.search(path, art.project)
+        return art.kind_of?(Project) ? [] : FileArtifact.search(path, art.project, &block)
     end
 
     def self.grep_file(path, pattern, match_all = false, &block)
@@ -1349,7 +1399,7 @@ class Directory < FileArtifact
     def build()
         super
         fp = fullpath
-        raise "File '#{fp}' is not a directory" if File.exists?(fp) && !File.directory?(fp)
+        raise "File '#{fp}' is not a directory" unless File.directory?(fp)
     end
 end
 
@@ -1925,7 +1975,6 @@ module PATHS
         end
     end
 end
-
 
 class GroupByExtension < FileMask
     def initialize(*args, &block)

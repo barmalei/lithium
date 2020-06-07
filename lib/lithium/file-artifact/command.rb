@@ -60,7 +60,7 @@ class CopyOfFile < FileArtifact
     def validate_source()
         raise 'Source path is not defined' if @source.nil?
         src = File.absolute_path?(@source) ? @source : fullpath(@source)
-        raise "Source '#{src}' doesn't exist or points to a directory"  if !File.exists?(src) || File.directory?(src)
+        raise "Source '#{src}' doesn't exist or points to a directory" unless File.file?(src)
         return src
     end
 

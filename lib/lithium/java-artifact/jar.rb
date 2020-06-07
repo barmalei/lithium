@@ -109,8 +109,7 @@ class JarFile < ArchiveFile
 
         if @manifest
             @manifest = fullpath(@manifest)
-            raise "Manifest file '#{@manifest}' cannot be found" unless File.exists?(@manifest)
-            raise "Manifest file '#{@manifest}' is a directory"  if     File.directory?(@manifest)
+            raise "Manifest file '#{@manifest}' is a directory or doesn't exist"  unless File.file?(@manifest)
         end
     end
 

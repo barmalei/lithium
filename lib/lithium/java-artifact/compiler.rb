@@ -8,7 +8,7 @@ class JavaCompiler < FileMask
     include LogArtifactState
     include OptionsSupport
 
-    log_attr :destination,  :create_destination, :options
+    log_attr :destination,  :create_destination, :options, :classpaths
 
     def initialize(*args)
         REQUIRE JAVA
@@ -21,8 +21,15 @@ class JavaCompiler < FileMask
         super
     end
 
+    def add_classpath(cp)
+        @classpaths ||= []
+        @classpaths.push(cp)
+    end
+
     def classpath
-        return @java.classpath
+        cp = @java.classpath
+        cp.JOIN(@classpaths) if @classpaths
+        return cp
     end
 
     def expired?() false end

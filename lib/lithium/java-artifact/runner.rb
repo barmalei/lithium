@@ -3,17 +3,21 @@ require 'lithium/java-artifact/base'
 class JavaFileRunner < FileCommand
     include OptionsSupport
 
+    attr_reader :classpaths
+
     def initialize(*args)
         REQUIRE JAVA
         super
         @arguments ||= []
     end
 
+    def add_classpath(cp)
+        @classpaths ||= []
+        @classpaths.push(cp)
+    end
+
     def build
         go_to_homedir()
-
-        puts "JavaFileRunner.build(): #{self.class}  #{@java.list_classpaths}"
-
         raise "Running '#{@name}' failed" if Artifact.exec(*cmd()) != 0
     end
 
@@ -30,7 +34,9 @@ class JavaFileRunner < FileCommand
     end
 
     def classpath
-        return @java.classpath
+        cp = @java.classpath
+        cp.JOIN(@classpaths) if @classpaths
+        return cp
     end
 
     def run_with
@@ -89,10 +95,15 @@ class RunJavaCodeWithJUnit < RunJavaCode
     def initialize(*args)
         super
         @junit_runner_class ||= 'org.junit.runner.JUnitCore'
+        @junit_tool_dir = File.join($lithium_code, 'tools', 'java', 'junit')
+        raise "JUnit tool directory '#{@junit_tool_dir}' doesn't exist" unless File.directory?(@junit_tool_dir)
     end
 
     def classpath
-        super.JOIN(File.join($lithium_code, 'tools', 'java', 'junit', 'junit-4.11.jar'))
+        cp   = super
+        cp.JOIN(File.join(@junit_tool_dir, 'junit-4.11.jar'))
+        cp.JOIN(File.join(@junit_tool_dir, 'hamcrest-core-1.3.jar'))
+        return cp
     end
 
     def target

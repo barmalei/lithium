@@ -251,7 +251,7 @@ class JAVA < JVM
         unless @jdk_home
             @jdk_home = @java_home
         else
-            raise "JDK '#{@jdk_home}' directory is invalid" if !File.exists?(@jdk_home) || !File.directory?(@jdk_home)
+            raise "JDK '#{@jdk_home}' directory is invalid" unless File.directory?(@jdk_home)
         end
 
         @java_version_version = '?'

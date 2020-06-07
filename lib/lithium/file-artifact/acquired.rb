@@ -35,7 +35,7 @@ class GeneratedFile < FileArtifact
 
                 dest_dir = File.join(tmpdir, dir)
                 if File.exists?(dest_dir)
-                    raise "Destination directory '#{dest_dir}' already exists as a file" unless File.directory?(dest_dir)
+                    raise "Destination directory '#{dest_dir}' already exists as a file" if File.file?(dest_dir)
                 else
                     FileUtils.mkdir_p(dest_dir)
                 end
@@ -179,7 +179,7 @@ class MetaFile < FileArtifact
     end
 
     def build()
-        raise "Meta file '#{fp}' points to directory, file is required" if File.directory?(fp)
+        raise "Meta file '#{fp}' points to directory or doesn't exist" unless File.file?(fp)
     end
 
     def what_it_does() nil end
@@ -195,7 +195,7 @@ class MetaGeneratedFile < GeneratedFile
     def META()
         meta = MetaFile.new(File.join('.lithium', 'meta', relative_path))
         fp = meta.fullpath
-        raise "Invalid meta file path '#{fp}'" if !File.exists?(fp) || File.directory?(fp)
+        raise "Invalid meta file path '#{fp}'" unless File.file?(fp)
         return meta
     end
 
@@ -216,7 +216,7 @@ class MetaGeneratedZipFile < MetaGeneratedFile
         super
         @base ||= nil
         fp = fullpath
-        raise "Zip file name points to directory #{fp}" if File.exists?(fp) && File.directory?(fp)
+        raise "Zip file '#{fp}' points to directory or doesn't exist" unless File.file?(fp)
     end
 
     def list_items(rel = nil)

@@ -251,12 +251,11 @@ class INIT < FileCommand
 
     def build()
         path = fullpath()
-        raise "File '#{path}' doesn't exist"      unless File.exists?(path)
-        raise "File '#{path}' is not a directory" unless File.directory?(path)
+        raise "File '#{path}' is not a directoryr or doesn't exist" unless File.directory?(path)
         lp = File.expand_path(File.join(path, ".lithium"))
 
         if File.exists?(lp)
-            raise "'.lithium' as a file already exits in '#{lp}'" unless File.directory?(lp)
+            raise "'.lithium' as a file already exits in '#{lp}'" if File.file?(lp)
             puts_warning "Project '#{lp}' already has lithium stuff initialized"
         else
             lh = File.join($lithium_code, 'templates',  @template, '.lithium')

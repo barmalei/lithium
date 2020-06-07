@@ -202,9 +202,6 @@ class RunMavenTest < RunMaven
         fp = fullpath(name)
         super
         TARGETS('test')
-
-        puts "FP = #{fp}"
-
         if fp.end_with?('.java')
             pkg = JVM.grep_package(fp)
             fp  = File.basename(fp)
