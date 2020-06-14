@@ -119,7 +119,7 @@ module LogArtifactState
     #############################################################
     #  Common logging API part
     #############################################################
-    def logs_home_dir()
+    def logs_home_dir
         raise 'Cannot detect log directory since project home is unknown' if !homedir()
         h = File.join(homedir, '.lithium', '.logs')
         unless File.exists?(h)
@@ -130,18 +130,16 @@ module LogArtifactState
     end
 
     # check if log can be done
-    def can_artifact_be_tracked?()
+    def can_artifact_be_tracked?
         lith = File.join(homedir, '.lithium')
-        if (!File.exists?(lith))
-            puts_warning "Artifact state cannot be tracked since since '#{lith}' log directory doesn't exist"
-            return false
-        else
-            return true
-        end
+        return true if File.directory?(lith)
+
+        puts_warning "Artifact state cannot be tracked since since '#{lith}' log directory doesn't exist"
+        return false
     end
 
     # expire log to make the target artifact expired
-    def expire_logs()
+    def expire_logs
         return unless can_artifact_be_tracked?
 
         p1 = items_log_path()
@@ -151,7 +149,7 @@ module LogArtifactState
         File.delete(p2) if is_attrs_log_enabled? && File.exists?(p2)
     end
 
-    def logs_mtime()
+    def logs_mtime
         return -1 unless can_artifact_be_tracked?
 
         p1 = items_log_path()
@@ -161,7 +159,7 @@ module LogArtifactState
         return t1 > t2 ? t1 : t2
     end
 
-    def logs_expired?()
+    def logs_expired?
         return false unless can_artifact_be_tracked?
 
         if is_items_log_enabled?
@@ -183,7 +181,7 @@ module LogArtifactState
         return false
     end
 
-    def update_logs()
+    def update_logs
         return unless can_artifact_be_tracked?
 
         t = Time.now
@@ -205,7 +203,7 @@ module LogArtifactState
     #############################################################
 
     # return map where key is an item path and value is integer modified time
-    def load_items_log()
+    def load_items_log
         return unless self.class.method_defined?(:list_items)
 
         p, e = items_log_path(), {}
@@ -240,7 +238,7 @@ module LogArtifactState
         }
     end
 
-    def update_items_log()
+    def update_items_log
         return unless self.class.method_defined?(:list_items)
 
         d, e, r = false, load_items_log(), {}
@@ -262,11 +260,11 @@ module LogArtifactState
         end
     end
 
-    def is_items_log_enabled?()
+    def is_items_log_enabled?
         true
     end
 
-    def items_log_path()
+    def items_log_path
         if @items_log_id.nil?
             @items_log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{self.name.tr("/\\<>:.*{}[]", '_')}")
         else
@@ -278,7 +276,7 @@ module LogArtifactState
     #############################################################
     #  log attributes specific methods
     #############################################################
-    def update_attrs_log()
+    def update_attrs_log
         path = attrs_log_path()
         if self.class.has_log_attrs()
             data = {}
@@ -294,7 +292,7 @@ module LogArtifactState
         end
     end
 
-    def list_expired_attrs_as_array()
+    def list_expired_attrs_as_array
         res = []
         list_expired_items { | k, v |
             res.push([k, v]);
@@ -350,11 +348,48 @@ module LogArtifactState
         end
     end
 
-    def is_attrs_log_enabled?()
+    def is_attrs_log_enabled?
         true
     end
 
     def attrs_log_path() items_log_path() + ".ser" end
+end
+
+# Option support
+module OptionsSupport
+    def OPTS(*args)
+        @options = options()
+        if args.length > 0
+            @options = []
+            args.each { | o |
+                OPT(o)
+            }
+        end
+        return @options.join(' ')
+    end
+
+    def OPT(opt)
+        @options = options()
+        @options.push(opt)
+    end
+
+    def OPT?(op)
+        @options = options()
+        return @options.include?(op)
+    end
+
+    def OPTS?
+        @options = options()
+        return @options.length > 0
+    end
+
+    # return valid not nil attribute value in a case of making it loggable.
+    # Otherwise 'option' attribute can equal [] after building (since OPTS)
+    # method has been called, but be nil before an artifact building
+    def options
+        @options ||= []
+        return @options
+    end
 end
 
 #  TODO: Problem list
@@ -542,9 +577,8 @@ end
 # Core artifact abstraction.
 #  "@name" - name of artifact
 #  "@shortname"
-#  "@ver"
 class Artifact
-    attr_reader :name, :shortname, :ver, :owner, :createdByMeta, :done
+    attr_reader :name, :shortname, :owner, :createdByMeta, :done
 
     # context class is special wrapper object that redirect
     # its methods call to a wrapped (artifact object) target
@@ -1006,7 +1040,7 @@ class FileArtifact < Artifact
         return path[base.length] == '/'
     end
 
-    def homedir()
+    def homedir
         if @is_absolute
             unless owner.nil?
                 home = owner.homedir
@@ -1022,7 +1056,7 @@ class FileArtifact < Artifact
         end
     end
 
-    def go_to_homedir()
+    def go_to_homedir
         Dir.chdir(homedir)
     end
 
@@ -1099,23 +1133,22 @@ class FileArtifact < Artifact
         return _contains_path?(home.to_s, path.to_s)
     end
 
-    def expired?()
-        File.exists?(fullpath) == false
+    def expired?
         return false
     end
 
-    def mtime()
+    def mtime
         f = fullpath()
         return File.exists?(f) ? File.mtime(f).to_i() : -1
     end
 
-    def puts_items()
+    def puts_items
         list_items { | p, t |
             puts "logged item = '#{p}' : #{t}"
         }
     end
 
-    def list_items()
+    def list_items
         fp = fullpath
         if File.exists?(fp)
             yield fp, File.mtime(fp).to_i
@@ -1146,8 +1179,7 @@ class FileArtifact < Artifact
 
     def self.cpfile(src, dest)
         self.testdir(dest)
-        raise "Source '#{src}' file doesn't exist" unless File.exists?(src)
-        raise "Source '#{src}' file cannot be dir" if File.directory?(src)
+        raise "Source '#{src}' file is a directory or doesn't exist" unless File.file?(src)
         raise "Destination '#{dest}' cannot be file" if File.file?(dest)
         FileUtils.mkdir_p(dest) unless File.exists?(dest)
         FileUtils.cp(src, dest)
@@ -1167,6 +1199,26 @@ class FileArtifact < Artifact
                 File.cp(spath, dpath)
             end
         }
+    end
+
+    def existing_dir(*args)
+        self.class.existing_dir(*args)
+    end
+
+    def existing_file(*args)
+        self.class.existing_file(*args)
+    end
+
+    def self.existing_dir(*args)
+        path = File.join(*args)
+        raise "Expected directory '#{path}' doesn't exist or points to a file" unless File.directory?(path)
+        return path
+    end
+
+    def self.existing_file(*args)
+        path = File.join(*args)
+        raise "Expected file '#{path}' doesn't exist or points to a directory" unless File.file?(path)
+        return path
     end
 
     def self.testdir(dir)
@@ -1256,8 +1308,7 @@ class FileArtifact < Artifact
         raise 'Pattern cannot be nil' if pattern.nil?
         pattern = Regexp.new(pattern) if pattern.kind_of?(String)
 
-        raise "File '#{path}' cannot be found"     unless File.exists?(path)
-        raise "File '#{path}' points to directory" unless File.file?(path)
+        raise "File '#{path}' is a directory or doesn't exist" unless File.file?(path)
 
         list = []
         line_num = 0
@@ -1478,6 +1529,121 @@ class FileMask < FileArtifact
     def expired?() true end
 
     def self.abbr() 'FMS' end
+end
+
+class RunTool < FileMask
+    include LogArtifactState
+    include OptionsSupport
+
+    log_attr :options, :arguments, :list_expired
+
+    def initialize(*args)
+        @source_file_prefix = '@'
+        @source_list_prefix = ''
+        @run_with           = nil
+        @list_expired       = false
+        @source_as_file     = false  # store target files into temporary file
+        super
+
+        @arguments ||= []
+        @arguments = $lithium_args.dup if @arguments.length == 0 && $lithium_args.length > 0
+    end
+
+    def expired?
+        true
+    end
+
+    # ec - Process::Status
+    def error_exit_code?(ec)
+        ec.exitstatus != 0
+    end
+
+    # can be overridden to transform paths,
+    # e.g. path to JAVA file to class name/
+    def transform_source_path(path)
+        path
+    end
+
+    def list_source_paths
+        if @list_expired
+            list_expired_items { | n, t |  yield transform_source_path(n) }
+        else
+            list_items { | n, t |  yield transform_source_path(n) }
+        end
+    end
+
+    # Return:
+    #   -- (Tempfile, count) if @source_as_file is true (temp file contains list of paths)
+    #   -- ([ path1, path2, .. pathN], count) if @source_as_file is false
+    #   -- nil if source cannot be built
+    def source
+        if @source_as_file
+            f = Tempfile.open('lithium')
+            c = 0
+            begin
+                list_source_paths { | path |
+                    f.puts(path)
+                    c = c + 1
+                }
+            ensure
+               f.close
+            end
+
+            if f.length == 0
+                f.unlink
+                return nil
+            else
+                return f, c
+            end
+        else
+            list = []
+            list_source_paths { | path |
+                list.push("\"#{path}\"")
+            }
+            return list, list.length
+        end
+    end
+
+    def run_with
+        raise "Tool name is not known for '#{self.class}'" if @run_with.nil?
+        @run_with
+    end
+
+    # Input:
+    #   opts: Array
+    # Return:
+    #   Array
+    def run_with_options(opts)
+        opts
+    end
+
+    # Return array
+    def run_with_target(src)
+        return [] if src.nil?
+        return [ "#{@source_file_prefix}\"#{src.path}\"" ] if @source_as_file
+        return [ @source_list_prefix ].concat(src)
+    end
+
+    def build
+        super
+
+        begin
+            src, len = source
+            cmd = [ run_with ]
+            cmd.concat(run_with_options(options().dup))
+            cmd.concat(run_with_target(src))
+            cmd.concat(@arguments)
+
+            #puts "CMD = #{cmd}"
+
+            go_to_homedir
+            ec = Artifact.exec(*cmd)
+            raise "'#{self.class}' has failed" if error_exit_code?(ec)
+            puts "#{len} source files have been processed with '#{self.class}'"
+        ensure
+            src.unlink if src.kind_of?(Tempfile)
+        end
+    end
 end
 
 
@@ -1769,42 +1935,6 @@ module AssignableDependency
     end
 end
 
-# Option support
-module OptionsSupport
-    def OPTS(*args)
-        @options = options()
-        if args.length > 0
-            @options = []
-            args.each { | o |
-                OPT(o)
-            }
-        end
-        return @options.join(' ')
-    end
-
-    def OPT(opt)
-        @options = options()
-        @options.push(opt)
-    end
-
-    def OPT?(op)
-        @options = options()
-        return @options.include?(op)
-    end
-
-    def OPTS?()
-        @options = options()
-        return @options.length > 0
-    end
-
-    # return valid not nil attribute value in a case of making it loggable.
-    # Otherwise 'option' attribute can equal [] after building (since OPTS)
-    # method has been called, but be nil before an artifact building
-    def options()
-        @options ||= []
-        return @options
-    end
-end
 
 # Environment artifact
 class EnvArtifact < Artifact

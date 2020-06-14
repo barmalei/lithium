@@ -2,6 +2,7 @@ require 'lithium/std-core' # help to run it as a code, since puts_warning is exp
 require 'lithium/core'
 
 require 'rexml/document'
+require 'tempfile'
 
 class JavaClasspath < Artifact
     include AssignableDependency
@@ -213,12 +214,20 @@ class JVM < EnvArtifact
         end
     end
 
+    def self.grep_classname(path)
+        pkgname = self.grep_package(path)
+        clname  = File.basename(path.dup())
+        clname[/\.java$/] = '' if clname.end_with?('.java')
+        raise "Class name cannot be identified by '#{path}'" if clname.nil?
+        return pkgname.nil? ? clname : "#{pkgname}.#{clname}"
+    end
+
     def self.relpath_to_class(src_path)
         pkg = self.grep_package(src_path)
 
         cn  = File.basename(src_path)
         cn[/\.java$/] = '' if cn.end_with?('.java')
-        raise 'Class name cannot be identified' if cn.nil?
+        raise "Class name cannot be identified by #{src_path}" if cn.nil?
 
         File.join(pkg.gsub('.', '/'), cn + '.class')
     end
@@ -377,3 +386,29 @@ class SCALA < JVM
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
+
+
+class RunJavaTool < RunTool
+    def initialize(*args)
+        REQUIRE JAVA
+        super
+    end
+
+    def add_classpath(cp)
+        @classpaths ||= []
+        @classpaths.push(cp)
+    end
+
+    def classpath
+        cp = @java.classpath
+        cp.JOIN(@classpaths) if @classpaths
+        return cp
+    end
+
+    def run_with_options(opts)
+        cp = classpath
+        opts.push('-classpath', "\"#{cp}\"") unless cp.EMPTY?
+        return opts
+    end
+end
+

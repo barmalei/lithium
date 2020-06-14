@@ -1,38 +1,28 @@
 require 'fileutils'
-require 'tempfile'
 
 require 'lithium/java-artifact/base'
 
-#  Java compile_with
-class JavaCompiler < FileMask
-    include LogArtifactState
-    include OptionsSupport
-
-    log_attr :destination,  :create_destination, :options, :classpaths
+#  Java 
+class JavaCompiler < RunJavaTool
+    log_attr :destination, :create_destination
 
     def initialize(*args)
-        REQUIRE JAVA
-
         @create_destination = false
         @description        = 'JAVA'
         @destination        = nil
-        @list_expired       = false
-        @source_as_file     = false  # store target files into tmp file
         super
     end
 
-    def add_classpath(cp)
-        @classpaths ||= []
-        @classpaths.push(cp)
+    def expired?
+        false
     end
 
     def classpath
-        cp = @java.classpath
-        cp.JOIN(@classpaths) if @classpaths
+        dst = destination()
+        cp  = super
+        cp.JOIN(dst) unless cp.INCLUDE?(dst)
         return cp
     end
-
-    def expired?() false end
 
     def destination
         unless @destination.nil?
@@ -61,16 +51,8 @@ class JavaCompiler < FileMask
         end
     end
 
-    def compile_with()
+    def run_with
         @java.javac
-    end
-
-    def list_source_paths()
-        if @list_expired
-            list_expired_items { | n, t |  yield n }
-        else
-            list_items   { | n, t |  yield n }
-        end
     end
 
     def list_dest_paths()
@@ -92,67 +74,15 @@ class JavaCompiler < FileMask
         end
     end
 
-    def source()
-        if @source_as_file
-            f = Tempfile.open('lithium')
-            c = 0
-            begin
-                list_source_paths { | path |
-                    f.puts("\"#{path}\"")
-                    c = c + 1
-                }
-            ensure
-               f.close
-            end
-
-            if f.length == 0
-                f.unlink
-                return nil
-            else
-                return f, c
-            end
-        else
-            list = []
-            list_source_paths { | path |
-                list.push("\"#{path}\"")
-            }
-            return list.length == 0 ? nil : list, list.length
-        end
-    end
-
-    def cmd(src)
-        cp  = classpath()
-
-        src = src.kind_of?(Tempfile) || src.kind_of?(File) ? "@\"#{src.path}\"" : src
-        dst = destination()
+    def run_with_options(opts)
+        opts = super(opts)
+        dst  = destination()
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
-
-        cp = cp.JOIN(dst) unless cp.INCLUDE?(dst)
-        unless cp.EMPTY?
-            [ compile_with, '-classpath', "\"#{cp}\"", OPTS(), '-d', dst, src ]
-        else
-            [ compile_with, OPTS(), '-d', dst, src ]
-        end
+        opts.push('-d', dst)
+        return opts
     end
 
-    def build
-        super
-
-        src, length = source()
-        if src.nil? || length == 0
-            puts_warning "Nothing to be compiled"
-        else
-            begin
-                go_to_homedir
-                raise 'Compilation has failed' if Artifact.exec(*cmd(src)) != 0
-                puts "#{length} source files have been compiled"
-            ensure
-                src.unlink if src.kind_of?(Tempfile)
-            end
-        end
-    end
-
-    def clean()
+    def clean
         list_dest_paths { | path |
             File.delete(path)
         }
@@ -166,28 +96,30 @@ end
 class JDTCompiler < JavaCompiler
     def initialize(*args)
         super
-        @description = 'JDT'
-        @jdt_jar_path = File.join($lithium_code, 'tools', 'java', 'jdt', 'ecj-4.15.jar') unless @jdt_jar_path
-
-        raise "JDT libray '#{@jdt_jar_path}' cannot be found" unless File.file?(@jdt_jar_path)
-
-        OPTS('-jar', @jdt_jar_path, '-1.8')
+        @description   = 'JDT'
+        @jdt_home    ||= File.join($lithium_code, 'tools', 'java', 'jdt')
+        raise "JDT home '#{@jdt_home}' cannot be found" unless File.file?(@jdt_home)
+        @target_version ||= '1.8'
     end
 
-    def compile_with()
+    def run_with
         @java.java
     end
 
-    def what_it_does()
+    def run_with_options(opts)
+        opts.push('-jar', File.join(@jdt_home, '*.jar'), @target_version)
+        return opts
+    end
+
+    def what_it_does
         "Compile JAVA '#{@name}' code with JDT\n        to:  '#{destination()}'"
     end
 
     def self.abbr() 'JDT' end
 end
 
-#
-# Groovy compile_with
-#
+
+# Groovy 
 class GroovyCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE GROOVY
@@ -196,10 +128,10 @@ class GroovyCompiler < JavaCompiler
     end
 
     def classpath
-        return super.JOIN(@groovy.classpaths)
+        super.JOIN(@groovy.classpaths)
     end
 
-    def compile_with
+    def run_with
         @groovy.groovyc
     end
 
@@ -211,7 +143,7 @@ class GroovyCompiler < JavaCompiler
 end
 
 #
-# Kotlin compile_with
+# Kotlin 
 class KotlinCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE KOTLIN
@@ -220,10 +152,10 @@ class KotlinCompiler < JavaCompiler
     end
 
     def classpath
-        return super.JOIN(@kotlin.classpaths)
+        super.JOIN(@kotlin.classpaths)
     end
 
-    def compile_with
+    def run_with
         @kotlin.kotlinc
     end
 
@@ -241,9 +173,7 @@ class KotlinCompiler < JavaCompiler
     def self.abbr() 'KTC' end
 end
 
-#
-# Scala compile_with
-#
+# Scala 
 class ScalaCompiler < JavaCompiler
     def initialize(*args)
         REQUIRE SCALA
@@ -251,12 +181,12 @@ class ScalaCompiler < JavaCompiler
         @description = 'Scala'
     end
 
-    def compile_with
+    def run_with
         @scala.scalac
     end
 
     def classpath
-        return super.JOIN(@scala.classpaths)
+        super.JOIN(@scala.classpaths)
     end
 
     def what_it_does

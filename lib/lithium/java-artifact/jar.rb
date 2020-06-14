@@ -18,12 +18,12 @@ class JarFileContent < FileArtifact
         true
     end
 
-    def build()
+    def build
         raise 'Invalid source file' if @source.nil?
 
         source_path = @source
         source_path = fullpath(source_path) unless File.absolute_path?(source_path)
-        raise "Source file '#{source_path}' is invalid" if !File.exists?(source_path) || File.directory?(source_path)
+        raise "Source file '#{source_path}' is invalid" unless File.file?(source_path)
 
         fp = fullpath
         FileUtils.mkdir_p(fp) unless File.exists?(fp)
@@ -33,7 +33,7 @@ class JarFileContent < FileArtifact
         }
     end
 
-    def what_it_does()
+    def what_it_does
         "Extract '#{@source}' JAR content into '#{@name}' directory"
     end
 end
@@ -49,7 +49,7 @@ class FindInZip < FileMask
         @pattern ||= $lithium_args[0]
     end
 
-    def build()
+    def build
         raise 'Class name cannot be detected' if @pattern.nil?
 
         c  = 0
@@ -113,7 +113,7 @@ class JarFile < ArchiveFile
         end
     end
 
-    def genarate(jar, destdir, list)
+    def generate(jar, destdir, list)
         return Artifact.exec(@java.jar, 'cfm', "\"#{jar}\"", "\"#{@manifest}\"", "-C \"#{destdir}\"", list) unless @manifest.nil?
         return Artifact.exec(@java.jar, 'cf', "\"#{jar}\"",  "-C \"#{destdir}\"", list)
     end

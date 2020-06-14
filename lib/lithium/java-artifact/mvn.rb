@@ -101,7 +101,7 @@ class MavenClasspath < InFileClasspath
 
     log_attr :excludeGroupIds, :excludeTransitive
 
-    default_name(".li_maven_class_path")
+    default_name(".lithium/li_maven_class_path")
 
     def initialize(*args, &block)
         REQUIRE MVN

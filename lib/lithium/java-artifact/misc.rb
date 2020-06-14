@@ -1,63 +1,53 @@
 require 'lithium/core'
 require 'lithium/java-artifact/base'
 
-class JavaDoc < FileCommand
-    #include LogArtifactState
-
+class GenerateJavaDoc < RunJavaTool
     def initialize(*args)
-        REQUIRE JAVA
-        @sources = []
         super
-        @sources = $lithium_args.dup if @sources.length == 0 && $lithium_args.length > 0
+        @source_as_file = true
+        @destination ||= 'apidoc'
     end
 
-    def build()
-        pkgs  = []
-        files = []
-
-        fp = fullpath()
-        raise "Javadoc destination cannot point to a directory '#{fp}'" if File.exists?(fp) || File.file?(fp)
-
-        @sources.each  { | source |
-            fp = fullpath(source)
-            raise "Source path '#{fp}' doesn't exists"   unless File.exists?(fp)
-            raise "Source path '#{fp}' points to a file" unless File.directory?(fp)
-
-            FileArtifact.grep(File.join(source, '**', '*.java'), /^package\s+([a-zA-Z._0-9]+)\s*;/, true) { | path, line_num, line, matched_part |
-                pkgs.push(matched_part) unless pkgs.include?(matched_part)
-                files.push(path)
-            }
-        }
-
-        if files.length > 0
-            puts "Detected packages: #{pkgs.join(', ')}"
-
-            FileArtifact.tmpfile(files) { | tmp_file |
-                r = Artifact.exec(@java.javadoc,
-                                  "-classpath '#{@java.classpath}'",
-                                  "-d '#{fullpath()}'",
-                                  "@#{tmp_file.path}" )
-                raise 'Javadoc generation has failed' if r != 0
-            }
-        else
-            puts_warning 'No a source file has been found'
-        end
+    def destination
+        dest = fullpath(@destination)
+        return dest if File.directory?(dest)
+        raise "Invalid destination directory '#{dest}'" if File.exists?(dest)
+        return dest
     end
 
-    def clean() FileUtils.rm_r(fullpath()) if  File.exists?(fullpath()) end
-    #def expired?() !File.exists?(fullpath()) end
-    def what_it_does() "Generate javadoc to '#{@name}' folder" end
+    def run_with
+        @java.javadoc
+    end
+
+    def run_with_options(opts)
+        opts.push('-d', destination())
+        return opts
+    end
+
+    def clean
+        dest = destination()
+        FileUtils.rm_r(dest) unless File.directory?(dest)
+    end
+
+    def what_it_does
+        "Generate javadoc to '#{destination()}' folder"
+    end
 
     def self.abbr() 'JDC' end
 end
 
-class ShowClassMethods < EnvArtifact
-    def initialize(*args)
-        REQUIRE JAVA
-        super
+class ShowClassMethods < JavaFileRunner
+    def classpath
+        super.JOIN(File.join($lithium_code, 'classes'))
     end
 
-    def build
+    def run_with_target(src)
+        t = [ 'lithium.JavaTools', "methods:#{@shortname}" ]
+        t.concat(super(src))
+        return t
+    end
+
+    def build2
         cn  = @shortname
         cp  = @java.classpath().to_s(File.join($lithium_code, 'classes'))
         

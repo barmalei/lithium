@@ -43,10 +43,10 @@ PATTERNS ({
        JavaExceptionLocPattern.new()
     ],
 
-    [ JavaCompiler, PMD ] => [
+    JavaCompiler => [
         # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
         StdPattern.new() {
-            location('java'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
+            location('java', 'scala'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
         }
     ],
 
@@ -116,10 +116,19 @@ PATTERNS ({
     ],
 
     JavaCheckStyle => [
-        # '\[[a-zA-Z]+\]\s+(?<file>${file_pattern}\.java):(?<line>[0-9]+):(?<column>[0-9]+)?'
         StdPattern.new {
             brackets { identifier(:level) }; spaces; location('java')
         }
+    ],
+
+    PMD => [
+        StdPattern.new() {
+            location('java'); spaces(); group(:message, '.*$')
+        }
+
+        # StdPattern.new {
+        #     brackets { identifier(:level) }; spaces; location('java')
+        # }
     ],
 
     JavaScriptHint => [

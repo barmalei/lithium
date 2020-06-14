@@ -127,9 +127,9 @@ class TREE < Artifact
         pshift, name = shift, root.art.shortname
 
         e = (root.expired ? '*' : '') +
-            (@show_id ? " #{root.art.object_id}" : '') +
+            (@show_id ? " ##{root.art.object_id}" : '') +
             (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
-            (@show_mtime ? ":#{root.art.mtime}" : '') +
+            (@show_mtime ? " #{root.art.mtime}ms" : '') +
             (@show_owner ? ":<#{root.art.owner}>" : '')
 
         s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name} (#{root.art.class})"  + e

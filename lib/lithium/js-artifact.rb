@@ -52,17 +52,12 @@ end
 class NodejsModule < FileArtifact
     def initialize(name, &block)
         REQUIRE JS
-        puts "1)    ------ #{name}"
-        puts "2)    ------ #{project.homedir}"
 
         unless File.absolute_path?(name)
-
             bn = File.basename(File.dirname(name))
             name = File.join($NODEJS_MODULES_DIR, name) if bn != $NODEJS_MODULES_DIR
         end
         super(name, &block)
-
-#        puts "3)    ------ #{fullpath}"
 
         bn = File.basename(File.dirname(fullpath))
         if bn != $NODEJS_MODULES_DIR
@@ -77,7 +72,6 @@ class NodejsModule < FileArtifact
     end
 
     def expired?
-        puts "---------- #{fullpath}"
         return !File.exists?(fullpath)
     end
 

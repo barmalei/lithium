@@ -7,7 +7,7 @@ require 'lithium/core'
 class GeneratedFile < FileArtifact
     include OptionsSupport
 
-    def build()
+    def build
         super
 
         tmpdir, remove = detstination_dir()
@@ -34,12 +34,10 @@ class GeneratedFile < FileArtifact
                 end
 
                 dest_dir = File.join(tmpdir, dir)
-                if File.exists?(dest_dir)
-                    raise "Destination directory '#{dest_dir}' already exists as a file" if File.file?(dest_dir)
-                else
-                    FileUtils.mkdir_p(dest_dir)
-                end
 
+                raise "Destination directory '#{dest_dir}' already exists as a file" if File.file?(dest_dir)
+                FileUtils.mkdir_p(dest_dir) unless File.exists?(dest_dir)
+                    
                 FileUtils.cp(fp, File.join(dest_dir, File.basename(path))) unless is_path_dir
             }
 
@@ -71,13 +69,13 @@ class GeneratedFile < FileArtifact
 end
 
 module ZipTool
-    def detect_zip()
+    def detect_zip
         @zip_path ||= nil
         @zip_path = FileArtifact.which('zip') if @zip_path.nil?
         return @zip_path
     end
 
-    def detect_zipinfo()
+    def detect_zipinfo
         @zipinfo_path ||= nil
         @zipinfo_path = FileArtifact.which('zipinfo') if @zipinfo_path.nil?
         return @zipinfo_path
@@ -127,7 +125,7 @@ class ArchiveFile < GeneratedFile
         @bases << base
     end
 
-    def what_it_does()
+    def what_it_does
         return "Create'#{@name}' by '#{@sources.map { | item | item.name }}'"
     end
 end
@@ -192,7 +190,7 @@ class MetaGeneratedFile < GeneratedFile
         REQUIRE @meta
     end
 
-    def META()
+    def META
         meta = MetaFile.new(File.join('.lithium', 'meta', relative_path))
         fp = meta.fullpath
         raise "Invalid meta file path '#{fp}'" unless File.file?(fp)
@@ -241,7 +239,7 @@ end
 class MetaGeneratedDirectory < MetaGeneratedFile
     CONTENT_FN = '.dir_content'
 
-    def clean()
+    def clean
         fp = fullpath
         list_items { |n, t|
             p =  File.join(fp, n)
@@ -255,7 +253,7 @@ class MetaGeneratedDirectory < MetaGeneratedFile
         }
     end
 
-    def expired?()
+    def expired?
         return true if super
 
         fp = fullpath
@@ -266,21 +264,21 @@ class MetaGeneratedDirectory < MetaGeneratedFile
         false
     end
 
-    def pre_build()
+    def pre_build
         clean()
     end
 
     def generate(dir, tmpdir, list) return 0 end
 
-    def detstination_dir()
+    def detstination_dir
        fp = fullpath
        FileUtils.mkdir_p(fp) unless File.exists?(fp)
        return fp, false
     end
 
-    def META()
+    def META
         meta = MetaFile.new(File.join('.lithium', 'meta', relative_path, CONTENT_FN))
-        raise "Meta file cannot be found #{meta.fullpath}" if !File.exists?(meta.fullpath)
+        raise "Meta file cannot be found '#{meta.fullpath}'" unless File.exists?(meta.fullpath)
         meta
     end
 

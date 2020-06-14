@@ -10,8 +10,8 @@ require 'pathname'
 #      artifact in a context of the given project
 # !==================================================================
 
-$lithium_version    = '3.6.0'
-$lithium_date       = 'May 2020'
+$lithium_version    = '3.6.1'
+$lithium_date       = 'Jun 2020'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 artifact            = ARGV[ $lithium_options.length ]
@@ -44,10 +44,10 @@ unless artifact_path.nil?
 
     if File.absolute_path?(artifact_path)
         # resolve link to real path for absolute paths
-        artifact_path = File.realpath(artifact_path)
+        artifact_path = File.realpath(artifact_path) if File.exists?(artifact_path)
         unless $lithium_options.has_key?('basedir')
             basedir = artifact_path
-            while !File.exists?(basedir) || !File.directory?(basedir) do
+            while !File.directory?(basedir) do
                 if Pathname.new(basedir).root?
                     basedir = Dir.pwd
                     break

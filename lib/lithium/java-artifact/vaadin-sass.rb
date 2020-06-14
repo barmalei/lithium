@@ -11,10 +11,8 @@ class BuildVaadinSass < JavaFileRunner
         @outputFile = @outputFile + '.css'
 
         @arguments.push("'#{@inputFile}'", "'#{@outputFile}'")
-    end
 
-    def target
-        'com.vaadin.sass.SassCompiler'
+        OPT('com.vaadin.sass.SassCompiler')
     end
 
     def what_it_does

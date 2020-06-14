@@ -4,28 +4,39 @@ require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
-class JavaCheckStyle < FileMask
-    include OptionsSupport
-
+class JavaCheckStyle < JavaFileRunner
     def initialize(*args)
-        REQUIRE JAVA
-
         super
-        @checkstyle_home = File.join($lithium_code, 'tools', 'java', 'checkstyle')  unless @checkstyle_home
-        raise "Checkstyle home '#{@checkstyle_home}' is incorrect"                  unless File.directory?(@checkstyle_home)
 
-        @checkstyle_config = File.join(@checkstyle_home, "default.xml")             unless @checkstyle_config
-        raise "Checkstyle config '#{@checkstyle_config}' cannot be found"           unless File.exists?(@checkstyle_config)
+        @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
+
+        unless @checkstyle_home
+            @checkstyle_home = existing_dir($lithium_code, 'tools', 'java', 'checkstyle')
+        end
+
+        unless @checkstyle_config
+            @checkstyle_config = existing_file(@checkstyle_home, "crystalloids_checks.xml")
+        end
+
+        unless File.exists?(@checkstyle_config)
+            raise "Checkstyle config '#{@checkstyle_config}' cannot be found"
+        end
 
         puts "Checkstyle home  : '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
+
+        cp = File.join(@checkstyle_home, '*.jar')
+        DefaultClasspath {
+            JOIN(cp)
+        }
     end
 
-    def build_item(path, mt)
-        raise "Cannot run check style" if Artifact.exec(@java.java,
-                                                       '-cp', "\"#{@checkstyle_home}/checkstyle-8.16-all.jar\"",
-                                                       'com.puppycrawl.tools.checkstyle.Main',
-                                                       '-c', "\"#{@checkstyle_config}\"",
-                                                       "\"#{fullpath(path)}\"") != 0
+    def run_with_target(src)
+        [ @checkstyle_main_class , '-c', @checkstyle_config, super(src) ]
+    end
+
+    def classpath
+        # only chackstyle classpath related JARs arer required
+        return PATHS.new(project.homedir).JOIN(@classpaths)
     end
 
     def what_it_does() "Check '#{@name}' java code style" end
@@ -41,30 +52,39 @@ class UnusedJavaCheckStyle < JavaCheckStyle
 end
 
 #  PMD code analyzer
-class PMD < FileMask
-    include OptionsSupport
-
+class PMD < JavaFileRunner
     def initialize(*args)
         super
-        @pmd_path = File.join($lithium_code, 'tools', 'java', 'pmd')
-        raise "Path cannot be found '#{@pmd_path}'" unless File.directory?(@pmd_path)
+        @pmd_home = File.join($lithium_code, 'tools', 'java', 'pmd')
+        raise "PMD home path cannot be found '#{@pmd_home}'" unless File.directory?(@pmd_home)
 
-        @pmd_rules  ||= File.join('rulesets', 'java', 'quickstart.xml')
-        @pmd_format ||= 'text'
-        @pmd_cmd    ||= 'run.sh'
+        @pmd_rules      ||= File.join('rulesets', 'java', 'quickstart.xml')
+        @pmd_format     ||= 'text'
+        @pmd_main_class ||= 'net.sourceforge.pmd.PMD'
+
+        @source_as_file     = true
+        @source_file_prefix = '-filelist '
+        @source_list_prefix = '-d '
+
+        cp = File.join(@pmd_home, 'lib', '*.jar')
+        DefaultClasspath {
+            JOIN(cp)
+        }
     end
 
-    def build_item(path, mt)
-        fp = fullpath(path)
-        raise "PMD target '#{fp}' cannot be found" unless File.exists?(fp)
+    def classpath
+        # only chackstyle classpath related JARs arer required
+        return PATHS.new(project.homedir).JOIN(@classpaths)
+    end
 
-        status = Artifact.exec(File.join(@pmd_path, 'bin', @pmd_cmd),
-                            'pmd', '-d', "\"#{fp}\"",
-                            '-format', @pmd_format,
-                            '-R', @pmd_rules)
+    def run_with_target(src)
+        t = [ @pmd_main_class, '-f', @pmd_format, '-R', @pmd_rules ]
+        t.concat(super(src))
+        return t
+    end
 
-        ecode = status.exitstatus
-        raise "PMD failed for '#{fp}' code = #{ecode}" if ecode != 0 && ecode != 4
+    def error_exit_code?(ec)
+        ec.exitstatus != 0 && ec.exitstatus != 4
     end
 
     def what_it_does() "Validate '#{@name}' code applying PMD:#{@pmd_rules}" end
