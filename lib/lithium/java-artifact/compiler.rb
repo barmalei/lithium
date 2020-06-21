@@ -39,12 +39,14 @@ class JavaCompiler < RunJavaTool
             while not pp.nil?
                 hd = pp.homedir
                 [ File.join(hd, 'classes'), File.join(hd, 'WEB-INF', 'classes') ].each { | path |
-                    if File.exists?(path)
+                    if File.directory?(path)
                         return path
                     else
                         puts_warning("Evaluated destination '#{path}' doesn't exist")
                     end
                 }
+
+
                 pp = pp.project
             end
             return nil

@@ -355,7 +355,6 @@ class KOTLIN < JVM
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
 
-        lib = File.join(@kotlin_home, 'lib')
         REQUIRE(KotlinClasspath) {
             @kotlin_home = kotlinc_path
         }

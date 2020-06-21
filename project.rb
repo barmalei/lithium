@@ -9,6 +9,10 @@
 
     RunMaven('mvn:*')
 
+    JAVA  {
+        puts "!!!!!!!!!!!!!!!!!!!"
+    }
+
     MATCH("run:*") {
         RunJavaCode('.lithium/lib/JavaTools.java') {
             DefaultClasspath {
@@ -59,10 +63,8 @@
         CompileSass         ('**/*.sass')
         BuildVaadinSass     ('VAADIN/**/*.scss')
 
-        GroupByExtension('**/*') {
-            DO { | ext |
-                Project.build("compile:#{@name}#{ext}")
-            }
+        OTHERWISE { | path |
+            Project.build("compile:#{path}")
         }
     }
 
@@ -70,10 +72,8 @@
         JavaCheckStyle('**/*.java')
         JavaScriptHint('**/*.js')
 
-        GroupByExtension('**/*') {
-            DO { | ext |
-                Project.build("check:#{@name}#{ext}")
-            }
+        OTHERWISE { | path |
+            Project.build("check:#{path}")
         }
     }
 

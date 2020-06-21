@@ -31,7 +31,7 @@ class StringRunner < Artifact
         super
     end
 
-    def build()
+    def build
         raise 'Script string has not been defined' unless @script
 
         # TODO: this notation is not supported by  Artifact.exec()
@@ -42,7 +42,7 @@ class StringRunner < Artifact
         raise 'Run string has failed' if r != 0
     end
 
-    def what_it_does()
+    def what_it_does
         formated, line = [], 1
         @script.each_line { | l |
             formated << "  #{line}: #{l.strip}"

@@ -249,15 +249,15 @@ class StdPattern
         any('\s+')
     end
 
-    def spaces?()
+    def spaces?
         any('\s*')
     end
 
-    def colon()
+    def colon
         any(':')
     end
 
-    def colon?()
+    def colon?
         any(':{0,1}')
     end
 

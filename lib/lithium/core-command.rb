@@ -3,7 +3,7 @@ require 'fileutils'
 require 'lithium/core'
 
 class CLEAN < Artifact
-    def build()
+    def build
         # firstly let's create tree that resolves static dependencies (for instance set environment variables)
 
         Project.build(@name).clean
@@ -36,7 +36,7 @@ class META < Artifact
         OPT($lithium_options['meta.opt'])
     end
 
-    def build()
+    def build
         p  = Project.current
         unless p.nil?
             if OPT?('current')
@@ -92,7 +92,7 @@ class META < Artifact
         puts "#{shift}    <no meta is available>" if count == 0
     end
 
-    def what_it_does()
+    def what_it_does
         "List meta tree"
     end
 
@@ -100,7 +100,7 @@ class META < Artifact
 end
 
 class REQUIRE < Artifact
-    def build()
+    def build
         puts "Artifact '#{@shortname}' dependencies list {"
         Project.artifact(@name).requires { | dep, assignTo, is_own, block |
             printf("    %-20s : '%s' (assignTo = %s)\n", dep.name, ArtifactName.new(dep, &block), (assignTo.nil? ? '<none>' : assignTo))
@@ -117,7 +117,7 @@ class TREE < Artifact
         super
     end
 
-    def build()
+    def build
         show_tree(ArtifactTree.new(@name))
     end
 
@@ -130,7 +130,7 @@ class TREE < Artifact
             (@show_id ? " ##{root.art.object_id}" : '') +
             (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
             (@show_mtime ? " #{root.art.mtime}ms" : '') +
-            (@show_owner ? ":<#{root.art.owner}>" : '')
+            (@show_owner ? ":<#{root.art.owner.class}:#{root.art.owner.createdByMeta}>" : '')
 
         s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name} (#{root.art.class})"  + e
         b = parent && root != parent.children.last
@@ -164,7 +164,7 @@ end
 
 # list expired items or/and attributes for the given artifact
 class EXPIRED < Artifact
-    def build()
+    def build
         a = Project.artifact(@name)
 
         name = "Artifact '#{a.class}:#{a.shortname}'"
@@ -225,7 +225,7 @@ class INFO < Artifact
 
     def initialize(name = '.') super end
 
-    def build()
+    def build
         INFO.info(@name)
     end
 
@@ -244,32 +244,33 @@ class INFO < Artifact
 end
 
 class INIT < FileCommand
-    def initialize(*args)
-        super(args.length == 0 || args[0].nil? ? '.' : args[0])
-        @template ||= 'generic'
-    end
-
     def build()
         path = fullpath()
-        raise "File '#{path}' is not a directoryr or doesn't exist" unless File.directory?(path)
+
+        raise "File '#{path}' is not a directory or doesn't exist" unless File.directory?(path)
         lp = File.expand_path(File.join(path, ".lithium"))
 
         if File.exists?(lp)
             raise "'.lithium' as a file already exits in '#{lp}'" if File.file?(lp)
             puts_warning "Project '#{lp}' already has lithium stuff initialized"
         else
-            lh = File.join($lithium_code, 'templates',  @template, '.lithium')
-            begin
-                l = File.join(lp, 'project.rb')
-                FileUtils.cp_r(lh, path)
-            rescue
-                FileUtils.rm_r lp if File.exists?(lp)
-                raise
-            end
+            Dir.mkdir(lp)
+        end
+
+        prj_file = File.join(lp, 'project.rb')
+        unless File.exists?(prj_file)
+            puts "Creating project config file -> '#{prj_file}'"
+            File.open(prj_file, 'w') { | f |
+                f.puts("-> {\n}")
+            }
+        else
+            puts_warning "Project configuration '#{prj_file}' already exists"
         end
     end
 
-    def what_it_does() "Generate lithium stuff for '#{@name}'" end
+    def what_it_does
+        "Generate lithium stuff for '#{@name}'" 
+    end
 end
 
 class INSTALL < Artifact
@@ -316,7 +317,7 @@ eval \"$vc\"
         end
     end
 
-    def build()
+    def build
         if File.exists?(@script_path)
             puts_warning "File '#{@script_path}' already exists"
             File.open(@script_path, 'r') { |f|

@@ -710,7 +710,7 @@ class Artifact
         end
     end
 
-    def project()
+    def project
         ow = owner
         while ow && !ow.kind_of?(Project) do
             ow = ow.owner
@@ -718,7 +718,7 @@ class Artifact
         return ow
     end
 
-    def homedir()
+    def homedir
         return owner.homedir unless owner.nil? # if has a container the artifact belongs
         return File.expand_path(Dir.pwd)
     end
@@ -1087,7 +1087,9 @@ class FileArtifact < Artifact
        # TODO: have no idea if the commented code will have a side effect !
        # return path if path.start_with?('.env/')
 
-        if path == @name
+        if path == '.' || path == './'
+            return Pathname.new(File.join(Dir.pwd, path)).cleanpath.to_s
+        elsif path == @name
             return path if @is_absolute
             return Pathname.new(File.join(homedir, path)).cleanpath.to_s
         else
@@ -1668,10 +1670,18 @@ module ArtifactContainer
 
                 # meta cannot be locally found try to delegate search to owner container
                 # if owner exists and artifact name doesn't identify environment artifact
-                #unless artname.env_path?
-                    # puts "artname.path.nil? = #{artname.path.nil?} !match('#{homedir}', '#{artname.path}') = #{!match(artname.path)}"
-                    # return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
-                #end
+ #               unless artname.env_path?
+#                    puts "artname.path.nil? = #{artname.path.nil?} !match('#{homedir}', '#{artname.path}') = #{!match(artname.path)}"
+  #                  return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
+   #             end
+
+                # TODO: the code is not proved, the idea is to host env artifact instances
+                # on the level of owner container if it has been defined on the level of
+                # the child container (no double JAVA initialization).
+                # if artname.env_path?
+                #     a = owner.artifact(name, &block)
+                #     return a unless a.nil?
+                # end
             end
 
             meta = _meta_from_owner(name)
@@ -1801,6 +1811,11 @@ module ArtifactContainer
         ARTIFACT(file_mask, FileMaskContainer, &block)
     end
 
+    def OTHERWISE(&block)
+        ARTIFACT('**/*', OTHERWISE, &block)
+    end
+
+
     def method_missing(meth, *args, &block)
         if meth.length > 2
             begin
@@ -1882,7 +1897,7 @@ class Project < ExistentDirectory
         @@curent_project = prj
     end
 
-    def self.current()
+    def self.current
         @@curent_project
     end
 
@@ -1899,16 +1914,27 @@ class Project < ExistentDirectory
         self.owner = args[1] if args.length > 1
         super(args[0], &block)
         @desc ||= File.basename(args[0])
+        LOAD('project.rb')
+    end
 
-        conf = File.join(homedir, '.lithium', 'project.rb')
-        if File.file?(conf)
-            self.instance_eval(File.read(conf)).call
+    def PROFILE(name, &block)
+        _load(File.join($lithium_code, 'profiles', name + '.rb'), &block)
+    end
+
+    def LOAD(name, &block)
+        _load(name, &block)
+    end
+
+    def _load(path, &block)
+        path = File.join(homedir, '.lithium', path) unless File.absolute_path?(path)
+        unless File.file?(path)
+            puts_warning "Project configuration '#{path}' doesn't exist"
         else
-            puts_warning "Project '#{@desc}' configuration '#{conf}' cannot be found"
+            self.instance_eval(File.read(path)).call
         end
     end
 
-    def homedir()
+    def homedir
         return @name if @is_absolute
         return super
     end
@@ -2106,27 +2132,31 @@ module PATHS
     end
 end
 
-class GroupByExtension < FileMask
-    def initialize(*args, &block)
-        @callback = nil
-        super
-    end
-
-    def DO(&block)
+# The artifact is used to handle **/* file mask,
+class OTHERWISE < FileMask
+    def initialize(name, build_ext_pattern = true, &block)
+        super(name) {} # prevent passing &block to super with empty one
+        raise "Block is required for #{self.class} artifact" if block.nil?
         @callback = block
+        @ignore_dirs = true
+        @build_ext_pattern = build_ext_pattern
     end
 
     def build()
-        exts = []
-        list_items { |f, m|
-            ext = File.extname(f)
-            exts.push(ext) if !ext.nil? && ext != "" && !exts.include?(ext)
-        }
+        if @build_ext_pattern
+            exts = []
+            list_items { | f, m |
+                ext = File.extname(f)
+                exts.push(ext) if !ext.nil? && ext != '' && !exts.include?(ext)
+            }
 
-        exts.each { | ext |
-            name = "#{@name}#{ext}"
-            puts "Detect '#{ext}' to be compiled as '#{name}'"
-            @callback.call(ext)
-        }
+            exts.each { | ext |
+                self.instance_exec("**/*#{ext}", &@callback)
+            }
+        else
+            list_items { | f, m |
+                self.instance_exec(f, &@callback)
+            }
+        end
     end
 end

@@ -75,7 +75,7 @@ class NodejsModule < FileArtifact
         return !File.exists?(fullpath)
     end
 
-    def clean()
+    def clean
         if File.exists?(fullpath)
             project.go_to_homedir
             raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0

@@ -108,7 +108,7 @@ class ValidateRubyScript < FileMask
 
     def initialize(*args)
         REQUIRE RUBY
-        OPT '-c'
+        OPT '-wc'
         super
     end
 
