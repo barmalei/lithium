@@ -14,12 +14,13 @@ Predefined classifiers:
   check:file|mask      - apply check-style 
   mvn:path             - run maven 
   minjs:file           - minify JS code
-  test:file|mask       - run test-cases 
+  test:file|mask       - run (junit) test-cases 
             
 Options:
   -std=[none|sublime] - std out mode
   -v=[0,1,2] - verbosity level 
   -basedir=<path> - custom project home directory
+  -i - show artifact properties
   -i:p=[@]name1[.[@]nameN][,[@]name1[.[@]nameN]] - inspect property
   
 Samples:

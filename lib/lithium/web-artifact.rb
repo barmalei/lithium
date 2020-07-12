@@ -27,7 +27,7 @@ end
 
 
 class RunHtml < FileCommand
-    def build()
+    def build
         `open #{fullpath()}`
     end
 end

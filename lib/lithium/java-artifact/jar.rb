@@ -105,17 +105,27 @@ class JarFile < ArchiveFile
     def initialize(*args)
         REQUIRE JAVA
         super
-        @manifest ||= nil
-
-        if @manifest
-            @manifest = fullpath(@manifest)
-            raise "Manifest file '#{@manifest}' is a directory or doesn't exist"  unless File.file?(@manifest)
-        end
+        OPTS 'vcf'
     end
 
-    def generate(jar, destdir, list)
-        return Artifact.exec(@java.jar, 'cfm', "\"#{jar}\"", "\"#{@manifest}\"", "-C \"#{destdir}\"", list) unless @manifest.nil?
-        return Artifact.exec(@java.jar, 'cf', "\"#{jar}\"",  "-C \"#{destdir}\"", list)
+    def MANIFEST(manifest)
+        manifest = fullpath(manifest)
+        raise "Manifest file '#{manifest}' is a directory or doesn't exist"  unless File.file?(manifest)
+        @manifest = manifest
+        OPTS 'vcfm'
+    end
+
+    def generate(list)
+        fp  = fullpath
+        cmd = [
+            @java.jar,
+            OPTS(),
+            "\"#{fp}\"",
+            self.manifest.nil? ? '' : "\"#{self.manifest}\"",
+            "-C \"#{Dir.pwd}\"",
+            list.join(' ')
+        ]
+        return Artifact.exec(*cmd)
     end
 
     def self.abbr() 'JAR' end

@@ -239,7 +239,7 @@ class JAVA < JVM
     log_attr :java_home, :jdk_home, :java_version, :java_version_low, :java_version_high
 
     def initialize(*args)
-        REQUIRE(DefaultClasspath) # define class path here to let re-define it with a custom code super calls
+    #REQUIRE(DefaultClasspath) # define class path here to let re-define it with a custom code in super calls
 
         super
 

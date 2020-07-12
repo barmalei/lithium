@@ -40,7 +40,7 @@ class CopyOfFile < FileArtifact
         return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
     end
 
-    def clean()
+    def clean
         if File.exists?(fullpath)
             File.delete(fullpath)
         else
@@ -48,7 +48,7 @@ class CopyOfFile < FileArtifact
         end
     end
 
-    def build()
+    def build
         super
         fetch(validate_source, fullpath)
     end
@@ -67,12 +67,65 @@ class CopyOfFile < FileArtifact
     def what_it_does() "    '#{@source}' => '#{fullpath}'" end
 end
 
+
+class SourceDirectory < FileMask
+    include AssignableDependency
+
+    def assign_me_to
+        :source
+    end
+end
+
+
+#  Copy of a file artifact
+class CopyOfDirectory < Directory
+    def expired?
+        true
+        # src = validate_source()
+        # return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
+    end
+
+    # def clean
+    #     if File.exists?(fullpath)
+    #         File.delete(fullpath)
+    #     else
+    #         puts_warning "File '#{fullpath}' doesn't exist"
+    #     end
+    # end
+
+    def build
+        super
+
+
+
+        puts @source.list_items_to_array()
+        @source.list_expired_items { |f, m|
+            puts f, m
+        }
+    end
+
+    def fetch(src, dest)
+        FileUtils.cp(src, dest)
+    end
+
+    def validate_source()
+        raise 'Source path is not defined' if @source.nil?
+        src = File.absolute_path?(@source) ? @source : fullpath(@source)
+        raise "Source '#{src}' doesn't exist or points to a directory" unless File.file?(src)
+        return src
+    end
+
+    def what_it_does() "    '#{@source}' => '#{fullpath}'" end
+end
+
+
+
 #  Remove a file or directory
 class RmFile < FileCommand
     def build()
         super
 
-        path = fullpath()
+        path = fullpath
         if File.directory?(path)
             FileUtils.remove_dir(path)
         elsif File.exists?(path)
@@ -152,20 +205,5 @@ class REGREP < GREP
             return m[0]
         end
     end
-end
-
-class FIND < FileCommand
-    def initialize(*args)
-        super
-        @file ||= $lithium_args.length > 0 ? $lithium_args[0] : 'TODO'
-    end
-
-    def build()
-        Dir.glob(File.join(fullpath, '**', @file)).each  { | path |
-            puts "    Found file: #{path}"
-        }
-    end
-
-    def what_it_does() "Looking for '#{@file} in '#{@name}'" end
 end
 

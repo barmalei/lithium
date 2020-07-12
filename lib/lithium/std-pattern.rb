@@ -62,7 +62,7 @@ class StdPattern
             _convert(name, &block)
         end
 
-        def level()
+        def level
             if has_group?(:level)
                 return 2 if @level < 2 && self[:level][:value] == 'error'
                 return 1 if @level < 1 && self[:level][:value] == 'warning'
@@ -237,15 +237,15 @@ class StdPattern
         return self
     end
 
-    def dot()
+    def dot
         any('\.')
     end
 
-    def comma()
+    def comma
         any('\,')
     end
 
-    def spaces()
+    def spaces
         any('\s+')
     end
 
@@ -361,11 +361,11 @@ class StdPattern
         return self
     end
 
-    def level()
+    def level
         @level
     end
 
-    def flush()
+    def flush
         @re_parts, @groups, @re = [], [], nil
     end
 
@@ -479,7 +479,7 @@ class JavaPattern < StdPattern
 end
 
 class JavaExceptionLocPattern < JavaPattern
-    def initialize()
+    def initialize
         super(3) {
             any('^\s+at\s*'); class_name; dot; identifier(:method)
             rbrackets {
@@ -496,7 +496,7 @@ class JavaExceptionLocPattern < JavaPattern
 end
 
 class JavaCompileErrorPattern < JavaPattern
-    def initialize()
+    def initialize
         super(2) {
             location('java', 'scala'); any('\s+error:\s+'); group(:message, '.*$')
         }
@@ -514,7 +514,7 @@ class KotlinCompileErrorPattern < JavaPattern
 end
 
 class GroovyCompileErrorPattern < JavaPattern
-    def initialize()
+    def initialize
         super(2) {
             location('groovy'); spaces?; group(:message, '.*$')
         }
@@ -530,21 +530,21 @@ class URLPattern < StdPattern
         }
     end
 
-    def path()
+    def path
         group(:path, '[^ \t]*')
     end
 
-    def host()
+    def host
         group(:host, '([0-9]+{1,3}\.[0-9]+{1,3}\.[0-9]+{1,3})|[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)')
     end
 
-    def port?()
+    def port?
         group(:port, '\:[0-9]+{2,6}')
         @re_parts.push('?')
         self
     end
 
-    def scheme()
+    def scheme
         group(:scheme, '(http|https|ftp|ftps|sftp)')
     end
 end

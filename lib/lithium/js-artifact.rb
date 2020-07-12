@@ -125,7 +125,7 @@ class UglifiedJSFile < ArchiveFile
         super
     end
 
-    def generate(path, dest_dir, list)
+    def generate(list)
         validate_extension()
         project.go_to_homedir
         return Artifact.exec(File.join(@uglify.fullpath, 'bin', 'uglifyjs'), OPTS(), list.join(' '), '-o', fullpath)
@@ -174,7 +174,7 @@ end
 
 
 class CombinedJSFile < ArchiveFile
-    def generate(path, dest_dir, list)
+    def generate(list)
         f = File.new(fullpath(), 'w')
         f.write("(function() {\n\n")
 

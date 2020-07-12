@@ -1,5 +1,6 @@
 require 'pathname'
 require 'open3'
+require 'digest'
 
 #  Log takes care about logged expiration state.
 #
@@ -266,7 +267,7 @@ module LogArtifactState
 
     def items_log_path
         if @items_log_id.nil?
-            @items_log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{self.name.tr("/\\<>:.*{}[]", '_')}")
+            @items_log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{Digest::MD5.hexdigest(self.name)}")
         else
             @items_log_path ||= File.join(logs_home_dir, @items_log_id)
         end
@@ -457,12 +458,8 @@ class ArtifactName < String
 
         @path = @suffix[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/] unless @suffix.nil?
         unless @path.nil?
-            mask_index = @path.index(/[\[\]\?\*\{\}]/)
-            unless mask_index.nil?
-                @path_mask = @path[mask_index, @path.length]
-                @path      = @path[0, mask_index]
-            end
-            @path      = @path.length == 0 ? nil : Pathname.new(@path).cleanpath.to_s
+            @path, @path_mask = FileArtifact.cut_mask(@path)
+            @path = Pathname.new(@path).cleanpath.to_s unless @path.nil?
             @mask_type = @mask_type | File::FNM_PATHNAME if @path_mask != '*' || !@path.nil?
         end
 
@@ -478,6 +475,15 @@ class ArtifactName < String
         super(name)
     end
 
+    def self.relative_to(name, to)
+        artname = ArtifactName.new(name)
+        unless artname.path.nil?
+            path    = FileArtifact.relative_to(artname.path, to)
+            artname = ArtifactName.new(ArtifactName.name_from(artname.prefix, path, artname.path_mask)) unless path.nil?
+        end
+        return artname
+    end
+
     def self.nil_name(name, msg = 'Artifact name')
         raise "#{msg} cannot be nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
     end
@@ -491,7 +497,7 @@ class ArtifactName < String
         return name
     end
 
-    def env_path?()
+    def env_path?
         return !path.nil? && path.start_with?(".env/")
     end
 
@@ -778,6 +784,9 @@ class Artifact
         }
     end
 
+    def build
+    end
+
     # test if the given artifact has expired and need to be built
     def expired?() true end
 
@@ -790,10 +799,30 @@ class Artifact
     def what_it_does() return "Build '#{to_s}' artifact" end
 
     # add required for the artifact building dependencies (other artifact)
-    def REQUIRE(art, &block)
-        raise 'No dependencies have been specified' if art.nil?
+    # art   - name of artifact or instance of artifact
+    # block - custom block for artifact or if art is nil block is build method for
+    # INIT artifact
+    def REQUIRE(art = nil, &block)
+        raise 'No dependencies have been specified' if art.nil? && block.nil?
         @requires ||= []
-        @requires.push([art, nil, false, block])
+        if art.nil?
+            # build custom artifact that run the given block as build method
+            art = Artifact.new(self.name + "/<INIT>", &block)
+
+
+            # class << art
+            #     attr_accessor :build_block
+
+            #     def build
+            #         self.instance_eval(&build_block)
+            #     end
+            # end
+            # art.build_block = block
+            @requires.push([art, nil, false, nil])
+        else
+            @requires.push([art, nil, false, block])
+        end
+
         return AssignRequiredTo.new(@requires[-1])
     end
 
@@ -876,10 +905,11 @@ class Artifact
     end
 
     # build artifact including all its dependencies
+    # @name name of artifact to be built
     def Artifact.build(name, &block)
         # !!! instantiate tree artifact in a context of an artifact that calls it
         # !!! the caller artifact is set as an owner of the created artifact
-        art = self.new(name, &block)
+        art  = self.new(name, &block)
         tree = ArtifactTree.new(art)
         tree.build()
         return tree.art
@@ -899,13 +929,13 @@ class ArtifactTree
         raise 'Artifact cannot be nil' if art.nil?
 
         p = parent.nil? ? Project : parent.art.owner
-        if !art.kind_of?(Artifact)
+        if art.kind_of?(Artifact)
+            art.instance_eval(&block) unless block.nil?
+        else
             art = p.artifact(art, &block)
-        elsif !block.nil?
-            art.instance_eval(&block)
         end
 
-        @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, art.expired?, nil
+        @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, nil, nil
         build_tree() if parent.nil?
     end
 
@@ -933,10 +963,6 @@ class ArtifactTree
 
             # build subtree to evaluate expiration
             node.build_tree(map)
-            if !@expired && (node.expired || bt.nil? || (bt > 0 && node.art.mtime() > bt))
-                @expired = true
-                @expired_by_kid = node.art
-            end
 
             # add the new node to tree and process it only if doesn't already exist
             @children << node if foundNode.nil?
@@ -974,37 +1000,49 @@ class ArtifactTree
                     end
                 end
             end
+
+            # most likely the expired state has to be set here, after assignable dependencies are set
+            # since @art.expired? method can require the assigned deps to define its expiration state
+            # moreover @art.expired? should not be called here since we can have multiple assignable
+            # deps
+            if @expired_by_kid.nil? && (node.expired || (bt > 0 && node.art.mtime() > bt))
+                puts "#{@art.name} -> node.expired(#{node.art.name}) = #{node.expired}  bt = #{bt} node.bt = #{node.art.mtime()}"
+
+                @expired = true
+                @expired_by_kid = node.art
+            end
         }
+
+        # check if expired attribute has not been set (if there ware no deps
+        # that expired the given art)
+        @expired = @art.expired? if @expired.nil?
     end
 
-    def build()
+    def build
         unless @expired
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
         else
             @children.each { | node | node.build() }
-            if @art.respond_to?(:build)
-                prev_art = $current_artifact
-                begin
-                    $current_artifact = @art
-                    wid = @art.what_it_does()
-                    puts wid unless wid.nil?
-                    @art.pre_build()
+            prev_art = $current_artifact
 
-                    @art.build()
-                    @art.instance_eval(&@art.done) unless @art.done.nil?
+            begin
+                $current_artifact = @art
+                wid = @art.what_it_does()
+                puts wid unless wid.nil?
+                @art.pre_build()
 
-                    @art.build_done()
-                rescue
-                    @art.build_failed()
-                    level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
-                    puts_exception($!, 0) if level == 0
-                    puts_exception($!, 3) if level == 1
-                    raise                 if level == 2
-                ensure
-                    $current_artifact = prev_art
-                end
-            else
-                puts_warning "'#{@art.name}' does not declare build() method"
+                @art.build()
+                @art.instance_eval(&@art.done) unless @art.done.nil?
+
+                @art.build_done()
+            rescue
+                @art.build_failed()
+                level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
+                puts_exception($!, 0) if level == 0
+                puts_exception($!, 3) if level == 1
+                raise                 if level == 2
+            ensure
+                $current_artifact = prev_art
             end
         end
     end
@@ -1029,24 +1067,13 @@ class FileArtifact < Artifact
         super(path.to_s, &block)
     end
 
-    def _contains_path?(base, path)
-        base = base[0..-2] if base[-1] == '/'
-        path = path[0..-2] if path[-1] == '/'
-
-        return true  if base == path
-        return false if base.length == path.length
-        i = path.index(base)
-        return false if i.nil? || i != 0
-        return path[base.length] == '/'
-    end
-
     def homedir
         if @is_absolute
             unless owner.nil?
                 home = owner.homedir
                 if File.absolute_path?(home)
                     home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
-                    return home #if _contains_path?(home, @name)
+                    return home #if FileArtifact.path_start_with?(@name, home)
                 end
             end
 
@@ -1060,27 +1087,9 @@ class FileArtifact < Artifact
         Dir.chdir(homedir)
     end
 
-    def relative_art(name)
-        artname = ArtifactName.new(name)
-        unless artname.path.nil?
-            path    = relative_path(artname.path)
-            artname = ArtifactName.new(ArtifactName.name_from(artname.prefix, path, artname.path_mask)) unless path.nil?
-        end
-        return artname
-    end
-
-    def relative_path(path = @name)
-        mi = path.index(/[\[\]\?\*\{\}]/)
-        unless mi.nil?
-            path = path[0, mi]
-            return nil if path.length == 0
-        end
-
-        path  = Pathname.new(path).cleanpath
-        home  = Pathname.new(homedir)
-        return nil if (path.absolute? && !home.absolute?) || (!path.absolute? && home.absolute?) || !_contains_path?(home.to_s, path.to_s)
-
-        return path.relative_path_from(home).to_s
+    # return path that is relative to the artifact homedir
+    def relative_to_home
+        FileArtifact.relative_to(@name, homedir)
     end
 
     def fullpath(path = @name)
@@ -1099,15 +1108,12 @@ class FileArtifact < Artifact
             if path.absolute?
                 path = path.to_s
                 home = home[0, home.length - 1] if home.length > 1 && home[home.length - 1] == '/'
-                raise "Path '#{path}' cannot be relative to '#{home}'" unless _contains_path?(home, path)
+                raise "Path '#{path}' is not relative to '#{home}' home" unless FileArtifact.path_start_with?(path, home)
                 return path
             else
                 return File.join(home, path.to_s)
             end
         end
-    end
-
-    def build()
     end
 
     # test if the given path is in a context of the given file artifact
@@ -1117,14 +1123,9 @@ class FileArtifact < Artifact
         # current directory always match
         return true if path == '.'
 
-        mi = path.index(/[\[\]\?\*\{\}]/) # test if the path contains mask
-
-        # cut mask part if it has been detected in the path
-        unless mi.nil?
-            pp   = path.dup
-            path = path[0, mi]
-            raise "Path '#{pp}' contains only mask" if path.length == 0
-        end
+        pp = path.dup
+        path, mask = FileArtifact.cut_mask(path)
+        raise "Path '#{pp}' contains only mask" if path.nil?
 
         path  = Pathname.new(path).cleanpath
         home  = Pathname.new(homedir)
@@ -1132,11 +1133,11 @@ class FileArtifact < Artifact
 
         # any relative path is considered as a not matched path
         return false if !path.absolute? && home.absolute?
-        return _contains_path?(home.to_s, path.to_s)
+        return FileArtifact.path_start_with?(path.to_s, home.to_s)
     end
 
     def expired?
-        return false
+        false
     end
 
     def mtime
@@ -1160,7 +1161,50 @@ class FileArtifact < Artifact
     end
 
     def search(path)
-        return FileArtifact.search(path, self)
+        FileArtifact.search(path, self)
+    end
+
+    def existing_dir(*args)
+        self.class.existing_dir(*args)
+    end
+
+    def existing_file(*args)
+        self.class.existing_file(*args)
+    end
+
+    def self.path_start_with?(path, to)
+        to   = to[0..-2]   if to[-1]   == '/'
+        path = path[0..-2] if path[-1] == '/'
+
+        return true  if to == path
+        return false if to.length == path.length
+        i = path.index(to)
+        return false if i.nil? || i != 0
+        return path[to.length] == '/'
+    end
+
+    #  path = [base]/...
+    def self.relative_to(path, to)
+        path, mask = self.cut_mask(path)
+        path  = Pathname.new(path).cleanpath
+        to    = Pathname.new(to)
+        return nil if (path.absolute? && !to.absolute?) || (!path.absolute? && to.absolute?) || !path_start_with?(path.to_s, to.to_s)
+        return path.relative_path_from(to).to_s
+    end
+
+    def self.cut_mask(path)
+        mi = path.index(/[\[\]\?\*\{\}]/) # test if the path contains mask
+
+        # cut mask part if it has been detected in the path
+        mask = nil
+        unless mi.nil?
+            path = path.dup
+            mask = path[mi, path.length]
+            path = path[0, mi]
+            path = nil if path.length == 0
+        end
+
+        return path, mask
     end
 
     def self.which(cmd)
@@ -1201,14 +1245,6 @@ class FileArtifact < Artifact
                 File.cp(spath, dpath)
             end
         }
-    end
-
-    def existing_dir(*args)
-        self.class.existing_dir(*args)
-    end
-
-    def existing_file(*args)
-        self.class.existing_file(*args)
     end
 
     def self.existing_dir(*args)
@@ -1257,7 +1293,7 @@ class FileArtifact < Artifact
     # track not found items
     @search_cache = {}
 
-    # searchthe given  path
+    # search the given path
     def self.search(path, art = $current_artifact, &block)
         if File.exists?(path)
             if block.nil?
@@ -1350,11 +1386,11 @@ class FileArtifact < Artifact
         raise 'Pattern cannot be nil' if pattern.nil?
         pattern = Regexp.new(pattern) if pattern.kind_of?(String)
 
-        is_not_mask = path.index(/[\[\]\?\*\{\}]/).nil?
-        raise "File '#{path}' cannot be found" if !File.exists?(path) && is_not_mask
+        pp, mask = FileArtifact.cut_mask(path)
+        raise "File '#{path}' cannot be found" if !File.exists?(path) && mask.nil?
 
         list = []
-        if File.directory?(path) || !is_not_mask
+        if File.directory?(path) || mask
             FileArtifact.dir(path, true) { | item |
                 res = FileArtifact.grep_file(item, pattern, match_all, &block)
                 list.concat(res) unless res.nil?
@@ -1369,9 +1405,9 @@ class FileArtifact < Artifact
     def self.dir(path, ignore_dirs = true, &block)
         raise 'Path cannot be nil'            if path.nil?
 
-        is_not_mask = path.index(/[\[\]\?\*\{\}]/).nil?
+        pp, mask = FileArtifact.cut_mask(path)
         raise "Path '#{path}' points to file" if File.file?(path)
-        raise "Path '#{path}' doesn't exist"  if !File.exists?(path) && is_not_mask
+        raise "Path '#{path}' doesn't exist"  if !File.exists?(path) && mask.nil?
 
         list = []
         Dir[path].each { | item |
@@ -1421,20 +1457,16 @@ class ExistentFile < FileArtifact
         assert_existence()
     end
 
-    def build()
+    def build
         assert_existence()
     end
 
-    def mtime()
+    def mtime
         assert_existence()
         return super()
     end
 
-    def expired?()
-        return false
-    end
-
-    def assert_existence()
+    def assert_existence
         fp = fullpath()
         raise "File '#{fp}' doesn't exist" unless File.exists?(fp)
     end
@@ -1449,10 +1481,22 @@ end
 
 # Directory artifact
 class Directory < FileArtifact
+    def expired?
+        !File.directory?(fullpath)
+    end
+
     def build()
         super
         fp = fullpath
-        raise "File '#{fp}' is not a directory" unless File.directory?(fp)
+        raise "File '#{fp}' is not a directory" if File.file?(fp)
+    end
+
+    def list_items
+        go_to_homedir()
+        Dir[@name].each { | path |
+            mt = File.mtime(path).to_i
+            yield path, mt
+        }
     end
 end
 
@@ -1460,7 +1504,7 @@ class ExistentDirectory < FileArtifact
     def build()
         super
         fp = fullpath
-        raise "File '#{fp}' is not a directory" unless File.directory?(fp)
+        raise "File '#{fp}' is not a directory or doesn't exist" unless File.directory?(fp)
     end
 end
 
@@ -1468,26 +1512,20 @@ end
 #
 class FileMask < FileArtifact
     def initialize(*args)
-        @regexp_filter = nil
-        @ignore_dirs   = false
-        @ignore_files  = false
         super
+        @regexp_filter ||= nil
+        @ignore_dirs   ||= false
+        @ignore_files  ||= false
         raise 'Files and directories are ignored at the same time' if @ignore_files && @ignore_dirs
     end
 
-    def print()
-        list_items { | p, m |
-            puts p
-        }
-    end
-
-    def build()
+    def build
         list_items { | p, m |
             build_item(p, m)
         }
     end
 
-    def ignore_hidden()
+    def ignore_hidden
         @regexp_filter = /^[\.].*/
     end
 
@@ -1506,9 +1544,7 @@ class FileMask < FileArtifact
     # List items basing on the mask returns items relatively to the
     # passed path
     def list_items(rel = nil)
-        go_to_homedir()
-
-        rel = rel[0, rel.length - 1] if !rel.nil? && rel[-1] == '/'
+        go_to_homedir
 
         Dir[@name].each { | path |
             next if @regexp_filter && !(path =~ @regexp_filter)
@@ -1520,8 +1556,8 @@ class FileMask < FileArtifact
 
             mt = File.mtime(path).to_i
             unless rel.nil?
-                "Relative path '#{rel}' cannot be applied to '#{path}'" unless _contains_path?(rel, path)
-                path = path[rel.length + 1, path.length - rel.length]
+                path = FileArtifact.relative_to(rel)
+                "Relative path '#{rel}' cannot be applied to '#{path}'" if path.nil?
             end
 
             yield path, mt
@@ -1663,25 +1699,13 @@ module ArtifactContainer
         meta = find_meta(artname)
         if meta.nil?
             unless owner.nil?
-                # puts "Container '#{@name}' delegate '#{artname.path}' to owner"
-                # if !artname.path.nil? && artname.path.start_with?('../')
-                #     return owner.artifact(artname.path_up(), &block)
-                # end
-
-                # meta cannot be locally found try to delegate search to owner container
-                # if owner exists and artifact name doesn't identify environment artifact
- #               unless artname.env_path?
-#                    puts "artname.path.nil? = #{artname.path.nil?} !match('#{homedir}', '#{artname.path}') = #{!match(artname.path)}"
-  #                  return owner.artifact(name, &block) if artname.path.nil? || !match(artname.path)
-   #             end
-
-                # TODO: the code is not proved, the idea is to host env artifact instances
-                # on the level of owner container if it has been defined on the level of
-                # the child container (no double JAVA initialization).
-                # if artname.env_path?
-                #     a = owner.artifact(name, &block)
-                #     return a unless a.nil?
-                # end
+                # There are two types of container: project and file mask containers. File mask containers
+                # exist only in a context of a project and should share common artifacts through a
+                # common project (if the artifact is not defined on the level of the container). It helps
+                # to avoid duplication of multiple artifacts created with the same meta. For instance
+                # JAVA artifact instance for java compiler (.*) and Java runner mask containers have to
+                # the same if it is not re-defined on the level of the container.
+                return owner.artifact(name, &block) if delegate_to_owner_if_meta_cannot_be_found?
             end
 
             meta = _meta_from_owner(name)
@@ -1689,7 +1713,7 @@ module ArtifactContainer
                 # attempt to handle situation when an artifact meta the container has been
                 # created is going to be applied to artifact creation. It can indicate we
                 # have cyclic come back
-                raise "There is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
+                raise "There is no an artifact META associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
             else
                 meta = artname unless artname.clazz.nil?
             end
@@ -1774,14 +1798,14 @@ module ArtifactContainer
     #     clazz:    class,
     #     def_name: name
     # }
-    def _meta()
+    def _meta
         @meta = [] unless defined? @meta
         return @meta
     end
 
     # find appropriate for the given artifact name registered meta if possible
     def find_meta(name)
-        name = relative_art(name)
+        name = ArtifactName.relative_to(name, homedir)
         return _meta.detect { | p | p.match(name) }
     end
 
@@ -1815,7 +1839,6 @@ module ArtifactContainer
         ARTIFACT('**/*', OTHERWISE, &block)
     end
 
-
     def method_missing(meth, *args, &block)
         if meth.length > 2
             begin
@@ -1840,6 +1863,7 @@ module ArtifactContainer
     end
 
 
+    # TODO: check if it is still actual
     # return reference to an artifact meta info
     def REF(name)
         name = ArtifactName.new(name)
@@ -1873,11 +1897,19 @@ module ArtifactContainer
     def REMOVE(name)
         # TODO: implement it
     end
+
+    def delegate_to_owner_if_meta_cannot_be_found?
+        return false
+    end
 end
 
 # mask container
 class FileMaskContainer < FileMask
     include ArtifactContainer
+
+    def delegate_to_owner_if_meta_cannot_be_found?
+        return true
+    end
 end
 
 # project artifact
@@ -1905,8 +1937,21 @@ class Project < ExistentDirectory
         @@curent_project.artifact(name, &block)
     end
 
-    def self.build(name, &block)
-       return @@curent_project.build(name, &block)
+    def self.build(name)
+        raise 'Current project cannot be detected' if @@curent_project.nil?
+
+        # build current project
+        tree = ArtifactTree.new(@@curent_project)
+        tree.build()
+
+        # make sure we are not going to build the current project again
+        an = ArtifactName.new(name)
+        if an.clazz.nil? || an.clazz != @@curent_project.class || @@curent_project.fullpath(an.path) != @@curent_project.fullpath
+            art = @@curent_project.artifact(name)
+            tree = ArtifactTree.new(art)
+            tree.build()
+        end
+        return tree.art
     end
 
     def initialize(*args, &block)
@@ -1939,15 +1984,14 @@ class Project < ExistentDirectory
         return super
     end
 
-    def expired?() true end
-
-    def build(name, &block)
-        tree = ArtifactTree.new(name, &block)
-        tree.build()
-        return tree.art
+    def expired?
+        true
     end
 
-    def what_it_does()
+    def build
+    end
+
+    def what_it_does
         nil
     end
 end
@@ -1956,7 +2000,7 @@ end
 # that requires the AssignableDependency artifact
 module AssignableDependency
     #  an attribute name the dependency artifact has to be assigned
-    def assign_me_to()
+    def assign_me_to
         self.class.name.downcase
     end
 end
@@ -2049,15 +2093,12 @@ module PATHS
             elsif path.kind_of?(String)
                 hd = path_base_dir
                 path.split(File::PATH_SEPARATOR).each { | path_item |
-                    if !hd.nil? && !File.absolute_path?(path_item)
-                        path_item = File.join(hd, path_item)
-                    end
+                    path_item = File.join(hd, path_item) if !hd.nil? && !File.absolute_path?(path_item)
 
-                    # TODO: copy paste ArtifactName initialize()
-                    mask_index = path_item.index(/[\[\]\?\*\{\}]/)
-                    unless mask_index.nil?
+                    pp, mask = FileArtifact.cut_mask(path_item)
+                    unless mask.nil?
                         @paths.concat(FileArtifact.dir(path_item))
-                        path_item = path_item[0, mask_index] # remove mask
+                        path_item = pp
                     end
 
                     @paths.push(path_item)

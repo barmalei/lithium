@@ -25,7 +25,7 @@ class JavaCheckStyle < JavaFileRunner
         puts "Checkstyle home  : '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
 
         cp = File.join(@checkstyle_home, '*.jar')
-        DefaultClasspath {
+        DefaultClasspath('checkstyle_def_classpath') {
             JOIN(cp)
         }
     end
@@ -67,7 +67,7 @@ class PMD < JavaFileRunner
         @source_list_prefix = '-d '
 
         cp = File.join(@pmd_home, 'lib', '*.jar')
-        DefaultClasspath {
+        DefaultClasspath('pmd_def_classpath') {
             JOIN(cp)
         }
     end

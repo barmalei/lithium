@@ -17,7 +17,7 @@ class LithiumStd < Std
         end
     end
 
-    def finalize()
+    def finalize
         unless @log_io.nil?
             @log_io.puts ']'
             @log_io.close

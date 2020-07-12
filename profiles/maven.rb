@@ -1,5 +1,13 @@
 
 -> {
+    REQUIRE {
+        Directory('target') {
+            DONE {
+              RunMaven.build('.')
+            }
+        }
+    }
+
     JAVA {
         DefaultClasspath {
             JOIN('target/classes')
@@ -10,12 +18,6 @@
     }
 
     JavaCompiler("compile:src/main/java/**/*.java") {
-        Directory('target') {
-            DONE {
-               RunMaven.build('.')
-            }
-        }
-
         @destination = 'target/classes'
     }
 

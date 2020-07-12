@@ -5,11 +5,14 @@ require 'lithium/core'
 class CLEAN < Artifact
     def build
         # firstly let's create tree that resolves static dependencies (for instance set environment variables)
-
-        Project.build(@name).clean
+        tree = ArtifactTree.new(@name)
+        tree.art.clean
+        #Project.build(@name)
     end
 
-    def what_it_does() "Cleanup '#{@name}', #{Project.artifact(@name).class}" end
+    def what_it_does
+        "Cleanup '#{@name}', #{Project.artifact(@name).class}" 
+    end
 end
 
 # Display registered meats
@@ -65,7 +68,7 @@ class META < Artifact
     def traverse(stack, index, shift = '')
         if index >= 0
             prj = stack[index]
-            artname = prj.relative_art(@name)
+            artname = ArtifactName.relative_to(@name, prj.homedie)
             puts "#{shift}[+] Meta data for '#{prj}' project {\n"
             puts_prj_metas(prj, artname, shift)
             traverse(stack, index - 1, shift + '    ')
@@ -244,7 +247,7 @@ class INFO < Artifact
 end
 
 class INIT < FileCommand
-    def build()
+    def build
         path = fullpath()
 
         raise "File '#{path}' is not a directory or doesn't exist" unless File.directory?(path)
@@ -278,12 +281,12 @@ class INSTALL < Artifact
         super
         @script_name ||= 'lithium'
 
-        if RUBY_PLATFORM =~ /darwin/i || RUBY_PLATFORM =~ /linux/i || RUBY_PLATFORM =~ /freebsd/i || RUBY_PLATFORM =~ /freebsd/i || RUBY_PLATFORM =~ /netbsd/i || RUBY_PLATFORM =~ /cygwin/i
-            os = :unix
-        elsif RUBY_PLATFORM =~ /mswin/i || RUBY_PLATFORM =~ /mingw/i || RUBY_PLATFORM =~ /bccwin/i
-            os = :win
+        if File::PATH_SEPARATOR == ':'
+            @os = :unix
+        elsif File::PATH_SEPARATOR == ';'
+            @os = :win
         else
-            os = nil;
+            @os = nil
         end
 
 @nix_script = "#!/bin/bash
@@ -304,10 +307,10 @@ eval \"$vc\"
 @set LITHIUM_HOME=#{$lithium_code}
 @ruby %LITHIUM_HOME%/lib/lithium.rb %*
 "
-        if os == :unix
+        if @os == :unix
             @script_path = "/usr/local/bin/#{@script_name}"
             @script = @nix_script
-        elsif os == :win
+        elsif @os == :win
             win = ENV['WINDIR'].dup
             win["\\"] = '/'
             @script_path = "#{win}/#{@script_name}.bat"
@@ -320,7 +323,7 @@ eval \"$vc\"
     def build
         if File.exists?(@script_path)
             puts_warning "File '#{@script_path}' already exists"
-            File.open(@script_path, 'r') { |f|
+            File.open(@script_path, 'r') { | f |
                 l = f.readlines()
                 l = l.join(' ')
                 if l.index('LITHIUM_HOME').nil?
@@ -332,7 +335,7 @@ eval \"$vc\"
 
         File.open(@script_path, 'w') { |f|
             f.print @script
-            f.chmod(0777) if os != :win
+            f.chmod(0777) if @os != :win
         }
     end
 

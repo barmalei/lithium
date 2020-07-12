@@ -171,7 +171,7 @@ PATTERNS ({
 })
 
 #
-# @param  artifact - original artifact target
+# @param  artifact        - original artifact target
 # @param  artifact_prefix - artifact prefix including ":". Can be nil
 # @param  artifact_path   - artifact path with mask cut. Can be nil
 # @param  basedir         - a related location the lithium has been started
@@ -179,9 +179,9 @@ PATTERNS ({
 def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # print header
     dt = DateTime.now.strftime("%H:%M:%S.%L")
-    puts "+#{'—'*73}+"
-    puts "│ Lithium - build tool v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
-    puts "+#{'—'*73}+"
+    puts "+#{'—'*77}+"
+    puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  sandtube@gmail.com (c) #{dt} │"
+    puts "+#{'—'*77}+"
     $stdout.flush()
 
     if artifact_prefix.nil? && artifact_path.nil?
@@ -192,7 +192,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         exit(-1)
     end
 
-    # load projects hierarchy
+    # collect projects hierarchy into array
     prjs_stack = []
     path       = basedir
     prj        = nil
