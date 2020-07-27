@@ -19,6 +19,7 @@ class JavaCompiler < RunJavaTool
 
     def classpath
         dst = destination()
+        raise 'Destination cannot be detected' if dst.nil?
         cp  = super
         cp.JOIN(dst) unless cp.INCLUDE?(dst)
         return cp
@@ -45,7 +46,6 @@ class JavaCompiler < RunJavaTool
                         puts_warning("Evaluated destination '#{path}' doesn't exist")
                     end
                 }
-
 
                 pp = pp.project
             end

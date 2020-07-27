@@ -1,5 +1,5 @@
 -> {
-    $lithium_options['v'] = 2
+    #$lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
     Touch('touch:*')
@@ -9,13 +9,28 @@
 
     RunMaven('mvn:*')
 
-    JAVA  {
-        puts "!!!!!!!!!!!!!!!!!!!"
+    CopyToDirectory("test") {
+        @full_copy = true
+        FileMaskSource('.lithium/lib/*')
+        FileMaskSource('classes/com/**/*')
+        MetaSourceFile('.lithium/meta/test.dir')
+    }
+
+    ZipFile("test.zip") {
+        FileMaskSource('.lithium/lib/*', '.lithium/lib')
+    }
+
+    JarFile("test.jar") {
+        FileMaskSource('.lithium/lib/*')
+    }
+
+    UglifiedJSFile("test.min.js") {
+        FileMaskSource('.lithium/exa mples/easyoop.js')
     }
 
     MATCH("run:*") {
         RunJavaCode('.lithium/lib/JavaTools.java') {
-            DefaultClasspath {
+            DefaultClasspath("li_run_class_path") {
                 JOIN('.lithium/classes')
             }
         }

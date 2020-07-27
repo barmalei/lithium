@@ -123,7 +123,7 @@ class JarFile < ArchiveFile
             "\"#{fp}\"",
             self.manifest.nil? ? '' : "\"#{self.manifest}\"",
             "-C \"#{Dir.pwd}\"",
-            list.join(' ')
+            list.map { | s | "\"#{s}\"" }.join(' ')
         ]
         return Artifact.exec(*cmd)
     end

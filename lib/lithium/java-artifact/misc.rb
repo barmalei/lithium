@@ -46,17 +46,17 @@ class ShowClassMethods < JavaFileRunner
         t.concat(super(src))
         return t
     end
+end
 
-    def build2
-        cn  = @shortname
-        cp  = @java.classpath().to_s(File.join($lithium_code, 'classes'))
-        
-        res = Artifact.exec(
-            @java.java,
-            '-classpath', "\"#{cp}\"",
-            'lithium.JavaTools', "methods:#{cn}", $lithium_args[0])
+class ShowClassModule < JavaFileRunner
+    def classpath
+        super.JOIN(File.join($lithium_code, 'classes'))
+    end
 
-        raise "#{self.class.name} failed" if res != 0
+    def run_with_target(src)
+        t = [ 'lithium.JavaTools', "module:#{@shortname}" ]
+        t.concat(super(src))
+        return t
     end
 end
 
@@ -85,6 +85,7 @@ class FindInClasspath < FileCommand
 
     def item_found(path, item, is_jar)
         puts "    [#{path} => #{item}]"
+        #puts "  {\n    \"item\": \"#{item}\",\n    \"path\": \"#{path}\"\n  }"
     end
 
     def FindInClasspath.find(use_zipinfo, classpath, target)
@@ -104,7 +105,7 @@ class FindInClasspath < FileCommand
                     }
                 end
             else
-                wmsg "File '#{path}' doesn't exist" unless File.exists?(path)
+                puts_warning "File '#{path}' doesn't exist" unless File.exists?(path)
             end
         }
     end

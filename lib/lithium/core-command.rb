@@ -106,7 +106,8 @@ class REQUIRE < Artifact
     def build
         puts "Artifact '#{@shortname}' dependencies list {"
         Project.artifact(@name).requires { | dep, assignTo, is_own, block |
-            printf("    %-20s : '%s' (assignTo = %s)\n", dep.name, ArtifactName.new(dep, &block), (assignTo.nil? ? '<none>' : assignTo))
+            aname = dep.kind_of?(Artifact) ? ArtifactName.new(dep.name, dep.class, &block) : ArtifactName.new(dep, &block)
+            printf("    %-20s : '%s' (assignTo = %s)\n", dep.name, dep, (assignTo.nil? ? '<none>' : assignTo))
         }
         puts '}'
     end
@@ -172,7 +173,7 @@ class EXPIRED < Artifact
 
         name = "Artifact '#{a.class}:#{a.shortname}'"
         if a.kind_of?(LogArtifactState)
-            if a.original_expired?()
+            if a.original_expired?
                 puts "#{name} is expired: 'expire?' => true"
                 return
             else

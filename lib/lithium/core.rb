@@ -757,7 +757,8 @@ class Artifact
     end
 
     # return cloned array of the artifact dependencies
-    def requires()
+    # yield  (dep, assignMeTo, is_own, block)
+    def requires
         @requires ||= []
         req = @requires
 
@@ -961,7 +962,7 @@ class ArtifactTree
             end
             raise "#{@art.class}:'#{art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
-            # build subtree to evaluate expiration
+            # build sub-tree to evaluate expiration
             node.build_tree(map)
 
             # add the new node to tree and process it only if doesn't already exist
@@ -974,14 +975,17 @@ class ArtifactTree
             # has to be placed before recursive build tree method call
             node.art.owner = @art.owner if is_own == true
 
-            if node.art.class < AssignableDependency
-                # call special method that is declared with AssignableDependency module
-                # to resolve host artifact property name the given dependency artifact has
-                # to be stored
-                assignMeTo = node.art.assign_me_to if assignMeTo.nil?
 
-                raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
+            #  resolve assign_me_to  property that says to which property the instance pf the
+            #  dependent artifact has to be assigned
+            if assignMeTo.nil?
+                if node.art.class < AssignableDependency
+                    assignMeTo = node.art.assign_me_to
+                    raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
+                end
+            end
 
+            unless assignMeTo.nil?
                 if @art.respond_to?(assignMeTo.to_sym)
                     @art.send(assignMeTo.to_sym, node.art)
                 else
@@ -2013,7 +2017,7 @@ class EnvArtifact < Artifact
     def self.default_name(*args)
         @default_name ||= nil
         if args.length > 0
-            raise "Invalid environment artifact '#{name}' name ('.env/<artifact_name>' ie expected)" unless name.start_with?('.env/')
+            raise "Invalid environment artifact '#{name}' name ('.env/<artifact_name>' is expected)" unless name.start_with?('.env/')
             @default_name = validate_env_name(args[0])
         elsif @default_name.nil?
             @default_name = File.join('.env', self.name)

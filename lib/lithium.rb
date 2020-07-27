@@ -10,8 +10,8 @@ require 'pathname'
 #      artifact in a context of the given project
 # !==================================================================
 
-$lithium_version    = '3.6.3'
-$lithium_date       = 'Jun 2020'
+$lithium_version    = '3.6.5'
+$lithium_date       = 'Jul 2020'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 artifact            = ARGV[ $lithium_options.length ]

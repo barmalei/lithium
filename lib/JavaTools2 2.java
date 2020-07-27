@@ -1,20 +1,13 @@
 package lithium;
 
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.lang.Class;
 import java.lang.reflect.Method;
-
 import java.util.ArrayList;
+
 import java.util.List;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import java.util.regex.Pattern;
-
-import java.net.URL;
-
 
 public class JavaTools {
     private static final String[] packages = new String[] {
@@ -58,11 +51,7 @@ public class JavaTools {
         String  pkg     = clazz.getPackage().getName() + ".";
         Pattern pattern = Pattern.compile(" ([^ ]+)(\\.[a-zA-Z_][a-zA-Z0-9_]*)\\(");
 
-        List<Map> items = new ArrayList();
         for (Method method : clazz.getMethods()) {
-            Map item = new HashMap();
-            item.put("name", method.getName());
-
             String methodString = method.toGenericString();
             methodString = methodString.replaceAll(pkg, "");
             methodString = methodString.replaceAll("java.lang.", "");
@@ -72,58 +61,12 @@ public class JavaTools {
                 methodString = methodString.substring(0, mt.start(1)) +
                                methodString.substring(mt.end(1) + 1);
             }
-
-            item.put("method", methodString);
-            items.add(item);
-        }
-
-        Collections.<Map>sort(items, (a, b) -> {
-            String n1 = (String)a.get("name");
-            String n2 = (String)b.get("name");
-            return n1.compareTo(n2);
-        });
-
-        for (Map item : items) {
-            System.out.println("{" + item.get("method") + "}");
-        }
-    }
-
-    public static String detectClassSource(String cn) throws Exception {
-        Class clazz = null;
-        if (cn.indexOf('.') < 0) {
-            List<Class> res = classByShortName(cn);
-            if (res != null && res.size() > 0) {
-                if (res.size() == 1) {
-                    clazz = res.get(0);
-                } else {
-                    System.out.println("Class '" + cn + "' cannot be resolved unambiguously");
-                }
-            }
-        } else {
-            clazz = Class.forName(cn);
-        }
-
-        if (clazz != null) {
-            URL    location = clazz.getResource('/' + clazz.getName().replace('.', '/') + ".class");
-            String path     = location.getPath();
-            int    index    = path.indexOf('!');
-            if (index > 0) {
-                path = path.substring(0, index);
-            }
-
-            String pref = "file:";
-            if (path.startsWith(pref)) {
-                path = path.substring(pref.length());
-            }
-
-            return path;
-        } else {
-            return null;
+            System.out.println("{" + methodString + "}");
         }
     }
 
     public static void main(String[] args) throws Exception {
-        String info = "<methods:className> or <class:className> or <module:className> commands are expected";
+        String info = "<methods:className> or <class:className> commands are expected";
 
         if (args.length == 0 || args[0].trim().length() == 0) {
             System.err.println("No argument has been passed");
@@ -132,8 +75,8 @@ public class JavaTools {
         }
 
         String command = args[0].trim();
-        if (!command.startsWith("methods:") && !command.startsWith("class:") && !command.startsWith("module:")) {
-            System.err.println("Unknown command: '" + command + "'");
+        if (!command.startsWith("methods:") && !command.startsWith("class:")) {
+            System.err.println("Unknown command");
             System.err.println(info);
             System.exit(1);
         }
@@ -179,13 +122,8 @@ public class JavaTools {
             }
 
             printMethods(clazz);
-        } else if ("module".equals(prefix)) {
-            String path = detectClassSource(suffix);
-            if (path != null) {
-                System.out.println("[" + path + " => " + suffix + "]");
-            }
         } else {
-            System.err.println("Unknown command: '" + command + "'");
+            System.err.println("Unknown command");
             System.err.println(info);
             System.exit(1);
         }

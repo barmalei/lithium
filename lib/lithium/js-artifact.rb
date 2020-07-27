@@ -26,17 +26,17 @@ class JS < EnvArtifact
     end
 
     def nodejs
-        return @nodejs
+        @nodejs
     end
 
     def npm
-        return @npm
+        @npm
     end
 
     def module_home(name)
         raise 'Name of module cannot be empty' if name.nil? || name.length == 0
         module_home = File.join(homedir, $NODEJS_MODULES_DIR, name)
-        module_home = File.join(owner.homedir, $NODEJS_MODULES_DIR, name) if     !File.exists?(module_home) && !owner.nil?
+        module_home = File.join(owner.homedir, $NODEJS_MODULES_DIR, name) unless File.exists?(module_home) || owner.nil?
         module_home = File.join($lithium_code, $NODEJS_MODULES_DIR, name) unless File.exists?(module_home)
         return module_home
     end
@@ -44,7 +44,7 @@ class JS < EnvArtifact
     def what_it_does() "Initialize Node JS environment '#{@name}'" end
 
     def expired?
-        return false
+        false
     end
 end
 
@@ -72,7 +72,7 @@ class NodejsModule < FileArtifact
     end
 
     def expired?
-        return !File.exists?(fullpath)
+        !File.exists?(fullpath)
     end
 
     def clean
@@ -83,15 +83,10 @@ class NodejsModule < FileArtifact
     end
 
     def what_it_does
-        return "Install '#{File.basename(fullpath)}' nodejs module"
+        "Install '#{File.basename(fullpath)}' nodejs module"
     end
 end
 
-module NPM
-    def NPM(name)
-        return REQUIRE("NodejsModule:#{name}")
-    end
-end
 
 # Run JS with nodejs
 class RunNodejs < FileCommand
@@ -114,47 +109,40 @@ class RunNodejs < FileCommand
 end
 
 # nodejs uglyfier
-class UglifiedJSFile < ArchiveFile
-    extend NPM
-
-    include OptionsSupport
-
+# @name : name of the uglified file
+class UglifiedJSFile < GeneratedFile
     def initialize(*args, &block)
         REQUIRE JS
-        NPM('uglify-js').OWN.TO('uglify')
+        NodejsModule('uglify-js')
         super
     end
 
-    def generate(list)
+    def build
+        list = []
+        list_sources_from { | from, from_m |
+            raise "Source from file '#{from}' doesn't exists or points to directory" unless File.file?(from)
+            list.push(from)
+        }
+
+        raise 'Source list is empty' if list.length == 0
         validate_extension()
         project.go_to_homedir
-        return Artifact.exec(File.join(@uglify.fullpath, 'bin', 'uglifyjs'), OPTS(), list.join(' '), '-o', fullpath)
+        raise 'Uglifier has failed' if Artifact.exec(
+            File.join(@js.module_home('uglify-js'), 'bin', 'uglifyjs'), 
+            OPTS(), 
+            list.map { | s |  "\"#{s}\"" }.join(' '), 
+            '-o',
+            "\"#{fullpath}\""
+        ) != 0
     end
 
     def expired?
-       return !File.exists?(fullpath)
+        !File.exists?(fullpath)
     end
 
     def clean
-        validate_extension()
-        File.delete(fullpath()) if File.exists?(fullpath())
-    end
-
-    def list_items(rel = nil)
-        if @sources.length == 0
-            fp     = fullpath()
-            bn     = File.basename(fp)
-            suffix = '.min.js'
-            i      = bn.rindex(suffix)
-
-            raise "JS minified file '#{bn}' cannot be used to detect input JS file" if i.nil? || i != (bn.length - suffix.length)
-            bn = bn[0, i + 1] + 'js'
-            fp = File.join(File.dirname(fp), bn);
-            raise "Auto-detected input JS file '#{fp}' doesn't exists or points to directory" unless File.file?(fp)
-            yield fp, File.mtime(fp).to_i, nil
-        else
-            super(rel)
-        end
+        validate_extension
+        super
     end
 
     def what_it_does
@@ -163,18 +151,20 @@ class UglifiedJSFile < ArchiveFile
 
     # to avoid name clash with JS source code
     def validate_extension
-        bn  = File.basename(fullpath)
-        ext = File.extname(bn)
-        return if ext.downcase != '.js'
-        bn = bn[0..(bn.length - ext.length + 1)]
-        ext = File.extname(bn)
-        raise "Minified file name '#{fullpath}' points to JS code" if ext.nil? || ext.length == 0
+        fp = fullpath()
+        raise "Minified file name '#{fp}' points to JS code" unless File.basename(fp).end_with?('.min.js')
     end
 end
 
 
-class CombinedJSFile < ArchiveFile
-    def generate(list)
+class CombinedJSFile < GeneratedFile
+    def build
+        list = []
+        list_sources_from { | from, from_m |
+            raise "Source from file '#{from}' doesn't exist or points to directory" unless File.file?(from)
+            list.push(from)
+        }
+
         f = File.new(fullpath(), 'w')
         f.write("(function() {\n\n")
 
@@ -186,12 +176,10 @@ class CombinedJSFile < ArchiveFile
 
         f.write("\n\n})();")
         f.close()
-
-        return 0;
     end
 
     def expired?
-       return !File.exists?(fullpath)
+        !File.exists?(fullpath)
     end
 
     def clean
@@ -210,7 +198,7 @@ class JavaScriptDoc < FileArtifact
         @input    ||= '.'
         raise 'Name has to be directory' unless File.directory?(fullpath)
 
-        REQUIRE('npm:yuidocjs')
+        NodejsModule('yuidocjs')
     end
 
     def expired?
@@ -291,6 +279,6 @@ class JavaScriptHint < FileMask
     end
 
     def what_it_does
-        return "JavaScript lint '#{@name}'"
+        "JavaScript lint '#{@name}'"
     end
 end

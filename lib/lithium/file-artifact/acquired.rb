@@ -88,10 +88,7 @@ class FileMaskSource < FileMask
     end
 end
 
-# acquired file artifact
-class GeneratedFile < FileArtifact
-    include OptionsSupport
-
+module GENERATED
     # called every time a new source has been registered
     def add_source(source)
         @sources ||= []
@@ -143,6 +140,18 @@ class GeneratedFile < FileArtifact
         }
     end
 
+    def list_sources_from
+        list_sources_items { | from, as, from_m |
+            yield from, File.exists?(from) ? File.mtime(from).to_i : -1
+        }
+    end
+end
+
+# acquired file artifact
+class GeneratedFile < FileArtifact
+    include OptionsSupport
+    include GENERATED
+
     def clean
         fp = fullpath
         raise "Path to generated file '#{fp}' points to directory" if File.directory?(fp)
@@ -154,8 +163,13 @@ class GeneratedFile < FileArtifact
     end
 end
 
+class GeneratedDirectory < Directory
+    include OptionsSupport
+    include GENERATED
+end
+
 # Generate directory
-class GeneratedDirectory < GeneratedFile
+class CopyToDirectory < GeneratedDirectory
     def initialize(*args, &block)
         @full_copy = false
         super
@@ -290,7 +304,7 @@ class GeneratedDirectory < GeneratedFile
 end
 
 # Generated temporary directory
-class GeneratedTmpDirectory < GeneratedDirectory
+class CopyToTmpDirectory < CopyToDirectory
     def initialize(name, &block)
         raise "Absolute path '#{name}' cannot be used" if File.absolute_path?(name)
         dir = Dir.mktmpdir(name)
@@ -339,7 +353,7 @@ class ArchiveFile < GeneratedFile
 
         tmp = nil
         begin
-            tmp = GeneratedTmpDirectory.new(File.basename(fp)) {
+            tmp = CopyToDirectory.new(File.basename(fp)) {
                 @full_copy = true
             }
             tmp.add_source(sources)
@@ -376,6 +390,6 @@ class ZipFile < ArchiveFile
     end
 
     def generate(src_list)
-        run_zip(OPTS(), "\"#{fullpath}\"", src_list.join(' '))
+        run_zip(OPTS(), "\"#{fullpath}\"", src_list.map { | s | "\"#{s}\"" }. join(' '))
     end
 end
