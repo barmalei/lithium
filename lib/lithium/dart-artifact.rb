@@ -1,6 +1,5 @@
 require 'lithium/core'
 require 'lithium/file-artifact/command'
-require 'lithium/misc-artifact'
 
 # DART
 class DART < EnvArtifact

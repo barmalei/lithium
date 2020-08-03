@@ -1,6 +1,5 @@
 require 'lithium/core'
 require 'lithium/file-artifact/command'
-require 'lithium/misc-artifact'
 
 class RunGCloud < FileCommand
     def build

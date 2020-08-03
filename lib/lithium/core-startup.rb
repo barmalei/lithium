@@ -24,7 +24,7 @@ require 'lithium/php-artifact'
 require 'lithium/tt-artifact'
 require 'lithium/web-artifact'
 
-require 'lithium/misc-artifact'
+require 'lithium/xml-artifact'
 
 # TODO:
 # Proposed pattern definition syntacsis

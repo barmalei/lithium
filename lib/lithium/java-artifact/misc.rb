@@ -60,6 +60,18 @@ class ShowClassModule < JavaFileRunner
     end
 end
 
+class ShowClassField < JavaFileRunner
+    def classpath
+        super.JOIN(File.join($lithium_code, 'classes'))
+    end
+
+    def run_with_target(src)
+        t = [ 'lithium.JavaTools', "field:#{@shortname}" ]
+        t.concat(super(src))
+        return t
+    end
+end
+
 class FindInClasspath < FileCommand
     def initialize(*args)
         REQUIRE JAVA

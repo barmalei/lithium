@@ -1,6 +1,7 @@
 package lithium;
 
 
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +16,8 @@ import java.util.regex.Pattern;
 
 import java.net.URL;
 
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 
 public class JavaTools {
     private static final String[] packages = new String[] {
@@ -39,6 +42,8 @@ public class JavaTools {
         "java.security",
         "javax.crypto"
     };
+
+    private static final String test = "dshajdshjdahsd";
 
     public static List<Class> classByShortName(String name) throws Exception {
         List<Class> res = new ArrayList();
@@ -122,8 +127,28 @@ public class JavaTools {
         }
     }
 
+    public static void detectFieldValue(String path) throws Exception {
+        int     index = path.lastIndexOf('.') ;
+        String  cn    = path.substring(0, index);
+        String  fn    = path.substring(index + 1);
+        Class   clazz = Class.forName(cn);
+        //Field[] flds  = clazz.getDeclaredFields();
+
+        Field  field = clazz.getField(fn);
+        Object value = field.get(null);
+        System.out.println("{{{" +  ReflectionToStringBuilder.toString(value, ToStringStyle.MULTI_LINE_STYLE) + "}}}");
+
+        // for (Field field : flds) {
+        //     System.out.println(" + ", " + field.get(null));
+        // }
+    }
+
     public static void main(String[] args) throws Exception {
         String info = "<methods:className> or <class:className> or <module:className> commands are expected";
+
+        // detectConstantValue("lithium.JavaTools");
+        // // TODO: removeme
+        // if (args.length == 0) return;
 
         if (args.length == 0 || args[0].trim().length() == 0) {
             System.err.println("No argument has been passed");
@@ -132,7 +157,7 @@ public class JavaTools {
         }
 
         String command = args[0].trim();
-        if (!command.startsWith("methods:") && !command.startsWith("class:") && !command.startsWith("module:")) {
+        if (!command.startsWith("methods:") && !command.startsWith("class:") && !command.startsWith("module:") && !command.startsWith("field:")) {
             System.err.println("Unknown command: '" + command + "'");
             System.err.println(info);
             System.exit(1);
@@ -184,6 +209,8 @@ public class JavaTools {
             if (path != null) {
                 System.out.println("[" + path + " => " + suffix + "]");
             }
+        } else if ("field".equals(prefix)) {
+            detectFieldValue(suffix);
         } else {
             System.err.println("Unknown command: '" + command + "'");
             System.err.println(info);

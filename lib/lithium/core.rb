@@ -870,6 +870,8 @@ class Artifact
         end
     end
 
+    # *args - command arguments
+    # block - call back to catch output
     def Artifact.exec(*args, &block)
         # clone arguments
         args = args.dup
@@ -879,25 +881,16 @@ class Artifact
 
         # merged stderr and stdout
         Open3.popen2e(args.join(' ')) { | stdin, stdout, thread |
-            stdin.close
             stdout.set_encoding(Encoding::UTF_8)
             if  block.nil?
+                # close stdin
+                stdin.close
+
                 # this code has been tested on Win10. It works and can replace
                 # read_exec_output() call (see the code below)
                 while line = stdout.gets do
                    $stdout.puts line
                 end
-
-                # TODO: the code below can read not all lines from the process output
-                # because the output processing can take time (detecting file location)
-                # The problem is output disappears when the process is terminated. But
-                # the code below has tested on Won. The code above should be tested on WIn
-                # to make sure it works.
-                #
-                # Artifact.read_exec_output(stdin, stdout, thread) { | line |
-                #     $stdout.puts line
-                #     $stdout.flush
-                # }
             else
                 block.call(stdin, stdout, thread)
             end
@@ -1582,7 +1575,7 @@ class RunTool < FileMask
     def initialize(*args)
         @source_file_prefix = '@'
         @source_list_prefix = ''
-        @run_with           = nil
+        @run_with           ||= nil
         @list_expired       = false
         @source_as_file     = false  # store target files into temporary file
         super
@@ -1685,6 +1678,13 @@ class RunTool < FileMask
         ensure
             src.unlink if src.kind_of?(Tempfile)
         end
+    end
+end
+
+class RunShell < RunTool
+    def initialize(*args)
+        @run_with = 'sh'
+        super
     end
 end
 
@@ -2205,3 +2205,5 @@ class OTHERWISE < FileMask
         end
     end
 end
+
+

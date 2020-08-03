@@ -32,6 +32,7 @@
         RunJavaCode('.lithium/lib/JavaTools.java') {
             DefaultClasspath("li_run_class_path") {
                 JOIN('.lithium/classes')
+                JOIN('.lithium/tools/java/commons-lang/commons-lang3-3.11.jar')
             }
         }
 
@@ -60,6 +61,10 @@
 
     MATCH("compile:*") {
         JavaCompiler('.lithium/lib/JavaTools.java') {
+            DefaultClasspath("li_run_class_path") {
+                JOIN('.lithium/tools/java/commons-lang/commons-lang3-3.11.jar')
+            }
+
             @destination = '.lithium/classes'
         }
 

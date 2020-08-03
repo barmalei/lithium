@@ -550,3 +550,22 @@ class URLPattern < StdPattern
 end
 
 
+# pattern = StdPattern.new() {
+#     location('java', 'scala'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
+# }
+
+
+
+# Artifact.exec('javac', '/Users/brigadir/projects/.lithium/lib/JavaTools22.java' ) { | stdin, stdout, thread |
+#     stdin.close
+
+#     # stdout.readlines().each { | line |
+#         #puts line
+#         # res = pattern.match(line)
+#         # puts res
+#     # }
+
+
+#     puts stdout.readlines()
+# }
+

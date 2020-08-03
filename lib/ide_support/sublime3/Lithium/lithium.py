@@ -228,7 +228,7 @@ def li_parse_output(text):
             paths.append(path)
     return paths
 
-# load deteceted problem
+# load detected problem
 def li_load_problems(path):
     data = []
     with open(path) as file:
@@ -275,7 +275,7 @@ def li_parse_output_region(view, region):
 
         return places
 
-# Show items
+# Show items in quick view
 # Input: array of items
 def li_show_items(items, done = None):
     l = len(items)
@@ -290,6 +290,66 @@ def li_show_items(items, done = None):
     else:
         if li_is_debug():
             print("li_show_items() : No items have been passed")
+
+
+def li_show_popup(view, caption, content):
+    html = """
+    <html>
+        <body style='width:400px;'>
+            <h3>%s</h3>
+            <code>
+            %s
+            </code>
+        </body>
+    </html>
+    """
+
+    view.show_popup(html % (caption, content), max_width = 700, max_height = 500, on_navigate = None)
+
+
+# Show items in popup view
+# Input: array of items
+def li_show_items_in_popup(view, caption, items, filters = { 'public': True, 'static':True, 'abstract': True }, done = None):
+    l = len(items)
+    if l > 0:
+        if li_is_debug():
+            print("li_show_items_in_popup() : number of items to be shown: " + str(l))
+            for i in range(l):
+                item = items[i]
+                print("li_show_items_in_popup() : item[" + str(i) + "] = " + str(item))
+
+        links   = []
+        content = """
+        <html>
+            <body style='width:900px;'>
+                %s
+                <hr>
+                <a href='filter:public'>[pub]</a>
+                <a href='filter:static'>[static]</a>
+                <a href='filter:abstract'>[abstract]</a>
+                <ul>%s</ul>
+            </body>
+        </html>
+        """
+
+        for i in range(l):
+            bb = True
+            for key in filters:
+                value = filters[key]
+                if value == False and items[i].find(key) >= 0:
+                    bb = False
+                    break;
+
+            if bb:
+                new_item = items[i].replace('<', "&lt;")
+                new_item = new_item.replace('>', "&gt;")
+                links.append("<li><a href='%s'>%s</a></li>" % ('none', new_item))
+
+        view.show_popup(content % (caption, "\n".join(links)), max_width = 1500, max_height = 700, on_navigate = done)
+    else:
+        if li_is_debug():
+            print("li_show_items_in_popup() : No items have been passed")
+
 
 # show textual message
 def li_show_message(msg):
@@ -443,24 +503,77 @@ def li_init_output_error_view():
 
     return panel
 
-# return string
+# return current symbol as (symbol, region, scope)
+def li_view_symbol(view, region = None):
+    if view is not  None:
+        symb = None
+        if region is None:
+            regions = view.sel()
+            if regions is not None and len(regions) == 1:
+                for region in regions:
+                    region = view.word(region)
+                    symb   = view.substr(region)
+            else:
+                if li_is_debug():
+                    print("li_view_symbol(): Region is NONE, symbol cannot be detected")
+                return None
+        else:
+            symb = view.substr(region)
+
+            if li_is_debug():
+                print("li_view_symbol(): (%s, %s)" % (symb, view.scope_name(region.begin())))
+
+        return symb, region, view.scope_name(region.begin())
+
+    elif li_is_debug():
+        print("li_view_symbol(): View is NONE, symbol cannot be detected")
+
+    return None
+
+# convert scope string to array of scope members
+def li_scope_to_array(scope):
+    scopes = scope.split(' ')
+    return [item for item in scopes if item != '']
+
+# test if the scope member is in the given array for the given location
+def li_has_in_scope(view, point, scopes):
+    if not isinstance(scopes, list):
+        scopes = [ scopes ]
+
+    scopes_array = li_scope_to_array(view.scope_name(point))
+    for scope in scopes:
+        if scope in scopes_array:
+            return True
+
+    return False
+
+
+# retrieve java package and return it
 def java_package(view):
     regs = view.find_by_selector('source.java meta.package-declaration.java meta.path.java entity.name.namespace.java')
     if regs is not None and len(regs) > 0:
         return view.substr(regs[0])
-    return None
+    else:
+        return None
 
+# retrieve current class name and return it
+def java_view_classname(view):
+    regions = view.find_by_selector("entity.name.class.java")
+    if regions is None or len(regions) == 0:
+        return None
+    else:
+        return view.substr(regions[0])
 
-# Collect imports
+# Collect JAVA imports
 # Output: [ [ region, "import <package>"], ... ]
-def java_collect_imports(view, syntax = 'java'):
+def java_view_imports(view, syntax = 'java'):
     # if syntax == 'java':
-    #     regions = view.find_by_selector("meta.import.java")
+    #     regions = view.find_by_selector("keyword.control.import.java")
     #     if regions is None or len(regions) == 0:
     #         return None
     #     else:
     #         return [ [ region, re.sub("\s\s+" , " ", view.substr(region)).strip().strip(';') ] for region in regions ]
-    # else:
+
     # this code probably will be required for other JVM languages since they may
     # not define a specific scope name for import sections
     region    = sublime.Region(0, view.size())
@@ -475,12 +588,17 @@ def java_collect_imports(view, syntax = 'java'):
                 idx = line.find("*/")
                 if idx >= 0:
                     hold = False
-                if (idx == 0):
+                    line = line[0:idx].strip()
+                    if len(line) == 0:
+                        continue
+                else:
                     continue
-                line = line[0:idx]
 
-            if line.startswith("//"):
-                continue
+            idx = line.find("//")
+            if idx >= 0:
+                line = line[0:idx].strip()
+                if len(line) == 0:
+                    continue
 
             if line.startswith("/*"):
                 hold = True
@@ -531,13 +649,129 @@ def java_detect_unused_imports(view):
     except Exception as ex:
         sublime.error_message("Lithium command execution has failed('%s')" % ((ex),))
 
+# return symbol that includes full dot path
+def java_view_symbol(view, region = None):
+    symbol, region, scope = li_view_symbol(view, region)
 
+    if symbol is None:
+        return None
+
+    pkg_name   = []
+    class_name = []
+    const_name = []
+    parts      = []
+
+    pkg_name_scope   = 'support.type.package.java'
+    class_name_scope = 'support.class.java'
+    const_name_scope = 'constant.other.java'
+
+    if li_has_in_scope(view, region.a, pkg_name_scope):
+        pkg_name.append(symbol);
+    elif li_has_in_scope(view, region.a, class_name_scope):
+        class_name.append(symbol);
+    elif li_has_in_scope(view, region.a, const_name_scope):
+        const_name.append(symbol)
+    elif li_has_in_scope(view, region.a, 'entity.name.class.java'):
+        pkg_name   = java_package(view).split('.')
+        class_name = [ symbol ]
+    elif li_has_in_scope(view, region.a, 'entity.other.inherited-class.java'):
+        class_name = [ symbol ]
+
+    # lookup back and forward to expand symbol
+    for direction in [ False, True ]:
+        ps = region.a
+        while True:
+            ps = view.find_by_class(ps, direction, sublime.CLASS_PUNCTUATION_START)
+
+            if ps >= 0  and view.substr(ps) == '.':
+                ws = view.find_by_class(ps, direction, sublime.CLASS_WORD_START)
+                wr = view.word(ws)
+
+                if li_has_in_scope(
+                    view, ws,
+                    [ 'comment.line.double-slash.java',
+                      'variable.function.java',
+                      'variable.language.java' ]):
+                    break
+
+                word  = view.substr(wr)
+
+                index = 0
+                if direction:
+                    index = max(len(pkg_name), len(class_name), len(const_name))
+
+                if li_has_in_scope(view, ws, pkg_name_scope):
+                    pkg_name.insert(index, word)
+                elif li_has_in_scope(view, ws, class_name_scope):
+                    class_name.insert(index, word)
+                elif li_has_in_scope(view, ws, const_name_scope):
+                    const_name.insert(index, word)
+                elif li_has_in_scope(view, ws, 'entity.name.class.java'):
+                    pkg_name   = java_package(view).split('.')
+                    class_name = [ word ]
+                elif li_has_in_scope(view, ws, 'entity.other.inherited-class.java'):
+                    class_name = [ word ]
+
+                if not direction:
+                    symbol = word + "." + symbol
+                else:
+                    symbol = symbol + "." + word
+
+                parts.insert(index, word)
+            else:
+                break
+
+    if len(class_name) == 0:
+        #  Direct reference to a constant:
+        #  a = CONSTANT
+        if len(const_name) > 0 and len(pkg_name) == 0:
+            class_name = [ java_view_classname(view) ]
+            pkg_name   = java_package(view).split('.')
+        elif len(parts) > 0:
+            class_name = [ parts[len(parts) - 1] ]
+        else:
+            class_name = [ symbol ]
+
+
+    if len(pkg_name) == 0 and len(class_name) > 0:
+        cn      = None
+        imports = java_view_imports(view)
+        for item in class_name:
+            cn = item if cn is None else cn + "." + item
+
+            find_package = [ x[1] for x in imports if x[1].endswith("." + cn)]
+
+            if len(find_package) > 0:
+                find_package = find_package[0]
+                find_package = find_package.split(' ')[1].strip()
+
+                print("CN = " + cn + ", item = " + item + ", find_pacakge = " + str(find_package))
+
+                if len(find_package) > len(cn):
+                    pkg_name = find_package[0 : len(find_package) - len(cn) - 1]
+                    pkg_name = pkg_name.split('.')
+                    break
+
+    print(">>>> " + str(pkg_name) + "," + str(class_name) + "," + str(const_name) + "," + symbol)
+
+    pkg_name   = '.'.join(pkg_name)   if len(pkg_name) > 0 else None
+    class_name = '.'.join(class_name) if len(class_name) > 0 else None
+    const_name = '.'.join(const_name) if len(const_name) > 0 else None
+
+    symbol = '' if pkg_name is None else pkg_name
+    if len(symbol) > 0:
+        symbol = symbol + "." + class_name
+    else:
+        symbol = class_name
+
+    if const_name is not None:
+        symbol = symbol + "." + const_name
+
+    return symbol, pkg_name, class_name, const_name
+
+
+# return [ method, ...],  fullClassName
 def java_collect_methods(view, symbol):
-    imports = java_collect_imports(view)
-    detected_package = [ x[1] for x in imports if x[1].endswith("." + symbol)]
-    if len(detected_package) > 0:
-        symbol = detected_package[0].split(' ')[1]
-
     methods = []
     def output(process, line):
         if line is not None:
@@ -545,24 +779,34 @@ def java_collect_methods(view, symbol):
         if line is not None:
             mt = re.search(r'\{([^\{\}]+)\}', line)
             if mt is not None:
-                method   = mt.group(1).strip()
-                th_index = method.find(' throws ')
-                # if th_index > 0:
-                #     methods.append(method[0:th_index] + "\n" + method[th_index:])
-                # else:
+                method  = mt.group(1).strip()
                 methods.append( method )
 
     def error(process, err):
         print("Unexpected error")
         print(err)
 
-    pkg_name = java_package(view)
-    if pkg_name is None or symbol.find('.') > 0:
-        li_run("ShowClassMethods:%s" % symbol, output, error, False, { "std": "none" })
-    else:
-        li_run("ShowClassMethods:%s %s" % (symbol, pkg_name), output, error, False, { "std": "none" })
-
+    li_run("ShowClassMethods:%s" % symbol, output, error, False, { "std": "none" })
     return methods
+
+def java_detect_module(view, symbol):
+    modules = []
+    def output(process, line):
+        if line is not None:
+            print(line)
+        if line is not None:
+            mt = re.search(r'\[([^\[\]]+) => .*\]', line)
+            if mt is not None:
+                module = mt.group(1).strip()
+                modules.append( module )
+
+    def error(process, err):
+        print("Unexpected error")
+        print(err)
+
+    li_run("ShowClassModule:%s" % symbol, output, error, False, { "std": "none" })
+    return modules
+
 
 class liCommand(sublime_plugin.WindowCommand):
     #panel_lock = threading.Lock()
@@ -623,10 +867,23 @@ class liCommand(sublime_plugin.WindowCommand):
             else:
                 placeholders['file'] = fn
 
+            filename, ext = os.path.splitext(fn)
+            print("EXT : %s" % ext)
+            if ext is not None and ext != '':
+                placeholders['src_ext'] = ext
+
             if fn is not None and os.path.exists(fn):
                 src_folder = li_detect_host_folder(fn, 'src')
+
                 if src_folder is None:
-                    placeholders['src_home'] = os.path.join(fn, 'src')
+                    if os.path.isfile(fn):
+                        src_home = os.path.join(os.path.dirname(fn), 'src')
+                        if os.path.exists(src_home):
+                            placeholders['src_home'] = src_home
+                        else:
+                            placeholders['src_home'] = os.path.dirname(fn)
+                    else:
+                        placeholders['src_home'] = os.path.join(fn, 'src')
                 else:
                     placeholders['src_home'] = os.path.join(src_folder, 'src')
 
@@ -692,13 +949,13 @@ class liTextCommand(sublime_plugin.TextCommand):
 
 class  liJavaTextCommand(liTextCommand):
     def enabled_syntaxes(self):
-        return ( 'kotlin', 'java', 'scala', 'groovy' )
+        return ( 'kotlin', 'java', 'scala', 'groovy')
 
 # the command kill comments in Java import sections
 class liSortImportsCommand(liJavaTextCommand):
     def run(self, edit, **args):
         #  [ [Region, String:<import [static]? [package];>], ... ]
-        imports = java_collect_imports(self.view)
+        imports = java_view_imports(self.view)
 
         if imports is not None:
             imports_str = ""
@@ -822,12 +1079,11 @@ class liCompleteImportCommand(liJavaTextCommand):
                 li_append_output_view("(W) [SUB]  No class has been found for '%s' word" % self.word)
                 #sublime.message_dialog("Import '%s' is already declared" % item)
 
-
     def class_name_selected(self, index):
         if index >= 0:
             item    = self.found_items[index]
             syntax  = self.syntax()
-            imports = java_collect_imports(self.view, syntax)
+            imports = java_view_imports(self.view, syntax)
             if imports is not None and next((x[1] for x in imports if x[1].endswith(item)), None) is not None:
                 li_append_output_view("(W) [SUB]  %s: Import '%s' is already declared\n" % (self.__class__.__name__,item))
             else:
@@ -872,8 +1128,10 @@ class liCompleteImportCommand(liJavaTextCommand):
         sublime.error_message("Lithium class detection has failed: ('%s')" % (str(err), ))
 
 class liShowClassMethodsCommand(liJavaTextCommand):
-    detected_methods = []
-    selected_method  = None
+    detected_methods   = []
+    selected_method    = None
+    selected_symbol    = None
+    filters            = { 'public': True, 'static':True, 'abstract': True }
 
     def run(self, edit, **args):
         if "paste" in args:
@@ -886,22 +1144,30 @@ class liShowClassMethodsCommand(liJavaTextCommand):
             else:
                 li_show_message("No region has been detected to place ")
         else:
-            word   = None
-            for region in self.view.sel():
-                word = self.view.substr(self.view.word(region))
-                break
+            self.selected_symbol, package_name, class_name, const_name = java_view_symbol(self.view)
 
-            if word is not None and word != '':
-                self.detected_methods = []
-                self.selected_method = None
+            print("SELECTED SYMBOL: " + self.selected_symbol)
 
-                self.detected_methods = java_collect_methods(self.view, word)
+            if self.selected_symbol is not None and self.selected_symbol != '':
+                self.selected_method  = None
+                self.detected_methods = java_collect_methods(self.view, self.selected_symbol)
                 if len(self.detected_methods) > 0:
-                    li_show_items(self.detected_methods, self.method_name_selected)
+                    li_show_items_in_popup(self.view, self.selected_symbol, self.detected_methods, self.filters, self.selected)
+
+                    #li_show_items(self.detected_methods, self.method_name_selected)
                 else:
-                    li_show_message("No method has been discovered for %s" % word)
+                    li_show_message("No method has been discovered for %s" % self.selected_symbol)
             else:
                 li_show_message("Nothing has been selected")
+
+    def selected(self, a):
+        pref = 'filter:'
+        if a.startswith(pref):
+            key   = a[len(pref):]
+            value = self.filters[key]
+            self.filters[key] = not value
+            li_show_items_in_popup(self.view, self.selected_symbol, self.detected_methods, self.filters, self.selected)
+        print(a)
 
     def method_name_selected(self, index):
         if index >= 0:
@@ -910,7 +1176,56 @@ class liShowClassMethodsCommand(liJavaTextCommand):
             self.selected_method = None
 
 
-# Pattern  InputStr.aeam
+class liShowClassModuleCommand(liJavaTextCommand):
+    def run(self, edit, **args):
+        word, package, clazz, const = java_view_symbol(self.view)
+        if word is not None and word != '':
+            detected_modules = java_detect_module(self.view, word)
+            if len(detected_modules) > 0:
+                li_show_items_in_popup(self.view, word, detected_modules)
+            else:
+                li_show_message("No module has been discovered for %s" % word)
+        else:
+            li_show_message("Nothing has been selected")
+
+
+# Show class field value JAVA command
+class liShowClassFieldCommand(liJavaTextCommand):
+    outputText = None
+
+    def output(self, process, line):
+        if line is not None:
+            self.outputText.append(line)
+
+    def error(self, process, err):
+        print("Unexpected error")
+        print(err)
+
+    def run(self, edit, **args):
+        word, package, clazz, const = java_view_symbol(self.view)
+
+        if word is not None and word != '':
+            self.outputText = []
+            li_run("ShowClassField:%s" % word, self.output, self.error, False, { "std": "none" })
+
+            if len(self.outputText) > 0:
+                self.outputText = "\n".join(self.outputText)
+
+                mt = re.search(r'\{\{\{([^{}]+)\}\}\}', self.outputText, re.MULTILINE)
+
+                print("MT = " + str(mt))
+
+                if mt is not None:
+                    content = mt.group(1);
+                    content = content.replace("\n", "<br/>")
+                    li_show_popup(self.view, word, content)
+                #li_show_popup(self.view, word, mt.group(1))
+            else:
+                li_show_message("No field value has been discovered for %s" % word)
+        else:
+            li_show_message("Nothing has been selected")
+
+# Pattern  InputStr.name
 class liShowDocCommand(sublime_plugin.TextCommand):
     def run(self, edit, **args):
         file_name, extension = os.path.splitext(self.view.file_name())

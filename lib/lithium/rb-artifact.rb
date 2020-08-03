@@ -1,6 +1,4 @@
 require 'lithium/file-artifact/command'
-require 'lithium/misc-artifact'
-
 
 class RUBYPATH < Artifact
     include AssignableDependency
