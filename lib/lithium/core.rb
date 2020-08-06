@@ -808,8 +808,10 @@ class Artifact
         @requires ||= []
         if art.nil?
             # build custom artifact that run the given block as build method
-            art = Artifact.new(self.name + "/<INIT>", &block)
 
+            puts "1>>>> #{self.name + '/#INIT'}"
+            art = Artifact.new(self.name + "/#INIT", &block)
+            puts "2>>>> #{art.object_id}"
 
             # class << art
             #     attr_accessor :build_block
@@ -1027,6 +1029,9 @@ class ArtifactTree
                 wid = @art.what_it_does()
                 puts wid unless wid.nil?
                 @art.pre_build()
+
+
+                puts "Build #{@art.class}:#{@art.name}, is_nil: #{@art.done.nil?}"
 
                 @art.build()
                 @art.instance_eval(&@art.done) unless @art.done.nil?

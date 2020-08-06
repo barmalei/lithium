@@ -2,8 +2,10 @@
 -> {
     REQUIRE {
         Directory('target') {
+            puts "!!!!"
             DONE {
-              RunMaven.build('.')
+                puts ">>>"
+                RunMaven.build('.')
             }
         }
     }
