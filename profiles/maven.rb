@@ -2,9 +2,7 @@
 -> {
     REQUIRE {
         Directory('target') {
-            puts "!!!!"
             DONE {
-                puts ">>>"
                 RunMaven.build('.')
             }
         }
@@ -25,5 +23,12 @@
 
     JavaCompiler("compile:src/test/java/**/*.java") {
         @destination = 'target/test-classes'
+    }
+
+    Directory("apidoc") {
+        GenerateJavaDoc("src/main/java/**/*.java")
+        # DONE {
+        #     GenerateJavaDoc.build("src/main/java/**/*.java")
+        # }
     }
 }

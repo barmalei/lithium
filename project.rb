@@ -2,6 +2,16 @@
     #$lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
+    # REQUIRE  {
+    #     puts ".............. #{@name}  '#{self.owner.nil?}' "
+    #     DONE {
+    #         puts ">>>>>>>>>>>>>>>>>>> #{self.name}"
+    #         art = Directory.build('target')
+    #         puts ">>>>>>>>>>>>>>>>>>> #{art.owner}"
+    #     }
+    # }
+
+
     Touch('touch:*')
 
     UglifiedJSFile('minjs:**/*.min.js')
