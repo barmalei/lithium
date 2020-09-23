@@ -752,8 +752,6 @@ def java_view_symbol(view, region = None):
                     pkg_name = pkg_name.split('.')
                     break
 
-    print(">>>> " + str(pkg_name) + "," + str(class_name) + "," + str(const_name) + "," + symbol)
-
     pkg_name   = '.'.join(pkg_name)   if len(pkg_name) > 0 else None
     class_name = '.'.join(class_name) if len(class_name) > 0 else None
     const_name = '.'.join(const_name) if len(const_name) > 0 else None

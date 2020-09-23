@@ -31,7 +31,6 @@ end
 class DefaultClasspath < JavaClasspath
     def initialize(*args, &block)
         super
-
         # if a user defines its own customization block ignore classpath auto-detection
         if block.nil?
             hd = path_base_dir
@@ -393,6 +392,9 @@ class RunJavaTool < RunTool
         super
     end
 
+    # the method is called when required classpath is specified
+    # (classpath classes are auto assignable artifact that has
+    # to be assigned by add_classpath method)
     def add_classpath(cp)
         @classpaths ||= []
         @classpaths.push(cp)

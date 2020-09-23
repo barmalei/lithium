@@ -80,7 +80,7 @@ class JavaCompiler < RunJavaTool
         opts = super(opts)
         dst  = destination()
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
-        opts.push('-d', dst)
+        opts.push('-d', "\"#{dst}\"")
         return opts
     end
 

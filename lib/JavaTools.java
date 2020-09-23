@@ -32,6 +32,7 @@ public class JavaTools {
         "java.text",
         "java.nio",
         "java.nio.file",
+        "java.nio.channels",
         "java.lang",
         "java.lang.reflect",
         "java.math",
@@ -131,10 +132,25 @@ public class JavaTools {
         int     index = path.lastIndexOf('.') ;
         String  cn    = path.substring(0, index);
         String  fn    = path.substring(index + 1);
-        Class   clazz = Class.forName(cn);
         //Field[] flds  = clazz.getDeclaredFields();
 
-        Field  field = clazz.getField(fn);
+        Class clazz = null;
+        while (true) {
+            try {
+                clazz = Class.forName(cn);
+                break;
+            } catch (ClassNotFoundException e) {
+                index = cn.lastIndexOf('.');
+                if (index <= 0) {
+                    break;
+                } else {
+                    cn = cn.substring(0, index) + "$" + cn.substring(index + 1);
+                }
+            }
+        }
+
+        Field  field = clazz.getDeclaredField(fn);
+        field.setAccessible(true);
         Object value = field.get(null);
         System.out.println("{{{" +  ReflectionToStringBuilder.toString(value, ToStringStyle.MULTI_LINE_STYLE) + "}}}");
 

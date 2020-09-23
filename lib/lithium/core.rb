@@ -676,7 +676,9 @@ class Artifact
         # if artifact name has not been passed let's try to use default one
         args = [ instance.class.default_name ] if (args[0] == nil || args.length == 0) && !instance.class.default_name.nil?
 
-        instance.send(:initialize, *args, &block)
+        # call instance proxy constructor to be able to track caller stack if a
+        # new artifact is created inside the constructor
+        instance_proxy.send(:initialize, *args, &block)
         return instance_proxy
     end
 
@@ -808,19 +810,8 @@ class Artifact
         @requires ||= []
         if art.nil?
             # build custom artifact that run the given block as build method
-
-            puts "1>>>> #{self.name + '/#INIT'}"
-            art = Artifact.new(self.name + "/#INIT", &block)
-            puts "2>>>> #{art.object_id}"
-
-            # class << art
-            #     attr_accessor :build_block
-
-            #     def build
-            #         self.instance_eval(&build_block)
-            #     end
-            # end
-            # art.build_block = block
+            init_name = File.join(self.name, '/#INIT-' + block.object_id.to_s)
+            art  = Artifact.new(init_name, &block)
             @requires.push([art, nil, false, nil])
         else
             @requires.push([art, nil, false, block])
@@ -839,6 +830,10 @@ class Artifact
         end
 
         raise "'#{art}' DEPENDENCY cannot be found and dismissed" if ln2 == ln1
+    end
+
+    def DONE(&block)
+        @done = block
     end
 
     # Overload "eq" operation of two artifact instances.
@@ -905,14 +900,11 @@ class Artifact
     def Artifact.build(name, &block)
         # !!! instantiate tree artifact in a context of an artifact that calls it
         # !!! the caller artifact is set as an owner of the created artifact
+
         art  = self.new(name, &block)
         tree = ArtifactTree.new(art)
         tree.build()
         return tree.art
-    end
-
-    def DONE(&block)
-        @done = block
     end
 end
 
@@ -924,10 +916,11 @@ class ArtifactTree
     def initialize(art, parent = nil, &block)
         raise 'Artifact cannot be nil' if art.nil?
 
-        p = parent.nil? ? Project : parent.art.owner
         if art.kind_of?(Artifact)
             art.instance_eval(&block) unless block.nil?
         else
+            p = parent.nil? ? Project :  parent.art.owner
+            raise "Owner artifact cannot be detected for '#{art}' by its parent '#{parent.art}' artifact" if p.nil?
             art = p.artifact(art, &block)
         end
 
@@ -1005,8 +998,6 @@ class ArtifactTree
             # moreover @art.expired? should not be called here since we can have multiple assignable
             # deps
             if @expired_by_kid.nil? && (node.expired || (bt > 0 && node.art.mtime() > bt))
-                puts "#{@art.name} -> node.expired(#{node.art.name}) = #{node.expired}  bt = #{bt} node.bt = #{node.art.mtime()}"
-
                 @expired = true
                 @expired_by_kid = node.art
             end
@@ -1029,10 +1020,6 @@ class ArtifactTree
                 wid = @art.what_it_does()
                 puts wid unless wid.nil?
                 @art.pre_build()
-
-
-                puts "Build #{@art.class}:#{@art.name}, is_nil: #{@art.done.nil?}"
-
                 @art.build()
                 @art.instance_eval(&@art.done) unless @art.done.nil?
 
@@ -1669,16 +1656,17 @@ class RunTool < FileMask
 
         begin
             src, len = source
+
+            puts_warning "Source files cannot be detected by '#{@name}'" if src.nil?
+
             cmd = [ run_with ]
             cmd.concat(run_with_options(options().dup))
             cmd.concat(run_with_target(src))
             cmd.concat(@arguments)
 
-            #puts "CMD = #{cmd}"
-
             go_to_homedir
             ec = Artifact.exec(*cmd)
-            raise "'#{self.class}' has failed" if error_exit_code?(ec)
+            raise "'#{self.class}' has failed (cmd = '#{cmd}')" if error_exit_code?(ec)
             puts "#{len} source files have been processed with '#{self.class}'"
         ensure
             src.unlink if src.kind_of?(Tempfile)
@@ -1949,7 +1937,7 @@ class Project < ExistentDirectory
     def self.build(name)
         raise 'Current project cannot be detected' if @@curent_project.nil?
 
-        # build current project
+        # # build current project
         tree = ArtifactTree.new(@@curent_project)
         tree.build()
 
@@ -1957,8 +1945,10 @@ class Project < ExistentDirectory
         an = ArtifactName.new(name)
         if an.clazz.nil? || an.clazz != @@curent_project.class || @@curent_project.fullpath(an.path) != @@curent_project.fullpath
             art = @@curent_project.artifact(name)
-            tree = ArtifactTree.new(art)
-            tree.build()
+            if art != @@curent_project
+                tree = ArtifactTree.new(art)
+                tree.build()
+            end
         end
         return tree.art
     end
@@ -1995,9 +1985,6 @@ class Project < ExistentDirectory
 
     def expired?
         true
-    end
-
-    def build
     end
 
     def what_it_does
