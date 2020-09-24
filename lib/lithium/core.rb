@@ -1666,7 +1666,7 @@ class RunTool < FileMask
 
             go_to_homedir
             ec = Artifact.exec(*cmd)
-            raise "'#{self.class}' has failed (cmd = '#{cmd}')" if error_exit_code?(ec)
+            raise "'#{self.class}' has failed cmd = '#{cmd}'" if error_exit_code?(ec)
             puts "#{len} source files have been processed with '#{self.class}'"
         ensure
             src.unlink if src.kind_of?(Tempfile)
