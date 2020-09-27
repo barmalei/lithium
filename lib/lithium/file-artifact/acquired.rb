@@ -48,7 +48,7 @@ class MetaSourceFile < FileArtifact
                 item = item.strip
                 next if item.length == 0 || item[0,1]=='#'  # skip comment and empty strings
 
-                files = FileMask.new(item)
+                files = FileMask.new(item, self.owner)
                 files.list_items(rel) { | path, m |
                     yield path, m
                 }
@@ -353,7 +353,7 @@ class ArchiveFile < GeneratedFile
 
         tmp = nil
         begin
-            tmp = CopyToDirectory.new(File.basename(fp)) {
+            tmp = CopyToDirectory.new(File.basename(fp), self.owner) {
                 @full_copy = true
             }
             tmp.add_source(sources)

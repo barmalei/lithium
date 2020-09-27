@@ -190,7 +190,7 @@ class CombinedJSFile < GeneratedFile
 end
 
 class JavaScriptDoc < FileArtifact
-    def initialize(name)
+    def initialize(*args, &block)
         REQUIRE JS
         super
         @config   ||= nil
@@ -252,7 +252,7 @@ end
 class TypeScriptCompiler < FileMask
     include OptionsSupport
 
-    def initialize(name)
+    def initialize(*args, &block)
         REQUIRE JS
         super
     end
@@ -269,7 +269,7 @@ end
 
 
 class JavaScriptHint < FileMask
-    def initialize(name)
+    def initialize(*args, &block)
         REQUIRE JS
         super
     end

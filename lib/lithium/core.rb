@@ -448,7 +448,7 @@ class ArtifactName < String
             raise "Unexpected number of parameters #{args.length}, #{args}, one or two parameters are expected"
         end
 
-        ArtifactName.nil_name(name)
+        name = ArtifactName.assert_notnil_name(name)
 
         @mask_type = File::FNM_DOTMATCH
         @prefix, @path, @path_mask, @suffix = nil, nil, nil, nil
@@ -484,8 +484,9 @@ class ArtifactName < String
         return artname
     end
 
-    def self.nil_name(name, msg = 'Artifact name')
-        raise "#{msg} cannot be nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
+    def self.assert_notnil_name(name)
+        raise "Passed name is nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
+        return name
     end
 
     def self.name_from(prefix, path, path_mask)
@@ -498,7 +499,7 @@ class ArtifactName < String
     end
 
     def env_path?
-        return !path.nil? && path.start_with?(".env/")
+        !path.nil? && path.start_with?(".env/")
     end
 
     def match(name)
@@ -586,61 +587,6 @@ end
 class Artifact
     attr_reader :name, :shortname, :owner, :createdByMeta, :done
 
-    # context class is special wrapper object that redirect
-    # its methods call to a wrapped (artifact object) target
-    # object. Additionally it tracks a current target object
-    # from which a method has been called.
-    # c
-    class Proxy
-        instance_methods.each { | m |
-            if not m.to_s =~ /__[a-z]+__/
-                undef_method m if not m.to_s =~ /object_id/
-            end
-        }
-
-        # keeps artifact call stack
-        @@calls_stack = []
-
-        def initialize(original)
-            raise 'Target has to be defined' if original.nil?
-            @original_instance = original
-        end
-
-        def top()
-            ow = self
-            while !ow.owner.nil? do
-                ow = ow.owner
-            end
-            return ow
-        end
-
-        def original_instance
-            @original_instance
-        end
-
-        def ==(prx)
-            prx && original_instance == prx.original_instance
-        end
-
-        def method_missing(meth, *args, &block)
-            switched = false
-            if  @@calls_stack.length == 0 || @@calls_stack.last.original_instance != @original_instance
-                @@calls_stack.push(self)
-                switched = true
-            end
-
-            begin
-                return @original_instance.send(meth, *args, &block)
-            ensure
-                @@calls_stack.pop() if switched
-            end
-        end
-
-        def self.last_caller() @@calls_stack.last end
-
-        def self._calls_stack_() @@calls_stack end
-    end
-
     @default_name = nil
 
     # set or get default artifact name
@@ -661,38 +607,35 @@ class Artifact
     # !!! to keep track for the current context (instance
     # !!! where a method has been executed)
     def Artifact.new(*args,  &block)
-        instance       = allocate()
-        instance_proxy = Proxy.new(instance)
-        last_caller    = Artifact.last_caller
+        instance = allocate()
+        name     = args.length > 0 && !args[0].kind_of?(Artifact)  ? args[0]  : nil
+        owner    = args.length > 0 &&  args[-1].kind_of?(ArtifactContainer) ? args[-1] : nil
 
-        unless last_caller.nil?
-            if last_caller.kind_of?(ArtifactContainer)
-                instance_proxy.owner = last_caller
-            elsif !last_caller.owner.nil?
-                instance_proxy.owner = last_caller.owner
-            end
+        # setup owner before hand
+        instance.owner = owner
+
+        # remove owner from arguments list
+        if !owner.nil? || (args.length > 1 && args[-1].nil?)
+            args = args.dup()
+            args.pop()
         end
 
         # if artifact name has not been passed let's try to use default one
-        args = [ instance.class.default_name ] if (args[0] == nil || args.length == 0) && !instance.class.default_name.nil?
+        if name.nil?
+            args = args.dup()
+            args.insert(0, instance.class.default_name )
+        end
 
         # call instance proxy constructor to be able to track caller stack if a
         # new artifact is created inside the constructor
-        instance_proxy.send(:initialize, *args, &block)
-        return instance_proxy
+        instance.send(:initialize, *args, &block)
+        return instance
     end
-
-    # return artifact instance whose method is currently called
-    def Artifact.last_caller() Proxy.last_caller end
-
-    def Artifact._calls_stack_() Proxy._calls_stack_ end
 
     def initialize(name, &block)
         # test if the name of the artifact is not nil or empty string
-        name = validate_artifact_name(name)
-
+        name = ArtifactName.assert_notnil_name(name)
         @name, @shortname = name, File.basename(name)
-        #@owner ||= nil  # TODO: owner has to be set basing on calling context before initialize method in new ?
 
         # block can be passed to artifact
         # it is expected the block setup class instance
@@ -700,9 +643,12 @@ class Artifact
         self.instance_eval(&block) if block
     end
 
-    def validate_artifact_name(name)
-        ArtifactName.nil_name(name)
-        name
+    def top
+        ow = self
+        while !ow.owner.nil? do
+            ow = ow.owner
+        end
+        return ow
     end
 
     def createdByMeta=(m)
@@ -742,16 +688,11 @@ class Artifact
 
         # if artifact class is detected add it as required
         if meth.length > 2
-            begin
-                clazz = Module.const_get(meth)
-                if clazz < Artifact
-                    if args.length > 0
-                        return REQUIRE(clazz.new(*args, &block))
-                    else
-                        return REQUIRE(*args, clazz, &block)
-                    end
-                end
-            rescue NameError
+            clazz = Module.const_get(meth)
+            if clazz < Artifact
+                args = args.dup()
+                args.push(_detect_required_owner())
+                return REQUIRE(clazz.new(*args, &block))
             end
         end
 
@@ -797,9 +738,18 @@ class Artifact
     # build stuff
     def clean() end
 
-    def to_s() shortname end
-
     def what_it_does() return "Build '#{to_s}' artifact" end
+
+    # Overload "eq" operation of two artifact instances.
+    def ==(art)
+        return !art.nil? && self.object_id == art.object_id ||
+                (self.class == art.class && @name == art.name && createdByMeta == art.createdByMeta)
+    end
+
+    # return last time the artifact has been modified
+    def mtime() -1 end
+
+    def to_s() shortname end
 
     # add required for the artifact building dependencies (other artifact)
     # art   - name of artifact or instance of artifact
@@ -808,10 +758,12 @@ class Artifact
     def REQUIRE(art = nil, &block)
         raise 'No dependencies have been specified' if art.nil? && block.nil?
         @requires ||= []
+
+        # artifact nil means we want to create initialization artifact
         if art.nil?
             # build custom artifact that run the given block as build method
             init_name = File.join(self.name, '/#INIT-' + block.object_id.to_s)
-            art  = Artifact.new(init_name, &block)
+            art = Artifact.new(init_name, _detect_required_owner(), &block)
             @requires.push([art, nil, false, nil])
         else
             @requires.push([art, nil, false, block])
@@ -836,15 +788,6 @@ class Artifact
         @done = block
     end
 
-    # Overload "eq" operation of two artifact instances.
-    def ==(art)
-        return !art.nil? && self.object_id == art.object_id ||
-                (self.class == art.class && @name == art.name && createdByMeta == art.createdByMeta)
-    end
-
-    # return last time the artifact has been modified
-    def mtime() -1 end
-
     def Artifact.abbr() 'ART' end
 
     def Artifact.read_exec_output(stdin, stdout, thread)
@@ -865,6 +808,13 @@ class Artifact
                 return thread.value
             end
         end
+    end
+
+
+    def _detect_required_owner
+        own = self.owner
+        own = self if self.kind_of?(ArtifactContainer)
+        return own
     end
 
     # *args - command arguments
@@ -897,11 +847,11 @@ class Artifact
 
     # build artifact including all its dependencies
     # @name name of artifact to be built
-    def Artifact.build(name, &block)
+    def Artifact.build(name, owner,  &block)
         # !!! instantiate tree artifact in a context of an artifact that calls it
         # !!! the caller artifact is set as an owner of the created artifact
 
-        art  = self.new(name, &block)
+        art  = self.new(name, owner, &block)
         tree = ArtifactTree.new(art)
         tree.build()
         return tree.art
@@ -962,7 +912,6 @@ class ArtifactTree
 
             # has to be placed before recursive build tree method call
             node.art.owner = @art.owner if is_own == true
-
 
             #  resolve assign_me_to  property that says to which property the instance pf the
             #  dependent artifact has to be assigned
@@ -1685,8 +1634,6 @@ end
 module ArtifactContainer
     #  (name : String | ArtifactName | Class)
     def artifact(name, &block)
-        raise "Stack is overloaded '#{name}'" if Artifact._calls_stack_.length > 25
-
         artname = ArtifactName.new(name)
 
         # check if artifact name points to current project
@@ -1768,7 +1715,7 @@ module ArtifactContainer
         name  = ArtifactName.new(name)
         clazz = meta.clazz
 
-        art = clazz.new(name.suffix,
+        art = clazz.new(name.suffix, self,
             &(block.nil? ? meta.block : Proc.new {
                 self.instance_eval &meta.block unless meta.block.nil?
                 self.instance_eval &block
@@ -1846,17 +1793,6 @@ module ArtifactContainer
         end
 
         super
-        # switched = false
-        # if  @@calls_stack.length == 0 || @@calls_stack.last.original_instance != @original_instance
-        #     @@calls_stack.push(self)
-        #     switched = true
-        # end
-
-        # begin
-        #     return @original_instance.send(meth, *args, &block)
-        # ensure
-        #     @@calls_stack.pop() if switched
-        # end
     end
 
 
@@ -1917,6 +1853,12 @@ class Project < ExistentDirectory
 
     @@curent_project = nil
 
+    def initialize(*args, &block)
+        super
+        @desc ||= File.basename(args[0])
+        LOAD('project.rb')
+    end
+
     def self.new(*args, &block)
         @@curent_project = super
         return @@curent_project
@@ -1951,14 +1893,6 @@ class Project < ExistentDirectory
             end
         end
         return tree.art
-    end
-
-    def initialize(*args, &block)
-        # means artifact meta are not shared with its children project
-        self.owner = args[1] if args.length > 1
-        super(args[0], &block)
-        @desc ||= File.basename(args[0])
-        LOAD('project.rb')
     end
 
     def PROFILE(name, &block)
@@ -2171,12 +2105,12 @@ end
 
 # The artifact is used to handle **/* file mask,
 class OTHERWISE < FileMask
-    def initialize(name, build_ext_pattern = true, &block)
+    def initialize(name, &block)
         super(name) {} # prevent passing &block to super with empty one
         raise "Block is required for #{self.class} artifact" if block.nil?
         @callback = block
         @ignore_dirs = true
-        @build_ext_pattern = build_ext_pattern
+        @build_ext_pattern = true
     end
 
     def build()
@@ -2197,5 +2131,4 @@ class OTHERWISE < FileMask
         end
     end
 end
-
 

@@ -68,7 +68,7 @@ class META < Artifact
     def traverse(stack, index, shift = '')
         if index >= 0
             prj = stack[index]
-            artname = ArtifactName.relative_to(@name, prj.homedie)
+            artname = ArtifactName.relative_to(@name, prj.homedir)
             puts "#{shift}[+] Meta data for '#{prj}' project {\n"
             puts_prj_metas(prj, artname, shift)
             traverse(stack, index - 1, shift + '    ')

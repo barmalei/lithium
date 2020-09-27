@@ -107,7 +107,7 @@ class MavenClasspath < InFileClasspath
         REQUIRE MVN
         @excludeTransitive = false
         super(*args, &block)
-        REQUIRE(PomFile.new(homedir))
+        REQUIRE(PomFile.new(homedir, self.owner))
         @excludeGroupIds ||= []
     end
 
@@ -136,12 +136,12 @@ class MavenDependenciesDir < FileArtifact
         @excludeTransitive = false
         @excludeGroupIds   = []
 
-        super(name, &block)
+        super
 
         fp = fullpath()
         raise "Invalid dependency dir '#{fp}'" unless File.directory?(fp)
 
-        REQUIRE(PomFile.new(@name))
+        REQUIRE(PomFile.new(@name, self.owner))
     end
 
     def EXCLUDE(groupId)
@@ -225,7 +225,7 @@ class MavenCompiler < RunMaven
 
     def list_items()
         dir = File.join(File.dirname(fullpath), 'src', '**', '*')
-        FileMask.new(dir).list_items { |f, t|
+        FileMask.new(dir, self.owner).list_items { |f, t|
             yield f, t
         }
 
@@ -234,4 +234,3 @@ class MavenCompiler < RunMaven
         }
     end
 end
-

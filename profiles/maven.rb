@@ -3,7 +3,7 @@
     REQUIRE {
         Directory('target') {
             DONE {
-                RunMaven.build('.')
+                RunMaven.build('.', self.owner)
             }
         }
     }
@@ -18,7 +18,12 @@
     }
 
     JavaCompiler("compile:src/main/java/**/*.java") {
+        puts "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
         @destination = 'target/classes'
+
+        DONE {
+            puts ("!!!!!!!!!!!!!!! #{self.class}: #{self.owner}")
+        }
     }
 
     JavaCompiler("compile:src/test/java/**/*.java") {
