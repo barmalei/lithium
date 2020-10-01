@@ -395,15 +395,12 @@ end
 
 #  TODO: Problem list
 #   + Project.current should be replaced with target
-#   + $project_home usage has to be reduced
-#   + Setup of owner has to be done before calling initialization method basing on current context
 #   + normalize homedir()
 #   + Lithium project defined artifact has to be re-populated with owner of current project otherwise
 #      compile/run common artifact will get lithium as its owner
 #      - Shared flag has been added to say if teh given artifact has to be instantiated in context
 #        of the calling project context. May be shared should be defined on the level of artifact ?
 #   - usage of $lithium_code should be minimized
-#   + def_name in meta usage ?
 #   + re-use artifact implementation
 #
 #   Artifact name keeps order of artifact following the rules below:
@@ -847,9 +844,13 @@ class Artifact
 
     # build artifact including all its dependencies
     # @name name of artifact to be built
-    def Artifact.build(name, owner,  &block)
-        # !!! instantiate tree artifact in a context of an artifact that calls it
-        # !!! the caller artifact is set as an owner of the created artifact
+    # @caller_art an artifact that initiated the build
+    def Artifact.build(name, caller_art,  &block)
+        if caller_art.nil?
+            owner = nil
+        else
+            owner = caller_art.kind_of?(ArtifactContainer) ?  caller_art : caller_art.owner
+        end
 
         art  = self.new(name, owner, &block)
         tree = ArtifactTree.new(art)
@@ -1737,11 +1738,7 @@ module ArtifactContainer
         return meta;
     end
 
-    # ArtifacName => {
-    #     block:    block,
-    #     clazz:    class,
-    #     def_name: name
-    # }
+    # meta hosts ArtifactName instances
     def _meta
         @meta = [] unless defined? @meta
         return @meta
@@ -1768,8 +1765,14 @@ module ArtifactContainer
         # store meta
         name = ArtifactName.new(*args, &block)
         raise "Unknown class for '#{name}' artifact" if name.clazz.nil?
-        _meta.push(name)
 
+        # delete artifacts that are already exists
+        s_name = name.to_s
+        _meta.delete_if { | e |
+            e.to_s == s_name
+        }
+
+        _meta.push(name)
         # sort meta array
         _meta.sort
     end
@@ -1793,25 +1796,6 @@ module ArtifactContainer
         end
 
         super
-    end
-
-
-    # TODO: check if it is still actual
-    # return reference to an artifact meta info
-    def REF(name)
-        name = ArtifactName.new(name)
-        meta = find_meta(name)
-        if meta.nil?
-            meta = _meta_from_owner(name)
-
-            unless meta.nil?
-                raise "It seems there is no an artifact associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
-            else
-                meta = name
-            end
-            raise NameError.new("No artifact is associated with '#{name}'") if meta.nil?
-        end
-        return meta
     end
 
     # TODO: this method most likely should be removed

@@ -39,6 +39,7 @@ public class JavaTools {
         "java.net",
         "java.time",
         "java.time.format",
+        "java.time.temporal",
         "java.sql",
         "java.security",
         "javax.crypto"
