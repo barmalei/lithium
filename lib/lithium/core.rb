@@ -5,7 +5,8 @@ require 'tempfile'
 
 $ready_list = []
 
-# Registered with READY code blocks are called when lithiium startup initialization is completed
+# Registered with READY code blocks are called when lithium startup 
+# initialization is completed
 def READY(&block)
     $ready_list.push(block)
 end
