@@ -608,10 +608,10 @@ class URLPattern < StdPattern
 end
 
 
-READY {
-    t = JavaCompiler.new("/Users/brigadir/projects/crystalloids/rituals-core/src/main/java/com/insightos/apps/rituals/supply/DatastoreNotWorkdaysApi.java", Project.current)
-    t.run_with_parsed_output
-    tree = ArtifactTree.new(t)
-    tree.build()
-}
+# READY {
+#     t = JavaCompiler.new("/Users/brigadir/projects/crystalloids/rituals-core/src/main/java/com/insightos/apps/rituals/supply/DatastoreNotWorkdaysApi.java", Project.current)
+#     t.run_with_parsed_output
+#     tree = ArtifactTree.new(t)
+#     tree.build()
+# }
 
