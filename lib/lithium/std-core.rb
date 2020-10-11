@@ -23,6 +23,23 @@ def PATTERNS(args)
     }
 end
 
+# return (line, pattern, match)
+def match_output(art_class, line)
+    parent_class = art_class.nil? ? Artifact : art_class
+    while parent_class do
+        patterns = $PATTERNS[parent_class.name]
+        if !patterns.nil? && patterns.length > 0
+            patterns.each { | pt |
+                mt = pt.match(line)
+                return line, pt, mt unless mt.nil?
+            }
+            break
+        end
+        parent_class = parent_class.superclass
+    end
+    return line, nil, nil
+end
+
 def puts_error(*args)
     if Std.std
         Std.std.puts_error(*args)
@@ -45,6 +62,11 @@ def puts_exception(*args)
     else
         puts args
     end
+end
+
+def puts_response(*args)
+
+
 end
 
 class Std
@@ -93,6 +115,13 @@ class Std
         }
     end
 
+    def puts_response(*args)
+        args.each { | a |
+            a = a.to_s
+            write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a)
+        }
+    end
+
     def write(msg, level = -1)
         msg = msg.to_s
         if msg.length > 0
@@ -138,23 +167,12 @@ class Std
     def expose(msg, level = 0)
         # collect artifact related recognized entities
         cur_art = $current_artifact  # current artifact
+        msg, pt, mt = match_output(cur_art.class, msg)
+        unless mt.nil?
+            msg   = pattern_matched(msg, pt, mt)
+            level = mt.level if mt.level > level
 
-        parent_class = cur_art.nil? ? Artifact : cur_art.class
-        while parent_class do
-            patterns = $PATTERNS[parent_class.name]
-
-            if !patterns.nil? && patterns.length > 0
-                patterns.each { | pt |
-                    mt = pt.match(msg)
-
-                    unless mt.nil?
-                        msg   = pattern_matched(msg, pt, mt)
-                        level = mt.level if mt.level > level
-                    end
-                }
-                break
-            end
-            parent_class = parent_class.superclass
+            #STDOUT.puts(mt.to_json)
         end
 
         # check if an artifact has a custom formatter

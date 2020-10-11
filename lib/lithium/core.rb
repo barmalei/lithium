@@ -1,6 +1,14 @@
 require 'pathname'
 require 'open3'
 require 'digest'
+require 'tempfile'
+
+$ready_list = []
+
+# Registered with READY code blocks are called when lithiium startup initialization is completed
+def READY(&block)
+    $ready_list.push(block)
+end
 
 #  Log takes care about logged expiration state.
 #
@@ -582,7 +590,7 @@ end
 #  "@name" - name of artifact
 #  "@shortname"
 class Artifact
-    attr_reader :name, :shortname, :owner, :createdByMeta, :done
+    attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored
 
     @default_name = nil
 
@@ -785,28 +793,11 @@ class Artifact
         @done = block
     end
 
-    def Artifact.abbr() 'ART' end
-
-    def Artifact.read_exec_output(stdin, stdout, thread)
-        while thread.status != false && thread.status != nil
-            begin
-                rr = IO.select([ stdout ], nil, nil, 2)
-                if !rr.nil? && !rr.empty?
-                    for std in rr[0]
-                        line = std.readline.rstrip
-                        yield line unless line.nil?
-                    end
-                end
-            rescue EOFError => e
-                $stdout.flush()
-            rescue Exception => e
-                STDERR.puts(e)
-                STDERR.flush()
-                return thread.value
-            end
-        end
+    def IGNORED(&block)
+        @ignored = block
     end
 
+    def Artifact.abbr() 'ART' end
 
     def _detect_required_owner
         own = self.owner
@@ -830,8 +821,6 @@ class Artifact
                 # close stdin
                 stdin.close
 
-                # this code has been tested on Win10. It works and can replace
-                # read_exec_output() call (see the code below)
                 while line = stdout.gets do
                    $stdout.puts line
                 end
@@ -960,6 +949,7 @@ class ArtifactTree
 
     def build
         unless @expired
+            @art.instance_eval(&@art.ignored) unless @art.ignored.nil?
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
         else
             @children.each { | node | node.build() }
@@ -1517,6 +1507,7 @@ class RunTool < FileMask
     def initialize(*args)
         @source_file_prefix = '@'
         @source_list_prefix = ''
+        @output_handler     = nil
         @run_with           ||= nil
         @list_expired       = false
         @source_as_file     = false  # store target files into temporary file
@@ -1547,6 +1538,30 @@ class RunTool < FileMask
         else
             list_items { | n, t |  yield transform_source_path(n) }
         end
+    end
+
+    # TODO: experimental method, the idea is catching output and representing it as JSON of parsed patterns.
+    def run_with_parsed_output
+        clazz = self.class
+
+        @output_handler = ->(stdin, stdout, pr) {
+            puts '<<<BEGIN>>>'
+            puts "{\n\"class\": \"#{clazz}\",\n\"target\":\"#{self.fullpath}\",\n\"home\":\"#{homedir}\",\n\"output\":["
+            stdin.close
+
+            c = 0
+            while line = stdout.gets do
+                line, pt, mt =  match_output(clazz, line)
+                unless mt.nil?
+                    json = mt.to_json(true)
+                    json = ',' + json  if c > 0
+                    puts '    ' + json
+                    c = c + 1
+                end
+            end
+            puts "]}"
+            puts '<<<END>>>'
+        }
     end
 
     # Return:
@@ -1601,6 +1616,10 @@ class RunTool < FileMask
         return [ @source_list_prefix ].concat(src)
     end
 
+    def run_with_output_handler
+        @output_handler
+    end
+
     def build
         super
 
@@ -1615,7 +1634,14 @@ class RunTool < FileMask
             cmd.concat(@arguments)
 
             go_to_homedir
-            ec = Artifact.exec(*cmd)
+
+            output_handler = run_with_output_handler()
+            if output_handler.nil?
+                ec = Artifact.exec(*cmd)
+            else
+                ec = Artifact.exec(*cmd, &output_handler)
+            end
+
             raise "'#{self.class}' has failed cmd = '#{cmd}'" if error_exit_code?(ec)
             puts "#{len} source files have been processed with '#{self.class}'"
         ensure
@@ -1626,7 +1652,7 @@ end
 
 class RunShell < RunTool
     def initialize(*args)
-        @run_with = 'sh'
+        @run_with = 'bash'
         super
     end
 end
@@ -2115,4 +2141,5 @@ class OTHERWISE < FileMask
         end
     end
 end
+
 

@@ -26,6 +26,7 @@ $: << File.join($lithium_code, 'lib')
 # artifact name is not a path
 if $lithium_options.has_key?('basedir')
     bd = $lithium_options['basedir']
+    raise 'Nil basedir has been passed' if bd.nil?
     basedir = File.realpath(bd)
     raise "Invalid project base directory '#{basedir}' has been passed" unless File.directory?(basedir)
     Dir.chdir basedir

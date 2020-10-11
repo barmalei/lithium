@@ -7,6 +7,7 @@ class LithiumStd < Std
     def initialize(prj_home = nil)
         super()
         @log_io, @log_file, @prj_home = nil, nil, prj_home
+
         unless @prj_home.nil?
             @log_file = File.join(@prj_home, '.lithium', 'std-out-entities.json')
             File.delete(@log_file) if File.exist?(@log_file)
@@ -45,16 +46,10 @@ class LithiumStd < Std
                 comma = ''
             end
 
-            entry = {
-                :patternClass  =>  pattern.class.name,
-                :artifactClass =>  $current_artifact.nil? ? nil : $current_artifact.class.name,
-                :artifactClassAbbr => $current_artifact.nil? ? nil : $current_artifact.class.abbr,
-                :errorLevel    =>  pattern.level
-            }
-
-            match.groups_names.each { | name |
-                entry[name] = match[name][:value]
-            }
+            entry = match.to_json_obj(true)
+            entry[:patternClass]  = pattern.class.name
+            entry[:artifactClass] = $current_artifact.nil? ? nil : $current_artifact.class.name
+            entry[:errorLevel]    = pattern.level
 
             @log_io.puts comma + entry.to_json
         end

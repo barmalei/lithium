@@ -11,12 +11,23 @@ class StdPattern
             groups.each_index { | i |
                 group       = groups[i]
                 name, value = group[:name], group[:value]
-                @groups[i] = group.dup()
+                @groups[i]  = group.dup()
+                @groups[i][:leaf] =  false
 
-                # parent has to point to cloned instance of group element instead of
-                # pointing to original (what we have got from pattern) parent group
-                # let's correct it
-                @groups[i][:parent] = @groups[i - 1] unless @groups[i][:parent].nil?
+                unless group[:parent].nil?
+                    j = i - 1
+                    p = group[:parent]
+                    while j >= 0
+                        if p[:name] == @groups[j][:name]
+                            @groups[j][:leaf]   = false
+                            @groups[i][:parent] = @groups[j]
+                            @groups[i][:leaf]   = true
+                            break
+                        end
+                        j = j - 1
+                    end
+                    raise "Parent #{group[:parent]} cannot be detected for '#{name}'" if j < 0
+                end
 
                 @variables[name] = value if name[0] != '_' && !@variables.has_key?(name)
             }
@@ -132,14 +143,61 @@ class StdPattern
             @groups.detect { | gr | gr[:name] == name } != nil
         end
 
-        def groups_names()
+        def groups_names
             @groups.map { | gr |
                 gr[:name]
             }
         end
 
-        def to_s()
+        def to_s
             @msg
+        end
+
+        def to_json_obj(plain = true)
+            if plain
+                res = {}
+                @groups.each { | gr |
+                   res[gr[:name]] = gr[:value] #if gr[:leaf] == true
+                }
+                return res
+            else
+                return  _traverse()
+            end
+        end
+
+        def to_json(plain = true)
+            to_json_obj(plain).to_json
+        end
+
+        def _collect_group_value(i)
+            gr   = @groups[i]
+            kids = []
+            j    = i + 1
+            while j < @groups.length
+                kid = @groups[j]
+                kids.push(j) if kid[:parent] == gr
+                j = j + 1
+            end
+
+            if kids.length == 0
+                return gr[:value]
+            else
+                kid_res = {}
+                kids.each { | kid_i |
+                    kid = @groups[kid_i]
+                    kid_res[kid[:name]] = _collect_group_value(kid_i)
+                }
+                return kid_res
+            end
+        end
+
+        def _traverse
+            res = {}
+            @groups.each_index { | i |
+                gr = @groups[i]
+                res[gr[:name]] = _collect_group_value(i) if gr[:parent].nil?
+            }
+            return res
         end
     end
 
@@ -550,22 +608,10 @@ class URLPattern < StdPattern
 end
 
 
-# pattern = StdPattern.new() {
-#     location('java', 'scala'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
-# }
-
-
-
-# Artifact.exec('javac', '/Users/brigadir/projects/.lithium/lib/JavaTools22.java' ) { | stdin, stdout, thread |
-#     stdin.close
-
-#     # stdout.readlines().each { | line |
-#         #puts line
-#         # res = pattern.match(line)
-#         # puts res
-#     # }
-
-
-#     puts stdout.readlines()
-# }
+READY {
+    t = JavaCompiler.new("/Users/brigadir/projects/crystalloids/rituals-core/src/main/java/com/insightos/apps/rituals/supply/DatastoreNotWorkdaysApi.java", Project.current)
+    t.run_with_parsed_output
+    tree = ArtifactTree.new(t)
+    tree.build()
+}
 

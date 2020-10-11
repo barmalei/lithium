@@ -234,6 +234,11 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         top_prj.ARTIFACT(meta) if prj.find_meta(meta).nil?
     }
 
+    # call block that has to be run after lithium has been initialized and ready to process
+    $ready_list.each { | block |
+        block.call
+    }
+
     # build target artifact including its dependencies
     target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
 

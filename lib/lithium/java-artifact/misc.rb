@@ -138,12 +138,7 @@ class FindClassInClasspath < FindInClasspath
             '-classpath',
             "\"#{File.join($lithium_code, 'classes')}\"",
             'lithium.JavaTools',
-            "class:#{@target}") { | stdin, stdout, thread |
-                Artifact.read_exec_output(stdin, stdout, thread) { | line |
-                    puts line
-                }
-            }
-
+            "class:#{@target}") 
         super
     end
 
