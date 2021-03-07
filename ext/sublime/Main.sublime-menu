@@ -1,0 +1,45 @@
+[
+    {
+        "id": "tools",
+        "children":
+        [
+            {
+                "caption": "Lithium",
+                "children":
+                [
+                     { "caption": "Compile",    "command": "li", "args": { "command": "compile:{file}"  } }
+                    ,{ "caption": "Run",        "command": "li", "args": { "command": "run:{file}"      } }
+                    ,{ "caption": "Run Tests",  "command": "li", "args": { "command": "test:{file}"     } }
+                    ,{ "caption": "Check",      "command": "li", "args": { "command": "check:{file}"    } }
+                    ,{ "caption": "PMD Check",  "command": "li", "args": { "command": "pmd:{file}"      } }
+
+                    ,{ "caption": "-" }
+
+                    ,{ "caption": "Maven clean/install",  "command": "li", "args": { "command": "mvn:{file}" } }
+                    ,{ "caption": "Maven compile",  "command": "li",       "args": { "command": "MavenCompiler:{file}" } }
+                    ,{ "caption": "Maven test",  "command": "li",          "args": { "command": "RunMavenTest:{file}" } }
+
+                    ,{ "caption": "-" }
+
+                    ,{ "caption": "Compile All",   "command": "li", "args": {"command":"compile:{src_home}/**/*{src_ext}" } }
+                    ,{ "caption": "Check All",     "command": "li", "args": {"command":"check:{src_home}/**/*{src_ext}"   } }
+                    ,{ "caption": "PMD Check All", "command": "li", "args": {"command":"pmd:{src_home}/**/*{src_ext}"     } }
+                    ,{ "caption": "Clean", "command": "CLEAN" }
+
+                    ,{ "caption": "-" }
+
+                    ,{ "caption": "Complete Import",  "command": "li_complete_import" }
+                    ,{ "caption": "Organize Imports", "command": "li_validate_imports" }
+                    ,{ "caption": "Show methods",     "command": "li_show_class_methods" }
+
+                    ,{ "caption": "-" }
+
+                    ,{ "caption": "Show errors", "command": "li_show_locations"   }
+                    ,{ "caption": "Show doc",    "command": "li_show_doc"     }
+                    ,{ "caption": "Detect module", "command": "li_show_class_module"     }
+                    ,{ "caption": "Detect field", "command": "li_show_class_field"     }
+                ]
+            }
+        ]
+    }
+]
