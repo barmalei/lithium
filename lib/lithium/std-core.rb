@@ -206,4 +206,3 @@ module StdFormater
         msg
     end
 end
-

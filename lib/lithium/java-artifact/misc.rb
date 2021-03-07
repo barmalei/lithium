@@ -36,40 +36,41 @@ class GenerateJavaDoc < RunJavaTool
     def self.abbr() 'JDC' end
 end
 
-class ShowClassMethods < JavaFileRunner
+class LithiumJavaToolRunner < JavaFileRunner
+    @java_tool_command_name = 'Unknown java tool command'
+
+    def self.java_tool_command_name
+        @java_tool_command_name
+    end
+
     def classpath
-        super.JOIN(File.join($lithium_code, 'classes'))
+        base = File.join($lithium_code, 'ext', 'java', 'lithium')
+        super.JOIN(File.join(base, 'classes'))
+             .JOIN(File.join(base, 'lib/*.jar'))
     end
 
     def run_with_target(src)
-        t = [ 'lithium.JavaTools', "methods:#{@shortname}" ]
+        t = [ 'lithium.JavaTools', "#{self.class.java_tool_command_name}:#{@shortname}" ]
         t.concat(super(src))
         return t
     end
+
 end
 
-class ShowClassModule < JavaFileRunner
-    def classpath
-        super.JOIN(File.join($lithium_code, 'classes'))
-    end
-
-    def run_with_target(src)
-        t = [ 'lithium.JavaTools', "module:#{@shortname}" ]
-        t.concat(super(src))
-        return t
-    end
+class ShowClassMethods < LithiumJavaToolRunner
+    @java_tool_command_name = 'methods'
 end
 
-class ShowClassField < JavaFileRunner
-    def classpath
-        super.JOIN(File.join($lithium_code, 'classes'))
-    end
+class ShowClassInfo < LithiumJavaToolRunner
+    @java_tool_command_name = 'classInfo'
+end
 
-    def run_with_target(src)
-        t = [ 'lithium.JavaTools', "field:#{@shortname}" ]
-        t.concat(super(src))
-        return t
-    end
+class ShowClassModule < LithiumJavaToolRunner
+    @java_tool_command_name = 'module'
+end
+
+class ShowClassField < LithiumJavaToolRunner
+    @java_tool_command_name = 'field'
 end
 
 class FindInClasspath < FileCommand
@@ -125,6 +126,7 @@ class FindInClasspath < FileCommand
     def what_it_does() "Looking for '#{@target}' in classpath" end
 end
 
+# TODO: the name is almost similiar to prev class name, a bit cinfusion.
 class FindClassInClasspath < FindInClasspath
     def initialize(*args)
         super
@@ -133,10 +135,11 @@ class FindClassInClasspath < FindInClasspath
     end
 
     def build
+        li_java_ext = File.join($lithium_code, 'ext', 'java', 'lithium')
         Artifact.exec(
             @java.java, 
             '-classpath',
-            "\"#{File.join($lithium_code, 'classes')}\"",
+            "\"#{File.join(li_java_ext, 'classes')}\"#{File::PATH_SEPARATOR}\"#{File.join(li_java_ext, 'lib/*')}\"",
             'lithium.JavaTools',
             "class:#{@target}") 
         super

@@ -33,11 +33,6 @@ class LithiumStd < Std
     end
 
     def pattern_matched(msg, pattern, match)
-        log_match(msg, pattern, match)
-        return msg
-    end
-
-    def log_match(msg, pattern, match)
         unless @log_file.nil?
             comma = ','
             if @log_io.nil?
@@ -53,6 +48,7 @@ class LithiumStd < Std
 
             @log_io.puts comma + entry.to_json
         end
+        return msg
     end
 end
 

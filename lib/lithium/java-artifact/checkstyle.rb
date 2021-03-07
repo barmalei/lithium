@@ -11,7 +11,7 @@ class JavaCheckStyle < JavaFileRunner
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
 
         unless @checkstyle_home
-            @checkstyle_home = existing_dir($lithium_code, 'tools', 'java', 'checkstyle')
+            @checkstyle_home = existing_dir($lithium_code, 'ext', 'java', 'checkstyle')
         end
 
         unless @checkstyle_config
@@ -55,7 +55,7 @@ end
 class PMD < JavaFileRunner
     def initialize(*args)
         super
-        @pmd_home = File.join($lithium_code, 'tools', 'java', 'pmd')
+        @pmd_home = File.join($lithium_code, 'ext', 'java', 'pmd')
         raise "PMD home path cannot be found '#{@pmd_home}'" unless File.directory?(@pmd_home)
 
         @pmd_rules      ||= File.join('rulesets', 'java', 'quickstart.xml')

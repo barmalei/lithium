@@ -38,7 +38,7 @@ class RunJUnit < JavaFileRunner
     def initialize(*args)
         super
         @junit_main_class ||= 'org.junit.runner.JUnitCore'
-        @junit_home       ||= File.join($lithium_code, 'tools', 'java', 'junit')
+        @junit_home       ||= File.join($lithium_code, 'ext', 'java', 'junit')
         raise "JUnit tool directory '#{@junit_home}' doesn't exist" unless File.directory?(@junit_home)
     end
 

@@ -180,7 +180,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # print header
     dt = DateTime.now.strftime("%H:%M:%S.%L")
     puts "+#{'—'*77}+"
-    puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  sandtube@gmail.com (c) #{dt} │"
+    puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
     puts "+#{'—'*77}+"
     $stdout.flush()
 

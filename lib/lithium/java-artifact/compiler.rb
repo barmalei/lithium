@@ -99,7 +99,7 @@ class JDTCompiler < JavaCompiler
     def initialize(*args)
         super
         @description   = 'JDT'
-        @jdt_home    ||= File.join($lithium_code, 'tools', 'java', 'jdt')
+        @jdt_home    ||= File.join($lithium_code, 'ext', 'java', 'jdt')
         raise "JDT home '#{@jdt_home}' cannot be found" unless File.file?(@jdt_home)
         @target_version ||= '1.8'
     end

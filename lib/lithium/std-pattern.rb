@@ -212,21 +212,9 @@ class StdPattern
         @matched = block
     end
 
-    # TODO: not clear if the method shoul be here
-    def COMPLETE_PATH()
+    # TODO: not clear if the method should be here
+    def COMPLETE_PATH
         BLOCK(:file) { | path |
-            break path if File.absolute_path?(path)
-            if $current_artifact.kind_of?(FileArtifact)
-                fp = $current_artifact.fullpath
-                if fp.end_with?(path)
-                    next fp
-                else
-                    hd = $current_artifact.homedir
-                    fp = File.join(hd, path)
-                    next fp if File.exists?(fp)
-                end
-            end
-
             res = FileArtifact.search(path)
             if res.length > 0
                 next res[0] # return first found file
@@ -427,6 +415,7 @@ class StdPattern
         @re_parts, @groups, @re = [], [], nil
     end
 
+    # register a block of code that has to be run for the given recognized group
     def BLOCK(name, &block)
         group = @groups.detect { | gr | name.to_sym == gr[:name]}
         group[:block] = block
@@ -494,7 +483,7 @@ class StdPattern
                                 msg[start_pos + dt .. end_pos + dt - 1] = new_value
                                 dt = dt + new_value.length - value.length
 
-                                # parent group values have to be corected according to the changes
+                                # parent group values have to be corrected according to the changes
                                 # child group does
                                 pg = group
                                 while pg[:parent] != nil

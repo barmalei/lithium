@@ -1226,43 +1226,44 @@ class FileArtifact < Artifact
     # search the given path
     def self.search(path, art = $current_artifact, &block)
         if File.exists?(path)
-            if block.nil?
-                return [ File.expand_path(path) ] 
-            else
-                return block.call(path)
-            end
+            return [ File.expand_path(path) ] if block.nil?
+            return block.call(path)
         end
 
         art = Project.current if art.nil? || !art.kind_of?(FileArtifact)
         if art.nil?
-            if block.nil?
-                return []
-            else
-                return
+            return [] if block.nil?
+            return
+        end
+
+        # test if current artifact points to path we are searching
+        fp = art.fullpath
+        if fp.end_with?(path)
+            return  [ fp ] if block.nil?
+            return block.call(fp)
+        else
+            hd  = $current_artifact.homedir
+            hfp = File.join(hd, path)
+            if File.exists?(hfp)
+                return  [ hfp ] if block.nil?
+                return block.call(hfp)
             end
         end
 
-        fp = art.fullpath
         fp = File.dirname(fp) unless File.directory?(fp)
         if File.exists?(fp)
             path = Pathname.new(path).cleanpath.to_s
             if @search_cache[fp] && @search_cache[fp][path]
-                if block.nil?
-                    return []
-                else
-                    return
-                end
+                return [] if block.nil?
+                return
             end
 
             res = Dir.glob(File.join(fp, '**', path))
             if res.length > 0
-                if block.nil?
-                    return res
-                else
-                    res.each { | found_item |
-                        block.call(found_item)
-                    }
-                end
+                return res if block.nil?
+                res.each { | found_item |
+                    block.call(found_item)
+                }
             end
 
             @search_cache[fp] = {} unless @search_cache[fp]
@@ -1280,7 +1281,8 @@ class FileArtifact < Artifact
 
         list = []
         line_num = 0
-        File.readlines(path).each { | line |
+
+        File.readlines(path, :encoding => 'UTF-8').each { | line |
             line_num += 1
             line = line.chomp.strip
             next if line.length == 0

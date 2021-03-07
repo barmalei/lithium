@@ -1,5 +1,5 @@
 -> {
-    #$lithium_options['v'] = 2
+    $lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
     # REQUIRE  {
@@ -10,7 +10,6 @@
     #         puts ">>>>>>>>>>>>>>>>>>> #{art.owner}"
     #     }
     # }
-
 
     Touch('touch:*')
 
@@ -39,10 +38,10 @@
     }
 
     MATCH("run:*") {
-        RunJavaCode('.lithium/lib/JavaTools.java') {
+        RunJavaCode('.lithium/ext/java/lithium/src/*') {
             DefaultClasspath("li_run_class_path") {
-                JOIN('.lithium/classes')
-                JOIN('.lithium/tools/java/commons-lang/commons-lang3-3.11.jar')
+                JOIN('.lithium/ext/java/lithium/classes')
+                JOIN('.lithium/ext/java/lithium/lib/*.jar')
             }
         }
 
@@ -70,12 +69,13 @@
     }
 
     MATCH("compile:*") {
-        JavaCompiler('.lithium/lib/JavaTools.java') {
+        JavaCompiler('.lithium/ext/java/lithium/src/*.java') {
             DefaultClasspath("li_run_class_path") {
-                JOIN('.lithium/tools/java/commons-lang/commons-lang3-3.11.jar')
+                JOIN('.lithium/ext/java/lithium/classes')
+                JOIN('.lithium/ext/java/lithium/lib/*.jar')
             }
 
-            @destination = '.lithium/classes'
+            @destination = '.lithium/ext/java/lithium/classes'
         }
 
         JavaCompiler        ('**/*.java')

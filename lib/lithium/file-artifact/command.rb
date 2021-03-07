@@ -156,7 +156,7 @@ class GREP < FileMask
 
     def build_item(fp, t)
         line_num = 0
-        File.readlines(fp).each { | line |
+        File.readlines(fp, :encoding => 'UTF-8').each { | line |
             line_num += 1
             line = line.chomp.strip
             next if line.length == 0
