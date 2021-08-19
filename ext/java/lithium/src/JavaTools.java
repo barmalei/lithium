@@ -29,12 +29,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class JavaTools {
     private static final String[] packages = new String[] {
         "java.util",
+        "java.lang.annotation",
         "java.util.function",
         "java.util.regex",
         "java.util.concurrent",
         "java.util.concurrent.atomic",
         "java.util.concurrent.locks",
         "java.util.stream",
+        "java.beans",
         "java.io",
         "java.text",
         "java.nio",
