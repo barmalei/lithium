@@ -37,26 +37,52 @@ end
 class RunJUnit < JavaFileRunner
     def initialize(*args)
         super
-        @junit_main_class ||= 'org.junit.runner.JUnitCore'
-        @junit_home       ||= File.join($lithium_code, 'ext', 'java', 'junit')
+        @junit_home ||= File.join($lithium_code, 'ext', 'java', 'junit')
         raise "JUnit tool directory '#{@junit_home}' doesn't exist" unless File.directory?(@junit_home)
     end
 
     def classpath
-        cp  = super
-        # TODO: existence of the JARs has to be checked in original classpath
-        cp.JOIN(File.join(@junit_home, 'junit-4.11.jar'))
-        cp.JOIN(File.join(@junit_home, 'hamcrest-core-1.3.jar'))
+        cp = super
+        juv = detect_junit_version(cp) if juv.nil?
+
+        if juv == 5
+            unless cp.INCLUDE?("**/junit-platform-console-standalone*.jar")
+                cp.JOIN(File.join(@junit_home, 'junit-platform-console-standalone-1.7.2.jar'))
+            end
+        else
+            cp.JOIN(File.join(@junit_home, 'junit-4.11.jar'))        unless cp.INCLUDE?("**/junit-*.jar")
+            cp.JOIN(File.join(@junit_home, 'hamcrest-core-1.3.jar')) unless cp.INCLUDE?("**/hamcrest-core-*.jar")
+        end
+
         return cp
     end
 
     def run_with_target(src)
-        [ @junit_main_class, super(src) ]
+        juv = detect_junit_version()
+        if juv == 5
+            return [
+                '-jar',
+                File.join(@junit_home, 'junit-platform-console-standalone-1.7.2.jar'),
+                '--disable-banner',
+                '--details=none',
+                '-c'
+            ].concat(super(src)).concat([ '--classpath', classpath() ])
+
+        else
+            return [ 'org.junit.runner.JUnitCore', super(src) ]
+        end
+    end
+
+    def detect_junit_version(cp = nil)
+        cp = method(:classpath).super_method.call if cp.nil?
+        return 4 if cp.INCLUDE?('**/junit-4*.jar')
+        return 5 if cp.INCLUDE?('**/junit-jupiter-*5*.jar')
+        return nil
     end
 
     def abbr() 'JUN' end
 
-    def what_it_does() "Run JAVA '#{@name}' with JUnit code" end
+    def what_it_does() "Run JAVA '#{@name}' with JUnit ('#{detect_junit_version}') code" end
 end
 
 class RunJavaCodeWithJUnit < RunJUnit
