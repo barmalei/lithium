@@ -1,0 +1,77 @@
+{
+	"name": "lithium",
+	"displayName": "vs1",
+	"description": "build tool",
+	"version": "0.0.1",
+	"engines": {
+		"vscode": "^1.36.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"onCommand:extension.lithium.compile",
+		"onCommand:extension.lithium.compileAll",
+		"onCommand:extension.lithium.run",
+		"onCommand:extension.lithium.checkstyle"
+	],
+	"main": "./extension.js",
+	"contributes": {
+		"languages": [
+			{
+				"id": "lithium",
+				"mimetypes": [
+					"log",
+					"text/log",
+					"text/x-log",
+					"text/x-code-output",
+					"x-code-output"
+				]
+			}
+		],
+		"grammars": [
+			{
+				"language": "lithium",
+				"scopeName": "source.lithium",
+				"path": "./lithium.tmLanguage"
+			}
+		],
+		"commands": [
+			{
+				"command": "extension.lithium.compile",
+				"title": "Lithium Compile"
+			},
+			{
+				"command": "extension.lithium.compileAll",
+				"title": "Lithium Compile All"
+			},
+			{
+				"command": "extension.lithium.run",
+				"title": "Lithium Run"
+			},
+			{
+				"command": "extension.lithium.checkstyle",
+				"title": "Lithium Checkstyle"
+			}
+		]
+	},
+	"scripts": {
+		"test": "node ./test/runTest.js"
+	},
+	"devDependencies": {
+		"@types/glob": "^7.1.1",
+		"@types/mocha": "^5.2.6",
+		"@types/node": "^10.12.21",
+		"@types/vscode": "^1.36.0",
+		"eslint": "^5.13.0",
+		"glob": "^7.1.4",
+		"mocha": "^6.1.4",
+		"typescript": "^3.3.1",
+		"vscode-test": "^1.0.0-next.0"
+	},
+	"dependencies": {
+		"uglify-js": "^3.6.0",
+		"uglifyjs": "^2.4.11",
+		"yuidocjs": "^0.10.2"
+	}
+}

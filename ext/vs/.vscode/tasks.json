@@ -1,0 +1,103 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Lithium Compile Task",
+            "type": "process",
+            "command": "lithium",
+            "args": ["-std=null", "compile:${file}"],
+            "windows": {
+                "command": "lithium"
+            },
+            "problemMatcher": {
+                "owner": "lithium",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "Lithium Run Task",
+            "type": "process",
+            "command": "lithium",
+            "args": ["-std=null", "run:${file}"],
+            "windows": {
+                "command": "lithium"
+            },
+            "problemMatcher": {
+                "owner": "lithium",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):\\s+(error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+
+        {
+            "label": "Lithium Check Task",
+            "type": "process",
+            "command": "lithium",
+            "args": ["-std=null", "check:${file}"],
+            "windows": {
+                "command": "lithium"
+            },
+            "problemMatcher": {
+                "owner": "lithium",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^\\[[a-zA-Z]+\\]\\s+(.*):(\\d+):(\\d+)\\s*(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+
+        {
+            "label": "Lithium Compile All",
+            "type": "process",
+            "command": "lithium",
+            "args": ["-std=null", "compile:${workspaceFolder}/src/**/*"],
+            "windows": {
+                "command": "lithium"
+            },
+            "problemMatcher": {
+                "owner": "lithium",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^\\[[a-zA-Z]+\\]\\s+(.*):(\\d+):(\\d+)\\s*(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+}
