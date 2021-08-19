@@ -223,7 +223,7 @@ class MavenCompiler < RunMaven
         false
     end
 
-    def list_items()
+    def list_items
         dir = File.join(File.dirname(fullpath), 'src', '**', '*')
         FileMask.new(dir, self.owner).list_items { |f, t|
             yield f, t
