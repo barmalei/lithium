@@ -58,6 +58,8 @@
         RunJavaClass     ('**/*.class')
         RunHtml          ('**/*.html')
         RunRubyScript    ('**/*.rb') 
+        CppCodeRunner    ('**/*.cpp')
+        CppCodeRunner    ('**/*.c')
     }
 
     MATCH("test:*") {
@@ -92,6 +94,9 @@
         CompileTTGrammar    ('**/*.tt')
         CompileSass         ('**/*.sass')
         BuildVaadinSass     ('VAADIN/**/*.scss')
+        RunMakefile         ('**/Makefile')
+        CppCompiler         ('**/*.cpp')
+        CppCompiler         ('**/*.c')
 
         OTHERWISE { | path |
             Project.build("compile:#{path}")
