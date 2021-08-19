@@ -138,13 +138,16 @@ class InFileClasspath < FileArtifact
 
     default_name(".li_classpath")
 
+    log_attr :exclude
+
     def initialize(*args, &block)
         super
         fp = fullpath
-        JOIN(read_classpath_file(fp)) if File.exists?(fp)
+        @exclude ||= []
+        load_paths() if File.exists?(fp)
     end
 
-    def assign_me_to()
+    def assign_me_to
         :add_classpath
     end
 
@@ -152,7 +155,16 @@ class InFileClasspath < FileArtifact
         super
         fp = fullpath
         raise "Classpath file/directory '#{fp}' doesn't exist" unless File.exists?(fp)
-        CLEAR().JOIN(read_classpath_file(fp))
+        load_paths()
+    end
+
+    def load_paths
+        CLEAR().JOIN(read_classpath_file(fullpath))
+        if @exclude.length > 0
+            @exclude.each { | exc_path |
+                FILTER(exc_path )
+            }
+        end
     end
 
     def read_classpath_file(path)
@@ -163,6 +175,11 @@ class InFileClasspath < FileArtifact
             lines.push(line)
         }
         return lines
+    end
+
+    def EXCLUDE(*path)
+        @exclude ||= []
+        @exclude.push(*path)
     end
 end
 
@@ -269,7 +286,7 @@ class JAVA < JVM
         IO.popen([java(), '-version',  :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
-                    m = /java\s+version\s+\"([0-9]+)\.([0-9]+)\.([^\"]*)\"/.match(line.chomp)
+                    m = /version\s+\"([0-9]+)\.([0-9]+)\.([^\"]*)\"/.match(line.chomp)
                     if m
                         @java_version_high = m[1]
                         @java_version_low  = m[2]
@@ -406,10 +423,13 @@ class RunJavaTool < RunTool
         return cp
     end
 
+    def error_exit_code?(ec)
+        return ec != 0
+    end
+
     def run_with_options(opts)
         cp = classpath
         opts.push('-classpath', "\"#{cp}\"") unless cp.EMPTY?
         return opts
     end
 end
-
