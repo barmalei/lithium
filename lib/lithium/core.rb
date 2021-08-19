@@ -371,9 +371,7 @@ module OptionsSupport
         @options = options()
         if args.length > 0
             @options = []
-            args.each { | o |
-                OPT(o)
-            }
+            @options.push(*args)
         end
         return @options.join(' ')
     end
@@ -464,7 +462,7 @@ class ArtifactName < String
 
         @path = @suffix[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/] unless @suffix.nil?
         unless @path.nil?
-            @path, @path_mask = FileArtifact.cut_mask(@path)
+            @path, @path_mask = FileArtifact.cut_fmask(@path)
             @path = Pathname.new(@path).cleanpath.to_s unless @path.nil?
             @mask_type = @mask_type | File::FNM_PATHNAME if @path_mask != '*' || !@path.nil?
         end
@@ -1054,7 +1052,7 @@ class FileArtifact < Artifact
         return true if path == '.'
 
         pp = path.dup
-        path, mask = FileArtifact.cut_mask(path)
+        path, mask = FileArtifact.cut_fmask(path)
         raise "Path '#{pp}' contains only mask" if path.nil?
 
         path  = Pathname.new(path).cleanpath
@@ -1115,14 +1113,18 @@ class FileArtifact < Artifact
 
     #  path = [base]/...
     def self.relative_to(path, to)
-        path, mask = self.cut_mask(path)
+        path, mask = self.cut_fmask(path)
         path  = Pathname.new(path).cleanpath
         to    = Pathname.new(to)
         return nil if (path.absolute? && !to.absolute?) || (!path.absolute? && to.absolute?) || !path_start_with?(path.to_s, to.to_s)
         return path.relative_path_from(to).to_s
     end
 
-    def self.cut_mask(path)
+    def self.fmask?(path)
+        not path.index(/[\[\]\?\*\{\}]/).nil?
+    end
+
+    def self.cut_fmask(path)
         mi = path.index(/[\[\]\?\*\{\}]/) # test if the path contains mask
 
         # cut mask part if it has been detected in the path
@@ -1318,7 +1320,7 @@ class FileArtifact < Artifact
         raise 'Pattern cannot be nil' if pattern.nil?
         pattern = Regexp.new(pattern) if pattern.kind_of?(String)
 
-        pp, mask = FileArtifact.cut_mask(path)
+        pp, mask = FileArtifact.cut_fmask(path)
         raise "File '#{path}' cannot be found" if !File.exists?(path) && mask.nil?
 
         list = []
@@ -1337,7 +1339,7 @@ class FileArtifact < Artifact
     def self.dir(path, ignore_dirs = true, &block)
         raise 'Path cannot be nil'            if path.nil?
 
-        pp, mask = FileArtifact.cut_mask(path)
+        pp, mask = FileArtifact.cut_fmask(path)
         raise "Path '#{path}' points to file" if File.file?(path)
         raise "Path '#{path}' doesn't exist"  if !File.exists?(path) && mask.nil?
 
@@ -1645,7 +1647,13 @@ class RunTool < FileMask
                 ec = Artifact.exec(*cmd, &output_handler)
             end
 
-            raise "'#{self.class}' has failed cmd = '#{cmd}'" if error_exit_code?(ec)
+
+            if error_exit_code?(ec)
+                # TODO: simplify detailed level fetching
+                level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
+                raise "'#{self.class}' has failed cmd = '#{cmd}'" if level == 2
+                raise "'#{self.class}' has failed"
+            end
             puts "#{len} source files have been processed with '#{self.class}'"
         ensure
             src.unlink if src.kind_of?(Tempfile)
@@ -1992,22 +2000,48 @@ module PATHS
     end
 
     def INCLUDE?(path)
-        is_file = false
+        return true if matched_path(path) >= 0
+        return false
+    end
 
-        bd   = path_base_dir()
-        path = File.join(bd, path) if !bd.nil? && !File.absolute_path?(path)
+    def FILTER(fpath)
+        if !defined?(@paths).nil? && !@paths.nil? && @paths.length > 0
+            @paths = @paths.filter { | path |
+                match_two_paths(fpath, path) == false
+            }
+        end
+    end
 
-        if path[-1] == '/'
-            path = path[0..-2]
-        elsif File.file?(path)
-            is_file = true
-            path = File.basename(path)
+    def matched_path(path)
+        paths().each_index { | index |
+            path_item = paths[index]
+            return index if match_two_paths(path, path_item)
+        }
+
+        return -1
+    end
+
+    def match_two_paths(path, path_item)
+        is_file  = false
+        bd       = path_base_dir()
+        has_mask = FileArtifact.fmask?(path)
+
+        unless has_mask
+            path = File.join(bd, path) unless bd.nil? || File.absolute_path?(path)
+            if path[-1] == '/'
+                path = path[0..-2]
+            elsif File.file?(path)
+                is_file = true
+                path = File.basename(path)
+            end
         end
 
-        paths().each { | path_item |
+        if has_mask
+            return true if File.fnmatch?(path, path_item)
+        else
             path_item = File.basename(path_item) if is_file && File.file?(path_item)
             return true if path_item == path
-        }
+        end
 
         return false
     end
@@ -2038,7 +2072,7 @@ module PATHS
                 path.split(File::PATH_SEPARATOR).each { | path_item |
                     path_item = File.join(hd, path_item) if !hd.nil? && !File.absolute_path?(path_item)
 
-                    pp, mask = FileArtifact.cut_mask(path_item)
+                    pp, mask = FileArtifact.cut_fmask(path_item)
                     unless mask.nil?
                         @paths.concat(FileArtifact.dir(path_item))
                         path_item = pp
@@ -2144,5 +2178,3 @@ class OTHERWISE < FileMask
         end
     end
 end
-
-
