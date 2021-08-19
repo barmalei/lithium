@@ -23,6 +23,7 @@ require 'lithium/rb-artifact'
 require 'lithium/php-artifact'
 require 'lithium/tt-artifact'
 require 'lithium/web-artifact'
+require 'lithium/c-artifact'
 
 require 'lithium/xml-artifact'
 
@@ -47,6 +48,12 @@ PATTERNS ({
         # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
         StdPattern.new() {
             location('java', 'scala'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
+        }
+    ],
+
+    CppCompiler => [
+        StdPattern.new() {
+            location('cpp', 'c'); spaces(); group(:level, 'error|note'); colon(); spaces(); group(:message, '.*$')
         }
     ],
 
@@ -179,9 +186,9 @@ PATTERNS ({
 def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # print header
     dt = DateTime.now.strftime("%H:%M:%S.%L")
-    puts "+#{'—'*77}+"
+    puts "+#{'—'*73}+"
     puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
-    puts "+#{'—'*77}+"
+    puts "+#{'—'*73}+"
     $stdout.flush()
 
     if artifact_prefix.nil? && artifact_path.nil?
