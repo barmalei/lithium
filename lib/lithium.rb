@@ -9,19 +9,19 @@ require 'pathname'
 #      ans "basedir" as an option makes possible to build an external
 #      artifact in a context of the given project
 # !==================================================================
-
-$lithium_version    = '4.2.1'
-$lithium_date       = 'Aug 2021'
+$lithium_version    = '4.2.2'
+$lithium_date       = 'Sep 2021'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
-artifact            = ARGV[ $lithium_options.length ]
-artifact_path       = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/]
-artifact_prefix     = artifact.nil? ? nil : (artifact_path.nil? ? artifact : artifact.chomp(artifact_path))
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
 $lithium_args     ||= []
 
 # modify ruby modules lookup path
 $: << File.join($lithium_code, 'lib')
+
+artifact            = ARGV[ $lithium_options.length ]
+artifact_path       = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/]
+artifact_prefix     = artifact.nil? ? nil : (artifact_path.nil? ? artifact : artifact.chomp(artifact_path))
 
 # artifact name is not a path
 if $lithium_options.has_key?('basedir')
