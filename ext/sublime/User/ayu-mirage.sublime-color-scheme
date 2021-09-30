@@ -1,0 +1,55 @@
+{
+
+   "globals": {
+        "guide": "#707a8c4d",
+        "highlight": "#ffcc6666",
+        "gutter_foreground": "slategrey",
+   },
+   "rules": [
+        {
+            "name": "Comment",
+            "scope": "comment",
+            "font_style": "italic",
+            "foreground": "lightslategray"
+        },
+
+        {
+            "name": "Java primitive variable types",
+            "scope": "source.java storage.type.primitive",
+            "foreground": "darkturquoise"
+        },
+
+        {
+            "name": "Library class/type",
+            "scope": "support.type, support.class, source.go storage.type",
+            "foreground": "darkturquoise"
+        },
+
+
+        {
+            "name": "Inherited class type",
+            "scope": "entity.other.inherited-class",
+            "foreground": "darkturquoise"
+        },
+
+        {
+            "name": "Language variable",
+            "scope": "variable.language",
+            "font_style": "italic",
+            "foreground": "darkturquoise"
+        },
+
+        {
+            "name": "Tag",
+            "scope": "entity.name.tag, meta.tag.sgml",
+            "foreground": "darkturquoise"
+        },
+
+        {
+            "name": "CSS Properties",
+            "scope": "support.type.property-name",
+            "font_style": "normal",
+            "foreground": "darkturquoise"
+        }
+    ]
+}

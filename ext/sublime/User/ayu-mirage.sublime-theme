@@ -1,0 +1,64 @@
+[
+    {
+       "class": "sidebar_label",
+       // "font.face2": "PragmataPro Mono Liga",
+       // "font.face2": "Monaco",
+       // "font.face2": "Menlo",
+       // "font.face2": "Andale Mono",
+       // "font.face2": "Consolas",
+       // "font.face2": "Lucida Console",
+       // "font.face2": "PT Mono",
+       "font.size": "14px",
+       // "fg2": "sandybrown",
+       // "fg2": "lightsalmon",
+       // "fg2": "darksalmon",
+       // "fg2": "peru",
+       // "fg2": "moccasin",
+       "fg": "darkturquoise"
+    },
+
+    {
+        "class": "sidebar_label",
+        "parents": [
+            {
+                "class": "tree_row",
+                "attributes": [
+                    "selected"
+                ]
+            }
+        ],
+       // "fg2": "red"
+       // "fg": "sandybrown",
+       // "fg": "lightsalmon",
+        //"fg": "darksalmon",
+       // "fg": "peru",
+        "fg": "moccasin"
+    },
+
+
+    {
+        "class": "tab_label",
+        "fg": "tomato",
+        "font.italic": false,
+        "font.bold": false,
+        "font.size": 12
+    },
+
+    {
+        "class": "mini_quick_panel_row",
+        "attributes": [
+            "selected"
+        ],
+        "layer0.tint": "darkslategray"
+    },
+
+
+    {
+        "class": "quick_panel_label",
+        "fg": "darkturquoise",
+        "match_fg": "#ffcc66",
+        "selected_fg": "#cbccc6",
+        "selected_match_fg": "#ffcc66"
+    }
+
+]

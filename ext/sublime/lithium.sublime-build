@@ -1,6 +1,0 @@
-{
-    "cmd": [ "lithium", "run:$file" ],
-    "selector": "source.mylang",
-    "cancel": {"kill": false },
-    "syntax": "Packages/Lithium/lithium.tmLanguage"
-}
