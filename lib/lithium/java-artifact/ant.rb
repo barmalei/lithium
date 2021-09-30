@@ -41,8 +41,9 @@ class RunANT < FileCommand
 
     def build()
         fp = fullpath()
-        Dir.chdir(File.dirname(fp))
-        raise 'ANT error' if 0 != Artifact.exec(@ant.ant, '-buildfile', "\"#{fp}\"", OPTS())
+        chdir(File.dirname(fp)) {
+            raise 'ANT error' if 0 != Artifact.exec(@ant.ant, '-buildfile', "\"#{fp}\"", OPTS())
+        }
     end
 
     def what_it_does() "Run ANT '#{fullpath()}'" end
