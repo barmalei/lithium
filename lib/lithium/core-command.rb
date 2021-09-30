@@ -105,9 +105,9 @@ end
 class REQUIRE < Artifact
     def build
         puts "Artifact '#{@shortname}' dependencies list {"
-        Project.artifact(@name).requires { | dep, assignTo, is_own, block |
+        Project.artifact(@name).requires { | dep, is_own, block |
             aname = dep.kind_of?(Artifact) ? ArtifactName.new(dep.name, dep.class, &block) : ArtifactName.new(dep, &block)
-            printf("    %-20s : '%s' (assignTo = %s)\n", dep.name, dep, (assignTo.nil? ? '<none>' : assignTo))
+            printf("    %-20s : '%s'\n", dep.name, dep)
         }
         puts '}'
     end
