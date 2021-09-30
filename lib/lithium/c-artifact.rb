@@ -78,9 +78,11 @@ class RunMakefile < RunTool
         super
         @targets ||= []
     end
+
     def build
-        Dir.chdir(File.dirname(fullpath))
-        Artifact.exec('make', @targets.join(' '))
+        chdir(File.dirname(fullpath)) {
+            Artifact.exec('make', @targets.join(' '))
+        }
     end
 
     def what_it_does
