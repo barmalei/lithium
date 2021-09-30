@@ -302,6 +302,10 @@ public class JavaTools {
             }
         }
 
+        if (clazz == null) {
+            throw new RuntimeException("Class cannot be identified by cn = '" + cn + "'");
+        }
+
         Field  field = clazz.getDeclaredField(fn);
         field.setAccessible(true);
         Object value = field.get(null);
