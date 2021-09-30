@@ -283,9 +283,11 @@ class JAVA < JVM
         @java_version_low     = '?'
         @java_version_high    = '?'
 
+        lines = []
         IO.popen([java(), '-version',  :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
+                    lines.push(line)
                     m = /version\s+\"([0-9]+)\.([0-9]+)\.([^\"]*)\"/.match(line.chomp)
                     if m
                         @java_version_high = m[1]
@@ -300,7 +302,10 @@ class JAVA < JVM
             end
         }
 
-        raise "Java version cannot be identified for #{@java_home}" if @java_version.nil?
+        if @java_version.nil?
+            puts_error(lines.join(''))
+            raise "Java version cannot be identified for #{@java_home}"
+        end
         puts "Java version '#{@java_version}', home '#{@java_home}'"
     end
 
