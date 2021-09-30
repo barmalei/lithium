@@ -64,11 +64,6 @@ def puts_exception(*args)
     end
 end
 
-def puts_response(*args)
-
-
-end
-
 class Std
     @@std = nil  # singleton object static variable
 
@@ -112,13 +107,6 @@ class Std
         args.each { | a |
             a = a.to_s
             write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a, 2)
-        }
-    end
-
-    def puts_response(*args)
-        args.each { | a |
-            a = a.to_s
-            write((a.length == 0 || a[-1, 1] != "\n") ? "#{a}\n" : a)
         }
     end
 
