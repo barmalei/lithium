@@ -1,0 +1,37 @@
+{% if typedItem.access == access %}
+    {% set level = typedItem.level %}
+    {% set declareHere = typedItem.get("declareHere") %}
+    
+    <div class="typedItem last{{isLastItem}}">
+
+
+        {% if isLastItem %}
+            <div class="typedItemName {{ ' '.join(level)}}">
+                -
+                <a>{{typedItem.name}}</a>
+            </div>
+        {% else %}
+            <div class="typedItemName {{ ' '.join(level)}}">
+                -
+                <a>{{typedItem.name}}{{"" if declareHere else " ᐃ" }}</a>
+            </div>
+        {% endif %}
+
+        {% if 'args' in typedItem %}
+            <div class="typedItemArgs">
+                ({% for arg in typedItem.args %}
+                    {{"," if loop.index > 1 }}
+                    {% set argQuery = arg.split('.')[-1] %}
+                    <div class="typedItemArgsArg">
+                        <a href='subl:li_show_doc {"type": "dash", "keyword": "{{argQuery}}", "syntax": "Java"}'>{{arg}}</a>
+                    </div>
+                {% endfor %}) 
+            </div>
+        {% endif %}
+
+        {% if 'type' in typedItem %}
+            <bold>→</bold>
+            <div class="typedItemType">{{typedItem.type}}</div>
+        {% endif %}
+    </div>
+{% endif %}

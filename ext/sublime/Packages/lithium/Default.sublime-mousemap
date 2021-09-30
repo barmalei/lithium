@@ -1,0 +1,47 @@
+[
+    {
+        "button"       : "button1",
+        "count"        : 1,
+        "modifiers"    : [ "ctrl" ],
+        "press_command": "drag_select",
+        "command"      : "li_go_to_location"
+    },
+
+    // {
+    //     "button"       : "button1",
+    //     "count"        : 1,
+    //     "modifiers"    : [ "alt" ],
+    //     "press_command": "drag_select",
+    //     "command"      : "li_show_class_methods"
+    // },
+
+    // {
+    //     "button"       : "button1",
+    //     "count"        : 1,
+    //     "modifiers"    : [ "command" ],
+    //     "press_command": "drag_select",
+    //     "command"      : "li_show_class_methods",
+    //     "args"         : { "paste": true }
+    // },
+
+    {
+        "button"       : "button2",
+        "count"        : 1,
+        "modifiers"    : [ "ctrl" ],
+        "command"      : "li_show_project"
+    },
+
+    {
+        "button"       : "button1",
+        "count"        : 2,
+        "modifiers"    : [ "ctrl" ],
+        "command"      : "li_show_pom"
+    },
+
+    {
+        "button"       : "button1",
+        "count"        : 1,
+        "modifiers"    : [ "ctrl" ],
+        "command"      : "reveal_in_side_bar"
+    }
+]

@@ -1,0 +1,39 @@
+<div class="headerNavigate">
+    <a href="navig:back">❮</a>
+    <a href="navig:forward">❯</a>
+</div>
+<div class="headerTitle">
+
+    {%set filterStatus = filters.get('showParent') %}
+
+    <a style="color:white;font-style: normal; text-decoration: none;" href="filter:showParent">
+        {{"[+]" if filterStatus else "[-]" }}
+    </a>{{clazz.name}}
+
+    {% if clazz.parent %}
+        <div class="headerParentClassName">
+        ← <a href='subl:li_show_class_info { "clazz": "{{clazz.parent}}" }'>{{clazz.parent}} </a>
+        </div>
+    {% endif %}
+</div>
+
+
+{% for interface in clazz.interfaces %}
+    {% if loop.index == 1 %}
+        <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|←
+    {% endif %}
+
+    {% if loop.index  % 3 > 0 %}
+        {% if  loop.index  % 3 == 2 %}
+            ,
+        {% endif %}
+        <div class="headerParentClassName">
+            <a href='subl:li_show_class_info { "clazz": "{{interface}}" }'>{{interface}} </a>
+        </div>
+    {% else %}
+        <br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|←
+    {% endif %}
+{% endfor %}
+
+
+

@@ -1,0 +1,255 @@
+ <html style="height:900px;width:1000px;">
+    <body style='padding:0px;margin:0px;'>
+        <style>
+            div.header {
+                display: block;
+                width: 900px;
+                background-color: sandybrown;
+                background-color:  color(sandybrown min-contrast(var(--background) 2.5));
+                background-color2: darkturquoise;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                padding-left: 10px;
+                padding-right: 10px;
+                color: red;
+                font-weight: bold;
+                font-size: 13px;
+            }
+
+            /*
+             *   Header style
+             */
+            div.headerNavigate {
+                display: inline;
+            }
+
+            div.headerNavigate a {
+                color: white;
+                text-decoration: none;
+                font-weight: bold;
+            }
+
+            div.headerTitle {
+                display: inline;
+                text-decoration:none;
+                color:  brown;
+            }
+
+            div.headerFilter {
+                display: inline;
+                position: relative;
+                left: 500px;
+            }
+
+            div.headerFilter a {
+                text-decoration:none;
+                color: black;
+            }
+
+            div.headerParentClassName {
+                display: inline;
+            }
+
+            div.headerParentClassName a {
+                color: red;
+                text-decoration: none;
+            }
+
+
+            /*
+             *   Typed items (fields, variables, constructor) style
+             */
+
+            div.typedItemsList {
+                display: block;
+                padding: 10px;
+                height:  300px;
+            }
+
+            div.typedItem {
+                margin-left: 11px;
+                border-left-width: 1px;
+                border-left-color: white;
+                border-left-style: solid;
+                padding-top: 6px ;
+            }
+
+            div.typedItem.lastTrue {
+                border-left-width: 1px;
+                border-left-color: white;
+                border-left-style: solid;
+                padding-top: 6px ;
+            }
+
+            div.typedItemAccessor {
+                font-weight: bold;
+                font-style: italic;
+            }
+
+            div.typedItemType {
+                display: inline;
+                color:  orange;
+                font-weight: bold;
+            }
+
+            div.typedItemName {
+                display:  inline;
+            }
+
+            div.typedItemName a {
+                font-style: normal;
+                font-weight: bold;
+                font-size: 13px;
+                text-decoration: none;
+                color: orange;
+            }
+
+            div.typedItemName.static a {
+                font-style: normal;
+                font-weight: bold;
+                font-size: 13px;
+                text-decoration2: underline;
+                font-style: italic;
+                color2: lightGray;
+            }
+
+            div.typedItemName.abstract a {
+                font-style: normal;
+                font-weight: bold;
+                font-size: 13px;
+                text-decoration: none;
+                color: red;
+            }
+
+
+            div.typedItemArgs {
+                display: inline;
+            }
+
+            div.typedItemArgsArg {
+                display: inline;
+            }
+
+            div.typedItemAgsArg a {
+                display: inline;
+                color:  sandybrown;
+                font-size: 11px;
+                text-decoration: none;
+                font-style: italic;
+            }
+
+           /*
+            *  Tabs area
+            */
+            div.tab {
+                border-left-width:1px;
+                border-right-width:1px;
+                border-top-width:1px;
+                border-style:solid;
+                border-color:white;
+                padding: 0px;
+                padding-right: 4px;
+                padding-left: 4px;
+                padding-top: 2px;
+                display:inline;
+            }
+
+            div.selectedTab {
+                border-left-width:1px;
+                border-right-width:1px;
+                border-top-width:3px;
+                border-right-width:3px;
+                border-left-width:3px;
+                border-style:solid;
+                padding-right: 6px;
+                padding-left: 6px;
+                padding-top: 4px;
+                margin-bottom: 10px;
+                display:inline;
+            }
+
+            div.selectedTab a {
+                font-weight2: bold;
+                font-size: 13px;
+                color: var(--bluish);
+                padding: 0px;
+                margin:  0px;
+                text-decoration: none;
+            }
+
+            div.tab a {
+                font-weight: normal;
+                text-decoration: none;
+                padding: 0px;
+                margin:  0px;
+                color: var(--cyanish);
+                color: var(--yellowish);
+                color: var(--orangish);
+                color: var(--redish);
+                color: var(--accent);
+                color: var(--pinkish);
+                color: var(--purplish);
+                color: var(--greenish);
+            }
+
+            div.tabs {
+                border-bottom-width: 1px;
+                border-style:solid;
+                border-color: white;
+                padding: 0px;
+                margin-top:  10px;
+            }
+
+            div.tabPages {
+                padding:  10px;
+            }
+
+        </style>
+
+        <div class="header">
+            {% include 'classInfoHeader.html' %}
+        </div>
+
+        <div class="tabs">
+            <div class="{{'selectedTab' if ui.page1 else 'tab'}}">
+               <a href="ui:page1">Methods</a>
+            </div>
+            <div class="{{'selectedTab' if ui.page2 else 'tab'}}">
+               <a href="ui:page2">Constructors</a>
+            </div>
+
+            <div class="{{'selectedTab' if ui.page3 else 'tab'}}">
+               <a href="ui:page3">Variables</a>
+            </div>
+
+            <a>[a]</a>[b][c][d][e][f]
+        </div>
+
+
+        <div class="tabPages">
+
+            {% if ui.page1 %}
+                {% with typedItemsList = methods %}
+                    {% include 'listTypedItemsTemplate.html'%}
+                {% endwith %}
+            {% endif %}
+
+            {% if ui.page2 %}
+
+                {% with typedItemsList = clazz.constructors %}
+                    {% include 'listTypedItemsTemplate.html'%}
+                {% endwith %}
+
+            {% endif %}
+
+            {% if ui.page3 %}
+
+                {% with typedItemsList = fields %}
+                    {% include 'listTypedItemsTemplate.html'%}
+                {% endwith %}
+
+            {% endif %}
+
+        </div>
+    </body>
+</html>

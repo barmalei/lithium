@@ -1,0 +1,98 @@
+[
+    {
+        "keys": ["super+b"],
+        "command": "li",
+        "args": { "command":"compile:{file}"}
+    },
+
+    {
+        "keys": ["super+alt+b"],
+        "command": "li",
+        "args": { "command":""}
+    },
+
+    {
+        "keys": ["super+enter"],
+        "command": "li",
+        "args": { "command":"run:{file}"}
+    },
+
+    {
+        "keys": ["super+shift+enter"],
+        "command": "li",
+        "args": { "command":"test:{file}"}
+    },
+
+    {
+        "keys": ["super+shift+b"],
+        "command": "li_show_locations"
+        //"command": "set_mark"
+        //"command": "test_mark"
+    },
+
+    {
+        "keys": ["super+shift+."],
+        "command": "li_show_locations",
+        "args": { "type" : "next"}
+    },
+
+    {
+        "keys": ["super+shift+,"],
+        "command": "li_show_locations",
+        "args": { "type" : "prev"}
+    },
+
+    {
+        "keys": ["super+f1"],
+        "command": "li_show_doc",
+        "args": { "type" : "solr"}
+    },
+
+    {
+        "keys": ["f1"],
+        "command": "li_show_doc",
+        "args": { "type" : "solr", "show_immediate": true }
+    },
+
+    {
+        "keys": ["alt+f1"],
+        "command": "li_show_doc",
+        "args": { "type" : "dash"}
+    },
+
+    {
+        "keys": [ "f10" ],
+        "command": "li_go_to_location",
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.lithium" }
+        ]
+    },
+
+    {
+        "keys": [ "alt+super+enter" ],
+        "command": "li",
+        "args" : { "command": "check:{file}" }
+    },
+
+    {
+        "keys": [ "ctrl+i" ],
+        "command": "li_complete_import",
+        "args"   : { "auto_apply": true }
+    },
+
+    {
+        "keys": [ "ctrl+shift+i" ],
+        "args": { "inline": true },
+        "command": "li_complete_import"
+    },
+
+    {
+        "keys": [ "ctrl+," ],
+        "command": "reveal_in_side_bar"
+    },
+
+    {
+        "keys": [ "super+t" ],
+        "command": "li_goto_class"
+    }
+]
