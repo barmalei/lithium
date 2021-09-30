@@ -18,9 +18,10 @@ Predefined classifiers:
             
 Options:
   -std=[none|sublime] - std out mode
-  -v=[0,1,2] - verbosity level 
-  -basedir=<path> - custom project home directory
-  -i - show artifact properties
+  -v={0,1,2}          - verbosity level
+  -basedir=<path>     - custom project home directory
+  -header={0,1,2}     - show header mode
+  -i                  - show artifact properties
   -i:p=[@]name1[.[@]nameN][,[@]name1[.[@]nameN]] - inspect property
   
 Samples:
