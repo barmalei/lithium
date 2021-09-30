@@ -8,6 +8,7 @@ require 'lithium/std-custom'
 
 require 'lithium/java-artifact/compiler'
 require 'lithium/java-artifact/runner'
+require 'lithium/file-artifact/archive'
 require 'lithium/java-artifact/jar'
 require 'lithium/java-artifact/misc'
 require 'lithium/java-artifact/checkstyle'
@@ -28,7 +29,7 @@ require 'lithium/c-artifact'
 require 'lithium/xml-artifact'
 
 # TODO:
-# Proposed pattern definition syntacsis
+# Proposed pattern definition syntactic
 #  -> {
 #     PATTERN(JavaExceptionLocPattern.new).TO(JavaFileRunner)
 
@@ -184,13 +185,6 @@ PATTERNS ({
 # @param  basedir         - a related location the lithium has been started
 #
 def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
-    # print header
-    dt = DateTime.now.strftime("%H:%M:%S.%L")
-    puts "+#{'—'*73}+"
-    puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
-    puts "+#{'—'*73}+"
-    $stdout.flush()
-
     if artifact_prefix.nil? && artifact_path.nil?
         puts 'No command or arguments have been specified'
         File.open(File.join($lithium_code, 'lib', 'lithium.txt'), 'r') { | f |
@@ -240,6 +234,17 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         meta = ArtifactName.new(clazz)
         top_prj.ARTIFACT(meta) if prj.find_meta(meta).nil?
     }
+
+    # print header
+    dt = DateTime.now.strftime("%H:%M:%S.%L")
+    unless $lithium_options.has_key?('header') && $lithium_options['header'] != '2'
+        puts "+#{'—'*73}+"
+        puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
+        puts "+#{'—'*73}+"
+        $stdout.flush()
+    else
+        puts "#{dt} Running lithium v#{$lithium_version}" if $lithium_options['header'] == '1'
+    end
 
     # call block that has to be run after lithium has been initialized and ready to process
     $ready_list.each { | block |
