@@ -86,7 +86,7 @@ module LogArtifactState
             @logged_attrs ||= []
             @logged_attrs += args
 
-            # check if attribute accessor method has not been already defined with a class
+            # check if attribute reader method has not been already defined with a class
             # and define it if it doesn't
             args.each { | arg |
                 attr_accessor arg unless method_defined?(arg)
@@ -362,7 +362,9 @@ module LogArtifactState
         true
     end
 
-    def attrs_log_path() items_log_path() + ".ser" end
+    def attrs_log_path
+        items_log_path() + ".ser"
+    end
 end
 
 # Option support
@@ -647,6 +649,7 @@ class Artifact
         self.instance_eval(&block) if block
     end
 
+    # top owner (container) artifact
     def top
         ow = self
         while !ow.owner.nil? do
@@ -755,6 +758,11 @@ class Artifact
 
     def to_s() shortname end
 
+    # make the block section callable in a contectxt of the class instance
+    def call(&block)
+        self.instance_eval &block
+    end
+
     # add required for the artifact building dependencies (other artifact)
     # art   - name of artifact or instance of artifact
     # block - custom block for artifact or if art is nil block is build method for
@@ -829,22 +837,6 @@ class Artifact
             return thread.value
         }
     end
-
-    # build artifact including all its dependencies
-    # @name name of artifact to be built
-    # @caller_art an artifact that initiated the build
-    def Artifact.build(name, caller_art,  &block)
-        if caller_art.nil?
-            owner = nil
-        else
-            owner = caller_art.kind_of?(ArtifactContainer) ?  caller_art : caller_art.owner
-        end
-
-        art  = self.new(name, owner, &block)
-        tree = ArtifactTree.new(art)
-        tree.build()
-        return tree.art
-    end
 end
 
 # Artifact tree. Provides tree of artifacts that is built basing
@@ -902,7 +894,7 @@ class ArtifactTree
             # has to be placed before recursive build tree method call
             node.art.owner = @art.owner if is_own == true
 
-            #  resolve assign_me_to  property that says to which property the instance pf the
+            #  resolve assign_me_to  property that says to which property the instance of the
             #  dependent artifact has to be assigned
             if assignMeTo.nil?
                 if node.art.class < AssignableDependency
@@ -983,6 +975,13 @@ class ArtifactTree
     end
 
     def what_it_does() "Build '#{@name}' artifact dependencies tree" end
+
+    def self.build(art)
+        art = Project.artifact(art) unless art.is_a?(Artifact)
+        tree = ArtifactTree.new(art)
+        tree.build()
+        return art
+    end
 end
 
 #  Base file artifact
@@ -1011,8 +1010,22 @@ class FileArtifact < Artifact
         end
     end
 
-    def go_to_homedir
-        Dir.chdir(homedir)
+    def go_to_homedir(&block)
+        chdir(homedir, &block)
+    end
+
+    def chdir(dir, &block)
+        if block.nil?
+            Dir.chdir(dir)
+        else
+            pwd = Dir.pwd
+            begin
+                Dir.chdir(dir)
+                block.call
+            ensure
+                Dir.chdir(pwd) unless pwd.nil?
+            end
+        end
     end
 
     # return path that is relative to the artifact homedir
@@ -1079,13 +1092,21 @@ class FileArtifact < Artifact
         }
     end
 
-    def list_items
+    def list_items(rel = nil)
         fp = fullpath
         if File.exists?(fp)
             yield fp, File.mtime(fp).to_i
         else
             yield fp, -1
         end
+    end
+
+    def list_items_to_array(rel = nil)
+        list = []
+        list_items(rel) { | path, m |
+            list << path
+        }
+        return list
     end
 
     def search(path)
@@ -1425,9 +1446,38 @@ class Directory < FileArtifact
         raise "File '#{fp}' is not a directory" if File.file?(fp)
     end
 
+    def mkdir
+        FileUtils.mkdir_p(fullpath) unless File.exists?(fullpath)
+    end
+
+    # return itself as a single item
     def list_items
         go_to_homedir()
         Dir[@name].each { | path |
+            mt = File.mtime(path).to_i
+            yield path, mt
+        }
+    end
+end
+
+# Directory content artifact
+class DirectoryContent < Directory
+    include LogArtifactState
+
+    def expired?
+        !File.directory?(fullpath)
+    end
+
+    def build()
+        super
+        fp = fullpath
+        raise "File '#{fp}' is not a directory" if File.file?(fp)
+    end
+
+    # return itself as a single item
+    def list_items
+        go_to_homedir()
+        Dir[File.join(@name, '*')].each { | path |
             mt = File.mtime(path).to_i
             yield path, mt
         }
@@ -1465,15 +1515,6 @@ class FileMask < FileArtifact
 
     # called for every detected item as a part of build process
     def build_item(path, m) end
-
-    # list items to array
-    def list_items_to_array(rel = nil)
-        list = []
-        list_items(rel) { | path, m |
-            list << path
-        }
-        return list
-    end
 
     # List items basing on the mask returns items relatively to the
     # passed path
@@ -1853,7 +1894,7 @@ module ArtifactContainer
     end
 
     def delegate_to_owner_if_meta_cannot_be_found?
-        return false
+        false
     end
 end
 
@@ -1862,7 +1903,7 @@ class FileMaskContainer < FileMask
     include ArtifactContainer
 
     def delegate_to_owner_if_meta_cannot_be_found?
-        return true
+        true
     end
 end
 
@@ -1897,10 +1938,15 @@ class Project < ExistentDirectory
         @@curent_project.artifact(name, &block)
     end
 
+    def self.PROJECT(&block)
+        raise "Current project is not known" if self.current.nil?
+        self.current.instance_eval &block
+    end
+
     def self.build(name)
         raise 'Current project cannot be detected' if @@curent_project.nil?
 
-        # # build current project
+        # build current project
         tree = ArtifactTree.new(@@curent_project)
         tree.build()
 

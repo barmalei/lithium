@@ -92,3 +92,23 @@ class PMD < JavaFileRunner
     def self.abbr() 'PMD' end
 end
 
+# TODO: complete the code !
+class JsonSchemaToPojo < RunJAR
+    def initialize(*args)
+        super
+        @jsonSchemaToPojo_home = File.join($lithium_code, 'ext', 'java', 'jsonschema2pojo')
+        raise "JSON Schema to POJO home path cannot be found '#{@pmd_home}'" unless File.directory?(@jsonSchemaToPojo_home)
+
+        cp = File.join(@jsonSchemaToPojo_home, 'lib', '*.jar')
+        DefaultClasspath('jsonSchemaToPojo_def_classpath') {
+            JOIN(cp)
+        }
+    end
+
+    def run_with_target(src)
+        t = t.concat(super(src))
+        t = [ File.join(@jsonSchemaToPojo_home, 'jsonschema2pojo-cli-1.1.1.jar'), '--source', fullpath, '--target', 'java-gen' ]
+        return t
+    end
+end
+

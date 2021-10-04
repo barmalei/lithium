@@ -70,7 +70,7 @@ class PYTHON < EnvArtifact
         @pypaths.length == 0 ? nil : PATHS.new(project.homedir).JOIN(@pypaths)
     end
 
-    def python()
+    def python
         File.join(@python_home, 'bin', @pyname)
     end
 

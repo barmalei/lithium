@@ -185,7 +185,7 @@ class CopyToDirectory < GeneratedDirectory
         fp = fullpath
         if @full_copy == true
             if File.directory?(fp)
-                puts "Remove directory: '#{fp}'"
+                puts "Remove '#{fp}' destination directory"
                 FileUtils.rm_r(fp)
             end
         else
@@ -193,9 +193,9 @@ class CopyToDirectory < GeneratedDirectory
             list_sources_items { | from, as |
                 dest = File.join(fp, as)
                 if File.directory?(from)
-                    raise "Invalid destination directory: '#{dest}'" if File.file?(dest)
+                    raise "Invalid '#{dest}' destination directory" if File.file?(dest)
                     if File.exists?(dest)
-                        puts "Remove directory(s): '#{dest}'"
+                        puts "Remove '#{dest}' destination directory(s)"
                         FileUtils.rm_r(dest)
                     end
                 else
@@ -246,21 +246,21 @@ class CopyToDirectory < GeneratedDirectory
             if File.directory?(from)
                 raise "Invalid destination directory '#{dest}'" if File.file?(dest)
                 unless File.exists?(dest)
-                    puts "Create directory: '#{dest}'"
+                    puts "Creating '#{dest}' destination directory"
                     FileUtils.mkdir_p(dest)
                 end
             else
                 unless File.directory?(File.dirname(dest))
                     dest_up = File.dirname(dest)
-                    puts "Create directory '#{dest_up}'"
+                    puts "Creating '#{dest_up}' destination directory"
                     FileUtils.mkdir_p(dest_up)
                 end
 
                 unless File.exists?(dest) && File.mtime(dest).to_i > from_m
                     if File.exists?(dest)
-                        puts "Update file from: '#{from}'\n            to:   '#{dest}'"
+                        puts "Updating '#{from}'\n    with '#{dest}'"
                     else
-                        puts "Copy file from:   '#{from}'\n            to:   '#{dest}'"
+                        puts "Copying '#{from}'\n     to '#{dest}'"
                     end
                     FileUtils.cp(from, dest)
                 end

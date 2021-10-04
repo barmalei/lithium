@@ -256,7 +256,6 @@ class JAVA < JVM
 
     def initialize(*args)
     #REQUIRE(DefaultClasspath) # define class path here to let re-define it with a custom code in super calls
-
         super
 
         # identify Java Home
