@@ -2,15 +2,6 @@
     $lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
-    # REQUIRE  {
-    #     puts ".............. #{@name}  '#{self.owner.nil?}' "
-    #     DONE {
-    #         puts ">>>>>>>>>>>>>>>>>>> #{self.name}"
-    #         art = Directory.build('target')
-    #         puts ">>>>>>>>>>>>>>>>>>> #{art.owner}"
-    #     }
-    # }
-
     Touch('touch:*')
 
     UglifiedJSFile('minjs:**/*.min.js')
@@ -18,15 +9,17 @@
 
     RunMaven('mvn:*')
 
-    CopyToDirectory("test") {
+    GeneratedDirectory("test") {
         @full_copy = true
-        FileMaskSource('.lithium/lib/*')
-        FileMaskSource('classes/com/**/*')
-        MetaSourceFile('.lithium/meta/test.dir')
+        FileMask('.lithium/lib/*')
+        FileMask('classes/com/**/*')
+        MetaFile('.lithium/meta/test.dir')
     }
 
     ZipFile("test.zip") {
-        FileMaskSource('.lithium/lib/*', '.lithium/lib')
+        SOURCES {
+            FileMask('.lithium/lib/*').BASE('.lithium/lib')
+        }
     }
 
     JarFile("test.jar") {

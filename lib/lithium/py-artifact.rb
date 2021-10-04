@@ -9,7 +9,7 @@ class PYPATH < Artifact
     log_attr :paths
 
     def assign_me_to
-       :add_pypath
+       :pypaths
     end
 
     def expired?
@@ -33,6 +33,8 @@ class PYTHON < EnvArtifact
     include AutoRegisteredArtifact
 
     log_attr :python_home, :pyname
+
+    attr_reader :pypaths
 
     def initialize(*args)
         @pypaths = []
@@ -70,7 +72,7 @@ class PYTHON < EnvArtifact
         @pypaths.length == 0 ? nil : PATHS.new(project.homedir).JOIN(@pypaths)
     end
 
-    def python()
+    def python
         File.join(@python_home, 'bin', @pyname)
     end
 
@@ -137,3 +139,25 @@ except py_compile.PyCompileError:\n
 
     def what_it_does() "Validate '#{@name}' script" end
 end
+
+READY {
+    p = PYTHON.new(Project.current) {
+        @test= 1
+        DefaultPypath {
+            JOIN("test")
+        }
+    }
+
+    puts "............. #{p.instance_variable_get("@test")}"
+
+    p.instance_variable_set("@test", "HELLO")
+
+
+    puts("---- #{p.name}")
+
+    p = ArtifactTree.build(p)
+
+
+    puts("-------- #{p.pypaths.length}")
+
+}

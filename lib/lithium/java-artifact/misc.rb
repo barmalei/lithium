@@ -36,7 +36,7 @@ class GenerateJavaDoc < RunJavaTool
     def self.abbr() 'JDC' end
 end
 
-class LithiumJavaToolRunner < JavaFileRunner
+class LithiumJavaToolRunner < RunJavaTool
     @java_tool_command_name = 'Unknown java tool command'
 
     def self.java_tool_command_name
@@ -47,6 +47,10 @@ class LithiumJavaToolRunner < JavaFileRunner
         base = File.join($lithium_code, 'ext', 'java', 'lithium')
         super.JOIN(File.join(base, 'classes'))
              .JOIN(File.join(base, 'lib/*.jar'))
+    end
+
+    def run_with
+        @java.java
     end
 
     def run_with_target(src)
@@ -73,26 +77,61 @@ class ShowClassField < LithiumJavaToolRunner
     @java_tool_command_name = 'field'
 end
 
-class FindInClasspath < FileCommand
+class RC < Artifact
     def initialize(*args)
-        REQUIRE JAVA
         super
-        @target ||= $lithium_args[0]
-        @use_zipinfo = false
-        @use_zipinfo = true unless FileArtifact.which('zipinfo').nil?
+        @target = args[0].is_a?(Artifact) ? args[0] : owner.artifact(args[0])
+        REQUIRE @target
+    end
+
+    def expired?
+        true
+    end
+end
+
+class ListJavaClasspath < RC
+    def build
+        unless @target.classpath.EMPTY?
+            count = 0
+            list_items { | path |
+                count += 1
+                puts "#{count}: #{path}"
+            }
+        else
+            puts_warning 'Class path is empty'
+        end
+    end
+
+    def list_items
+        @target.classpath.paths.each { | path |
+            if File.directory?(path)
+                Dir.glob(File.join(path, '**')).each  { | item |
+                    yield path
+                }
+            else
+                yield path
+            end
+        }
+    end
+end
+
+class FindInClasspath < RC
+    def initialize(*args)
+        super
+        @patterns ||= $lithium_args.dup
     end
 
     def build()
-        unless @java.classpath.EMPTY?
+        unless @target.classpath.EMPTY?
             count = 0
-            FindInClasspath.find(@use_zipinfo, @java.classpath, @target) { | path, item, is_jar |
+            find(@target.classpath, *(@patterns)) { | path, item, is_jar |
                 item_found(path, item, is_jar)
                 count = count + 1
             }
 
             puts_warning "No item for '#{@target}' has been found" if count == 0
         else
-            puts_warning 'Classpath is not defined'
+            puts_warning 'Classpath is empty'
         end
     end
 
@@ -101,22 +140,16 @@ class FindInClasspath < FileCommand
         #puts "  {\n    \"item\": \"#{item}\",\n    \"path\": \"#{path}\"\n  }"
     end
 
-    def FindInClasspath.find(use_zipinfo, classpath, target)
+    def find(classpath, *patterns)
         classpath.paths.each { | path |
             if File.directory?(path)
-                Dir.glob(File.join(path, '**', target)).each  { | item |
+                Dir.glob(File.join(path, '**', patterns[0])).each  { | item |
                     yield path, item, false
                 }
             elsif path.end_with?('.jar') || path.end_with?('.zip')
-                if use_zipinfo
-                    FindInZip.find_with_zipinfo('zipinfo', path, "/" + target) { | item |
-                        yield path, item, true
-                    }
-                else
-                    FindInZip.find_with_jar('jar', path, "/" + target) { | item |
-                        yield path, item, true
-                    }
-                end
+                FindInZip.new(path, self.owner).find(*patterns) { | item |
+                    yield path, item, true
+                }
             else
                 puts_warning "File '#{path}' doesn't exist" unless File.exists?(path)
             end
@@ -126,7 +159,7 @@ class FindInClasspath < FileCommand
     def what_it_does() "Looking for '#{@target}' in classpath" end
 end
 
-# TODO: the name is almost similiar to prev class name, a bit cinfusion.
+# TODO: the name is almost similar to prev class name, a bit confusion.
 class FindClassInClasspath < FindInClasspath
     def initialize(*args)
         super
@@ -156,22 +189,39 @@ class FindClassInClasspath < FindInClasspath
     def self.abbr() 'FCC' end
 end
 
-def SyncWarClasses(art, war_path)
-    war_dir  = File.dirname(war_path)
-    war_path = File.join($lithium_options['app_server_root'], war_path) if war_dir.nil? || war_dir == '.'
+READY {
+    # Project.PROJECT {
+    #     JAVA {
+    #         .
+    #         DefaultClasspath {
+    #             JOIN('.lithium_code/ext/java/junit/junit-4.11.jar')
+    #         }
 
-    raise "Invalid WAR path '#{war_path}'" unless File.directory?(war_path)
-    dest = File.join(war_path, 'WEB-INF', 'classes')
-    raise "Invalid WAR classpath path '#{dest}'" unless File.directory?(dest)
+    #     }
 
-    art.list_dest_paths { | path, pkg |
-        puts "Copy '#{path}' to '#{dest}'"
+    # }
 
-        FileArtifact.cpfile(path,
-            File.join(dest, pkg.gsub('.', '/'))
-        )
+
+    JV = Project.artifact('.env/JAVA')
+    JV.() {
+        DefaultClasspath {
+            puts "?????????????"
+            JOIN('.lithium_code/ext/java/junit/junit-4.11.jar')
+        }
     }
 
-    Touch.touch(File.join(war_path, 'WEB-INF', 'web.xml'))
-    Touch.touch(File.join(war_path, '..', "#{File.basename(war_path)}.deployed"))
-end
+
+    puts "???? #{JV.classpaths.length}"
+
+    puts "???? #{Project.artifact('.env/JAVA').classpaths.length}"
+
+    # Project.artifact('.env/JAVA').REQUIRE
+
+
+    #puts ">> #{ArtifactTree.build('.env/JAVA').owner}"
+    a = ListJavaClasspath.new('.env/JAVA', Project.current)
+    l = ArtifactTree.build(a)
+
+    # Project.artifact('.env/JAVA')
+    # puts ">>>> #{Project.artifact('.env/JAVA').classpaths}"
+}

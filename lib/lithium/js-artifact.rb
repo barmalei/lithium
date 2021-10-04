@@ -119,7 +119,7 @@ class UglifiedJSFile < GeneratedFile
 
     def build
         list = []
-        list_sources_from { | from, from_m |
+        list_sources_items { | source, from, from_m, dest |
             raise "Source from file '#{from}' doesn't exists or points to directory" unless File.file?(from)
             list.push(from)
         }
@@ -160,7 +160,7 @@ end
 class CombinedJSFile < GeneratedFile
     def build
         list = []
-        list_sources_from { | from, from_m |
+        list_sources_items { | source, from, from_m, dest |
             raise "Source from file '#{from}' doesn't exist or points to directory" unless File.file?(from)
             list.push(from)
         }

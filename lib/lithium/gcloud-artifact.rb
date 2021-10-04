@@ -7,7 +7,7 @@ class RunGCloud < FileCommand
     end
 end
 
-class DeployGCApp < FileCommand
+class DeployGoogleApp < FileCommand
     include OptionsSupport
 
     def initialize(*args)
@@ -21,7 +21,15 @@ class DeployGCApp < FileCommand
     end
 
     def build
-        raise "Failed" if Artifact.exec('gcloud', app) != 0
+        p = fullpath
+        if File.file?
+
+        else
+
+        end
+
+
+        #raise "Failed" if Artifact.exec('gcloud', app) != 0
     end
 
     def what_it_does() "Deploy google app" end

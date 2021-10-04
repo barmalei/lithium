@@ -8,7 +8,7 @@ class RUBYPATH < Artifact
     log_attr :paths
 
     def assign_me_to
-       :add_rubypath
+       :ruby_paths
     end
 
     def expired?
@@ -46,10 +46,6 @@ class RUBY < EnvArtifact
         end
 
         puts "Ruby home   : '#{@ruby_home}'\n     library: '#{rubypath}'"
-    end
-
-    def add_rubypath(rp)
-        @ruby_paths.push(rp) if @ruby_paths.index(rp).nil?
     end
 
     def rubypath

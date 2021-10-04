@@ -3,6 +3,10 @@ require 'lithium/std-pattern'
 
 $PATTERNS = {}
 
+# keep default std saved
+$STDOUT = $stdout
+$STDERR = $stderr
+
 def PATTERNS(args)
     # normalize keys and values
     args.each_pair { | key, patterns |
@@ -25,8 +29,8 @@ end
 
 # return (line, pattern, match)
 def match_output(art_class, line)
-    parent_class = art_class.nil? ? Artifact : art_class
-    while parent_class do
+    parent_class = art_class
+    while parent_class && parent_class != Object do
         patterns = $PATTERNS[parent_class.name]
         if !patterns.nil? && patterns.length > 0
             patterns.each { | pt |
@@ -155,11 +159,10 @@ class Std
     def expose(msg, level = 0)
         # collect artifact related recognized entities
         cur_art = $current_artifact  # current artifact
-        msg, pt, mt = match_output(cur_art.class, msg)
+        msg, pt, mt = match_output(cur_art == nil ? Artifact : cur_art.class, msg)
         unless mt.nil?
             msg   = pattern_matched(msg, pt, mt)
             level = mt.level if mt.level > level
-
             #STDOUT.puts(mt.to_json)
         end
 

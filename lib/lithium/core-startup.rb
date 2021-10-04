@@ -90,14 +90,16 @@ PATTERNS ({
     ],
 
     [ ValidatePythonScript, RunPythonScript ] => [
-        # '\s*File\s+\"(?<file>${file_pattern}\.py)\"\,\s*line\s+(?<line>[0-9]+)')
         StdPattern.new {
             any('^\s*File\s+'); group(:location) { dquotes { file('py') }; any(',\s*line\s+'); line; }
         }
     ],
 
     [ ValidateRubyScript, RunRubyScript ] => [
-
+        StdPattern.new(2) {
+            any('^\s*from\s+'); location('rb')
+            COMPLETE_PATH()
+        }
     ],
 
     ValidateXML  => [
@@ -174,7 +176,12 @@ PATTERNS ({
 
     Artifact => [
         URLPattern.new,
+        StdPattern.new(2) {
+            any('^\s*from\s+'); location('rb')
+            COMPLETE_PATH()
+        },
         FileLocPattern.new
+
     ]
 })
 

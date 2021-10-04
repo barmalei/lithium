@@ -202,7 +202,7 @@ class StdPattern
     end
 
     def initialize(level = 0, &block)
-        raise "Invalid level" if level.nil?
+        raise 'Invalid level' if level.nil?
         @level, @stack, @matched = level, [], nil
         flush()
         instance_eval(&block) unless block.nil?
@@ -235,6 +235,10 @@ class StdPattern
             :parent => @stack.last
         })
         @groups.last
+    end
+
+    def to_s
+        @re_parts.join()
     end
 
     def _append(pattern, name = nil, &block)
@@ -588,19 +592,9 @@ class URLPattern < StdPattern
     def port?
         group(:port, '\:[0-9]+{2,6}')
         @re_parts.push('?')
-        self
     end
 
     def scheme
         group(:scheme, '(http|https|ftp|ftps|sftp)')
     end
 end
-
-
-# READY {
-#     t = JavaCompiler.new("/Users/brigadir/projects/crystalloids/rituals-core/src/main/java/com/insightos/apps/rituals/supply/DatastoreNotWorkdaysApi.java", Project.current)
-#     t.run_with_parsed_output
-#     tree = ArtifactTree.new(t)
-#     tree.build()
-# }
-

@@ -12,7 +12,7 @@ class JavaClasspath < Artifact
     log_attr :paths
 
     def assign_me_to
-        :add_classpath
+        :classpaths
     end
 
     # keep it to track the artifact logged expiration state
@@ -148,7 +148,7 @@ class InFileClasspath < FileArtifact
     end
 
     def assign_me_to
-        :add_classpath
+        :classpaths
     end
 
     def build()
@@ -191,13 +191,6 @@ class JVM < EnvArtifact
     def initialize(*args, &block)
         @classpaths = []
         super
-    end
-
-    def add_classpath(cp)
-        raise "Invalid class path type: '#{cp.class}'" unless cp.kind_of?(PATHS)
-        # the method can call multiple time for the same instance of the artifact
-        # if there are more than 1 artifact that depends on the artifact
-        @classpaths.push(cp) if @classpaths.index(cp).nil?
     end
 
     def list_classpaths
@@ -256,7 +249,6 @@ class JAVA < JVM
 
     def initialize(*args)
     #REQUIRE(DefaultClasspath) # define class path here to let re-define it with a custom code in super calls
-
         super
 
         # identify Java Home
@@ -410,16 +402,9 @@ end
 
 class RunJavaTool < RunTool
     def initialize(*args)
+        @classpaths ||= []
         REQUIRE JAVA
         super
-    end
-
-    # the method is called when required classpath is specified
-    # (classpath classes are auto assignable artifact that has
-    # to be assigned by add_classpath method)
-    def add_classpath(cp)
-        @classpaths ||= []
-        @classpaths.push(cp)
     end
 
     def classpath

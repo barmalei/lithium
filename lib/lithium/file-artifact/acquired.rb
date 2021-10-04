@@ -3,29 +3,115 @@ require 'pathname'
 
 require 'lithium/core'
 
-module SOURCE
-    include AssignableDependency
+module FileSourcesSupport
+    module FileSource
+        include AssignableDependency
 
-    def assign_me_to
-        :add_source
+        def assign_me_to
+            :sources
+        end
+
+        def relative_from
+            @base ||= nil
+            return @base
+        end
+
+        def BASE(base)
+            @base = base
+            @base = base[0 .. base.length - 1] unless base.nil? || base[-1] != '/'
+            return self
+        end
     end
 
-    def get_base
-        @base ||= nil
-        return @base
+    def BASE(path)
+        @sources ||= []
+        @sources.each { | src |  src.BASE(path) unless src.relative_from.nil? }
     end
 
-    def BASE(base)
-        @base = base
-        @base = base[0 .. base.length - 1] unless base.nil? || base[-1] != '/'
+    def sources(*src)
+        @sources ||= []
+
+        # validate
+        src.each { | s |
+            raise 'Source cannot be nil' if s.nil?
+        }
+
+        @sources = @sources.concat(src) if src.length > 0
         return self
+    end
+
+    # yield files from all registered sources:
+    #   (source, source_path, mtime, dest)
+    # @from  an absolute path to file that has to be used as a part of generation
+    # @as a path under which the given source is expected to handle
+    # @from_mtime modified time of source file
+    def list_sources_items
+        @sources.each { | source |
+            source.list_items { | path, mtime |
+                from = fullpath(path)
+                raise "File '#{from}' cannot be found" unless File.exists?(from)
+
+                dest = destination(source, path, mtime)
+                raise "Absolute path '#{dest}' cannot be used as a relative destination" if File.absolute_path?(dest)
+
+                yield source, from, mtime, dest
+            }
+        }
+    end
+
+    def destination(source, path, mtime)
+        from        = fullpath(path)
+        base        = source.relative_from
+        is_path_dir = File.directory?(from)
+        unless base.nil?
+            dest = Pathname.new(is_path_dir ? path : File.dirname(path)).relative_path_from(Pathname.new(base)).to_s
+            if dest == '.' # relative path completely eats directory from path
+                raise "Invalid relative path detected for '#{path}' by '#{base}' base" if is_path_dir
+                dest = File.basename(path)
+            elsif dest == '/'
+                raise "Invalid relative detected for '#{path}' by '#{base}' points to root!"
+            elsif dest.start_with?('..') # relative path could not be resolved
+                raise "Invalid base path '#{base}'"
+            else
+                dest = is_path_dir ? dest : File.join(dest, File.basename(path))
+            end
+            return dest
+        else
+            return path
+        end
+    end
+
+    def SOURCES(&block)
+        begin
+            @add_as_sources = true
+            self.instance_eval &block
+        ensure
+            @add_as_sources = false
+        end
+    end
+
+    def REQUIRE(art)
+        if @add_as_sources == true
+            raise "Source artifact '#{art.class}:#{art.name}' doesn't implement 'list_items' method" unless art.respond_to?(:list_items)
+
+            unless art.is_a?(FileSource)
+                class << art
+                    include FileSource
+                end
+            end
+        end
+
+        super(art)
     end
 end
 
+class FileMaskSource < FileMask
+    include FileSourcesSupport::FileSource
+end
+
 # file that contains artifacts paths of a composite target artifact
-class MetaSourceFile < FileArtifact
+class MetaFile < ExistentFile
     include LogArtifactState
-    include SOURCE
 
     attr_accessor :validate_items
     log_attr :base
@@ -46,7 +132,7 @@ class MetaSourceFile < FileArtifact
             # read meta file line by line
             File.readlines(fp).each { | item |
                 item = item.strip
-                next if item.length == 0 || item[0,1]=='#'  # skip comment and empty strings
+                next if item.length == 0 || item[0,1] == '#'  # skip comment and empty strings
 
                 files = FileMask.new(item, self.owner)
                 files.list_items(rel) { | path, m |
@@ -71,86 +157,10 @@ class MetaSourceFile < FileArtifact
     end
 end
 
-class FileMaskSource < FileMask
-    include LogArtifactState
-    include SOURCE
-
-    log_attr :base
-
-    def initialize(*args, &block)
-        BASE(args[1]) if args.length > 1
-        @ignore_dirs ||= true
-        super(args[0], &block)
-    end
-
-    def expired?
-        false
-    end
-end
-
-module GENERATED
-    # called every time a new source has been registered
-    def add_source(source)
-        @sources ||= []
-        if source.is_a?(Enumerable)
-            @sources.concat(source)
-        else
-            @sources.push(source)
-        end
-    end
-
-    def sources
-        @sources ||= []
-        return @sources
-    end
-
-    # yield files from all registered sources:
-    #   (from, as, from_mtime)
-    # @from  an absolute path to file that has to be used as a part of generation
-    # @as a path under which the given source is expected to handle
-    # @from_mtime modified time of source file
-    def list_sources_items
-        sources.each { | source |
-            base = source.get_base
-            source.list_items { | path, m |
-                from = fullpath(path)
-                raise "File '#{from}' cannot be found" unless File.exists?(from)
-
-                is_path_dir = File.directory?(from)
-                from_dir    = is_path_dir ? path : File.dirname(path)
-                unless base.nil?
-                    as = Pathname.new(from_dir).relative_path_from(Pathname.new(base)).to_s
-                    if as == '.' # relative path completely eats directory from path
-                        raise "Invalid relative path detected for '#{path}' by '#{base}' base" if is_path_dir
-                        as = File.basename(path)
-                    elsif as == '/'
-                        raise "Invalid relative detected for '#{path}' by '#{base}' points to root!"
-                    elsif as.start_with?('..') # relative path could not be resolved
-                        raise "Invalid base path '#{base}'"
-                    else
-                        as = is_path_dir ? as : File.join(as, File.basename(path))
-                    end
-                else
-                    as = path
-                end
-
-                raise "Absolute path '#{as}' cannot be used as a relative destination" if File.absolute_path?(as)
-                yield from, as, m
-            }
-        }
-    end
-
-    def list_sources_from
-        list_sources_items { | from, as, from_m |
-            yield from, File.exists?(from) ? File.mtime(from).to_i : -1
-        }
-    end
-end
 
 # acquired file artifact
 class GeneratedFile < FileArtifact
-    include OptionsSupport
-    include GENERATED
+    include FileSourcesSupport
 
     def clean
         fp = fullpath
@@ -163,13 +173,10 @@ class GeneratedFile < FileArtifact
     end
 end
 
-class GeneratedDirectory < Directory
-    include OptionsSupport
-    include GENERATED
-end
-
 # Generate directory
-class CopyToDirectory < GeneratedDirectory
+class GeneratedDirectory < Directory
+    include FileSourcesSupport
+
     def initialize(*args, &block)
         @full_copy = false
         super
@@ -185,17 +192,17 @@ class CopyToDirectory < GeneratedDirectory
         fp = fullpath
         if @full_copy == true
             if File.directory?(fp)
-                puts "Remove directory: '#{fp}'"
+                puts "Remove '#{fp}' destination directory"
                 FileUtils.rm_r(fp)
             end
         else
             dirs = { }
-            list_sources_items { | from, as |
+            list_sources_items { | source, from, mtime, as |
                 dest = File.join(fp, as)
                 if File.directory?(from)
-                    raise "Invalid destination directory: '#{dest}'" if File.file?(dest)
+                    raise "Invalid '#{dest}' destination directory" if File.file?(dest)
                     if File.exists?(dest)
-                        puts "Remove directory(s): '#{dest}'"
+                        puts "Remove '#{dest}' destination directory(s)"
                         FileUtils.rm_r(dest)
                     end
                 else
@@ -241,26 +248,26 @@ class CopyToDirectory < GeneratedDirectory
             FileUtils.mkdir_p(fp)
         end
 
-        list_sources_items { | from, as, from_m |
+        list_sources_items { | source, from, mtime, as |
             dest = File.join(fp, as)
             if File.directory?(from)
                 raise "Invalid destination directory '#{dest}'" if File.file?(dest)
                 unless File.exists?(dest)
-                    puts "Create directory: '#{dest}'"
+                    puts "Creating '#{dest}' destination directory"
                     FileUtils.mkdir_p(dest)
                 end
             else
                 unless File.directory?(File.dirname(dest))
                     dest_up = File.dirname(dest)
-                    puts "Create directory '#{dest_up}'"
+                    puts "Creating '#{dest_up}' destination directory"
                     FileUtils.mkdir_p(dest_up)
                 end
 
-                unless File.exists?(dest) && File.mtime(dest).to_i > from_m
+                unless File.exists?(dest) && File.mtime(dest).to_i > mtime
                     if File.exists?(dest)
-                        puts "Update file from: '#{from}'\n            to:   '#{dest}'"
+                        puts "Updating '#{from}'\n    with '#{dest}'"
                     else
-                        puts "Copy file from:   '#{from}'\n            to:   '#{dest}'"
+                        puts "Copying '#{from}'\n     to '#{dest}'"
                     end
                     FileUtils.cp(from, dest)
                 end
@@ -272,39 +279,35 @@ class CopyToDirectory < GeneratedDirectory
 
     def list_items(rel = nil)
         fp = fullpath
-        list_sources_items { | from, as, from_m |
+        list_sources_items { | source, from, mtime, as |
             as_fp = File.join(fp, as) unless File.absolute_path?(as)
             yield as, File.exists?(as_fp) ? File.mtime(as_fp).to_i : -1
         }
-    end
-
-    def list_items_to_array
-        list = []
-        list_items { | path, m |
-            list << path
-        }
-        return list
     end
 
     def expired?
         return true if super
         fp = fullpath
 
-        list_sources_items { | from, as, from_m |
+        list_sources_items { | source, from, mtime, as |
             path = File.join(fp, as)
             return true unless File.exists?(path)
-            return true if from_m > 0 && from_m > File.mtime(path).to_i
+            return true if mtime > 0 && mtime > File.mtime(path).to_i
         }
         return false
     end
 
     def what_it_does
-        "Generate folder '#{@name}' and its content"
+        "Generate folder '#{fullpath}' and its content"
+    end
+
+    def self.abbr
+        'DIR'
     end
 end
 
 # Generated temporary directory
-class CopyToTmpDirectory < CopyToDirectory
+class GeneratedTmpDirectory < GeneratedDirectory
     def initialize(name, &block)
         raise "Absolute path '#{name}' cannot be used" if File.absolute_path?(name)
         dir = Dir.mktmpdir(name)
@@ -315,81 +318,9 @@ class CopyToTmpDirectory < CopyToDirectory
         fp = fullpath
         FileUtils.rm_r(fp) if File.directory?(fp)
     end
-end
-
-module ZipTool
-    def detect_zip
-        @zip_path ||= nil
-        @zip_path = FileArtifact.which('zip') if @zip_path.nil?
-        return @zip_path
-    end
-
-    def detect_zipinfo
-        @zipinfo_path ||= nil
-        @zipinfo_path = FileArtifact.which('zipinfo') if @zipinfo_path.nil?
-        return @zipinfo_path
-    end
-
-    def run_zip(*args)
-        z = detect_zip
-        raise 'zip command line tool cannot be found' if z.nil?
-        return Artifact.exec(*([ z ] << args))
-    end
-
-    def run_zipinfo(*args)
-        zi = detect_zipinfo
-        raise 'zip command line tool cannot be found' if zi.nil?
-        return Artifact.exec(*([ zi ] << args))
-    end
-end
-
-# @sources - FileMask artifacts list that point to files that has to be grabbed for archiving
-class ArchiveFile < GeneratedFile
-    include LogArtifactState
-
-    def build
-        fp  = fullpath
-        raise "File '#{fp}' points to directory" if File.directory?(fp)
-
-        tmp = nil
-        begin
-            tmp = CopyToDirectory.new(File.basename(fp), self.owner) {
-                @full_copy = true
-            }
-            tmp.add_source(sources)
-            ArtifactTree.new(tmp).build
-
-            list = tmp.list_items_to_array()
-            Dir.chdir(tmp.fullpath)
-            raise "Archiving of '#{fp}' has failed" if generate(list) != 0
-        rescue
-            raise
-        ensure
-            tmp.clean() unless tmp.nil?
-        end
-    end
-
-    # called to generate an archive by the given sources files
-    # the current directory is set to temporary folder where
-    # all content to be archived is copied.
-    def generate(src_list)
-        raise 'Not implemented method'
-    end
 
     def what_it_does
-        "Create '#{@name}' archive"
+        "Generate temporary folder '#{fullpath}' and its content"
     end
 end
 
-class ZipFile < ArchiveFile
-    include ZipTool
-
-    def initialize(*args)
-        OPT '-9q'
-        super
-    end
-
-    def generate(src_list)
-        run_zip(OPTS(), "\"#{fullpath}\"", src_list.map { | s | "\"#{s}\"" }. join(' '))
-    end
-end

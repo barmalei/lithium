@@ -1,132 +1,102 @@
-require 'fileutils'
-require 'pathname'
-
 require 'lithium/core'
-require 'lithium/file-artifact/command'
-require 'lithium/file-artifact/acquired'
+require 'lithium/file-artifact/archive'
 require 'lithium/java-artifact/base'
 
-# directory that hosts a JAR file content
-class JarFileContent < FileArtifact
+module JarTool
+    include ZipTool
+
+    def detect_zip
+        @java.jar
+    end
+
+    def detect_unzip
+        @java.jar
+    end
+
+    def detect_zipinfo
+        @java.jar
+    end
+
+    def unzip(archive_path, dest_dir = nil)
+        archive_path = assert_zip_archive(archive_path)
+        args = [ detect_unzip, 'xf', archive_path ]
+        unless dest_dir.nil?
+            raise "Invalid '#{dest_dir}' destination JAR directory" unless File.directory?(dest_dir)
+            args.push('-C', dest_dir)
+        end
+        raise "UnJar '#{archive_path}' file failed" if Artifact.exec(*args).exitstatus != 0
+    end
+
+    def lszip(archive_path, *patterns)
+        archive_path = assert_zip_archive(archive_path)
+        raise 'JAR tool does not support pattern to filter listed archive items' if patterns.length > 0
+        err = Artifact.exec(detect_zipinfo, '-tf', archive_path) { | stdin, stdout, th |
+            stdin.close()
+            stdout.read.split("\n").each { | path |
+                yield File.join(base, path) unless path.end_with?('/..') ||  path.end_with?('/.')
+            }
+        }
+
+        raise "List JAR '#{archive_path}' file failed" if err.exitstatus != 11 && err.exitstatus != 0
+    end
+
+    def zip(archive_path, *files)
+        raise "There is no any files to be archived in '#{archive_path}' have been specified" if files.length == 0
+
+        # detect manifest file
+        manifest_file = files.find { | path |
+            File.basename(path) == 'MANIFEST.MF'
+        }
+
+        args = [ detect_zip ]
+        if manifest_file.nil?
+            args.push('vcf', "\"#{archive_path}\"")
+        else
+            args.push('vcfm', "\"#{archive_path}\"", "\"#{manifest_file}\"")
+            files = files.filter { | path |
+                File.basename(path) != 'MANIFEST.MF'
+            }
+        end
+        args.push("-C \"#{Dir.pwd}\"")
+        args = args.concat(files.map { | p | "\"#{p}\"" })
+        raise "JAR '#{archive_path}' file cannot be created" if Artifact.exec(*args).exitstatus != 0
+    end
+end
+
+
+# visualize a JAR file content making it available for copying via a
+# virtual directory
+class JarFileContent < ArchiveFileContent
+    include JarTool
+
     def initialize(*args, &block)
         REQUIRE JAVA
         super
-        @source ||= $lithium_args[0]
-    end
-
-    def expired?
-        true
-    end
-
-    def build
-        raise 'Invalid source file' if @source.nil?
-
-        source_path = @source
-        source_path = fullpath(source_path) unless File.absolute_path?(source_path)
-        raise "Source file '#{source_path}' is invalid" unless File.file?(source_path)
-
-        fp = fullpath
-        FileUtils.mkdir_p(fp) unless File.exists?(fp)
-        Dir.chdir(fp)
-        `#{@java.jar} -xfv '#{source_path}'`.each_line { |i|
-            puts " :: #{i.chomp}"
-        }
     end
 
     def what_it_does
-        "Extract '#{@source}' JAR content into '#{@name}' directory"
+        "Represent '#{fullpath}' JAR file content"
+    end
+
+    def self.abbr
+        'JRC'
     end
 end
 
-class FindInZip < FileMask
-    include ZipTool
-
-    attr_accessor  :pattern
-
-    def initialize(*args)
-        REQUIRE JAVA
-        super
-        @pattern ||= $lithium_args[0]
-    end
-
-    def build
-        raise 'Class name cannot be detected' if @pattern.nil?
-
-        c  = 0
-        hd = homedir
-        mt = @pattern
-
-        # detect if class name is regexp
-        mt = Regexp.new(@pattern) unless @pattern.index(/[\*\?\[\]\{\}\^]/).nil?
-
-        zi = detect_zipinfo
-        list_items { | path, m |
-            fp = fullpath(path)
-            unless zi.nil?
-                FindInZip.find_with_zipinfo(zi, fp, mt) { | found |
-                    puts "    #{Pathname.new(fp).relative_path_from(Pathname.new(hd))} : #{found}"
-                    c += 1
-                }
-            else
-                FindInZip.find_with_jar(@java.jar, fp, mt) { | found |
-                    puts "    #{Pathname.new(fp).relative_path_from(Pathname.new(hd))} : #{found}"
-                    c += 1
-                }
-            end
-        }
-        puts_warning "No a class whose name matches '#{@pattern}' was found" if c == 0
-    end
-
-    def FindInZip.find_with_jar(jar, jar_path, match)
-        `#{jar} -ft '#{jar_path}'`.each_line { |item|
-            yield item.chomp unless item.chomp.index(match).nil?
-        }
-    end
-
-    def FindInZip.find_with_zipinfo(zi, jar_path, match)
-        IO.popen([zi, '-1',  jar_path, :err=>[:child, :out]]) { | stdout |
-            begin
-                stdout.each { |line|
-                    yield line.chomp unless line.chomp.index(match).nil?
-                }
-            rescue Errno::EIO
-                puts_warning 'Java version cannot be detected'
-            end
-        }
-    end
-
-    def what_it_does() "Search '#{@pattern}' in '#{@name}' archive " end
-end
-
-
+# generate JAR file
 class JarFile < ArchiveFile
-    log_attr :manifest
+    include JarTool
 
     def initialize(*args)
         REQUIRE JAVA
         super
-        OPTS 'vcf'
-    end
-
-    def MANIFEST(manifest)
-        manifest = fullpath(manifest)
-        raise "Manifest file '#{manifest}' is a directory or doesn't exist"  unless File.file?(manifest)
-        @manifest = manifest
-        OPTS 'vcfm'
     end
 
     def generate(list)
-        fp  = fullpath
-        cmd = [
-            @java.jar,
-            OPTS(),
-            "\"#{fp}\"",
-            self.manifest.nil? ? '' : "\"#{self.manifest}\"",
-            "-C \"#{Dir.pwd}\"",
-            list.map { | s | "\"#{s}\"" }.join(' ')
-        ]
-        return Artifact.exec(*cmd)
+        zip(fullpath, *list)
     end
 
-    def self.abbr() 'JAR' end
+    def self.abbr()
+        'JAR'
+    end
 end

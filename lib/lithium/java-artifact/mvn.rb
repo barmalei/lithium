@@ -112,15 +112,16 @@ class MavenClasspath < InFileClasspath
     end
 
     def build
-        Dir.chdir(File.dirname(@pom.fullpath))
-        raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
-            @mvn.mvn,
-            "dependency:build-classpath",
-            "-DexcludeTransitive=#{@excludeTransitive}",
-            @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
-            "-Dmdep.outputFile=\"#{fullpath}\""
-        )
-        super
+        chdir(File.dirname(@pom.fullpath)) {
+            raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
+                @mvn.mvn,
+                "dependency:build-classpath",
+                "-DexcludeTransitive=#{@excludeTransitive}",
+                @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
+                "-Dmdep.outputFile=\"#{fullpath}\""
+            )
+            super
+        }
     end
 
     def what_it_does
@@ -153,14 +154,15 @@ class MavenDependenciesDir < FileArtifact
     end
 
     def build()
-        Dir.chdir(File.dirname(@pom.fullpath))
-        raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
-            @mvn.mvn,
-           "dependency:copy-dependencies",
-           "-DexcludeTransitive=#{@excludeTransitive}",
-           @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
-           "-DoutputDirectory=#{fullpath}"
-        )
+        chdir(File.dirname(@pom.fullpath)) {
+            raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
+                @mvn.mvn,
+               "dependency:copy-dependencies",
+               "-DexcludeTransitive=#{@excludeTransitive}",
+               @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
+               "-DoutputDirectory=#{fullpath}"
+            )
+        }
     end
 end
 
@@ -186,8 +188,9 @@ class RunMaven < PomFile
     def build()
         path = fullpath()
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
-        Dir.chdir(File.dirname(path));
-        raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')) != 0
+        chdir(File.dirname(path)) {
+            raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')) != 0
+        }
     end
 
     def what_it_does() 

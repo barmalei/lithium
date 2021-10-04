@@ -86,7 +86,7 @@ module LogArtifactState
             @logged_attrs ||= []
             @logged_attrs += args
 
-            # check if attribute accessor method has not been already defined with a class
+            # check if attribute reader method has not been already defined with a class
             # and define it if it doesn't
             args.each { | arg |
                 attr_accessor arg unless method_defined?(arg)
@@ -122,8 +122,8 @@ module LogArtifactState
 
     # extend class the module included with  "logged_attrs" class method
     def self.included(clazz)
-        super
-        clazz.extend(LoggedAttrs)
+       super
+       clazz.extend(LoggedAttrs)
     end
 
     #############################################################
@@ -362,7 +362,9 @@ module LogArtifactState
         true
     end
 
-    def attrs_log_path() items_log_path() + ".ser" end
+    def attrs_log_path
+        items_log_path() + ".ser"
+    end
 end
 
 # Option support
@@ -600,19 +602,12 @@ class Artifact
         return @default_name
     end
 
-    # stub class to perform chain-able calls
-    class AssignRequiredTo
-        def initialize(item) @item = item end
-        def TO(an) @item[1] = an; return self end
-        def OWN() @item[2] = true; return self end
-    end
-
     # !!! this method creates wrapped with context class artifact
     # !!! to keep track for the current context (instance
     # !!! where a method has been executed)
     def Artifact.new(*args,  &block)
         instance = allocate()
-        name     = args.length > 0 && !args[0].kind_of?(Artifact)  ? args[0]  : nil
+        name     = args.length > 0 && !args[0].kind_of?(Artifact)           ? args[0]  : nil
         owner    = args.length > 0 &&  args[-1].kind_of?(ArtifactContainer) ? args[-1] : nil
 
         # setup owner before hand
@@ -627,7 +622,7 @@ class Artifact
         # if artifact name has not been passed let's try to use default one
         if name.nil?
             args = args.dup()
-            args.insert(0, instance.class.default_name )
+            args.insert(0, instance.class.default_name)
         end
 
         # call instance proxy constructor to be able to track caller stack if a
@@ -647,6 +642,7 @@ class Artifact
         self.instance_eval(&block) if block
     end
 
+    # top owner (container) artifact
     def top
         ow = self
         while !ow.owner.nil? do
@@ -704,7 +700,7 @@ class Artifact
     end
 
     # return cloned array of the artifact dependencies
-    # yield  (dep, assignMeTo, is_own, block)
+    # yield  (dep, is_own, block)
     def requires
         @requires ||= []
         req = @requires
@@ -728,7 +724,7 @@ class Artifact
         }.reverse
 
         req.each { | dep |
-            yield dep[0], dep[1], dep[2], dep[3]
+            yield dep[0], dep[1], dep[2]
         }
     end
 
@@ -755,6 +751,11 @@ class Artifact
 
     def to_s() shortname end
 
+
+    def call(&block)
+        self.instance_eval &block
+    end
+
     # add required for the artifact building dependencies (other artifact)
     # art   - name of artifact or instance of artifact
     # block - custom block for artifact or if art is nil block is build method for
@@ -768,12 +769,13 @@ class Artifact
             # build custom artifact that run the given block as build method
             init_name = File.join(self.name, '/#INIT-' + block.object_id.to_s)
             art = Artifact.new(init_name, _detect_required_owner(), &block)
-            @requires.push([art, nil, false, nil])
+            @requires.push([art, false, nil])
         else
-            @requires.push([art, nil, false, block])
+            @requires.push([art, false, block])
         end
 
-        return AssignRequiredTo.new(@requires[-1])
+        # return artifact itself
+        @requires[-1][0]
     end
 
     def DISMISS(art)
@@ -829,22 +831,6 @@ class Artifact
             return thread.value
         }
     end
-
-    # build artifact including all its dependencies
-    # @name name of artifact to be built
-    # @caller_art an artifact that initiated the build
-    def Artifact.build(name, caller_art,  &block)
-        if caller_art.nil?
-            owner = nil
-        else
-            owner = caller_art.kind_of?(ArtifactContainer) ?  caller_art : caller_art.owner
-        end
-
-        art  = self.new(name, owner, &block)
-        tree = ArtifactTree.new(art)
-        tree.build()
-        return tree.art
-    end
 end
 
 # Artifact tree. Provides tree of artifacts that is built basing
@@ -871,10 +857,10 @@ class ArtifactTree
     def build_tree(map = [])
         bt = @art.mtime()
 
-        @art.requires { | dep, assignMeTo, is_own, block |
+        @art.requires { | dep, is_own, block |
             foundNode, node = nil, ArtifactTree.new(dep, self, &block)
 
-            if block.nil?  # requires with a custom block cannot be removed from build tree
+            if block.nil?  # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
                 # optimize tree to exclude dependencies that are already in the tree
                 foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
 
@@ -902,32 +888,24 @@ class ArtifactTree
             # has to be placed before recursive build tree method call
             node.art.owner = @art.owner if is_own == true
 
-            #  resolve assign_me_to  property that says to which property the instance pf the
+            #  resolve assign_me_to  property that says to which property the instance of the
             #  dependent artifact has to be assigned
-            if assignMeTo.nil?
-                if node.art.class < AssignableDependency
-                    assignMeTo = node.art.assign_me_to
-                    raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
-                end
-            end
+            if node.art.is_a?(AssignableDependency)
+                assignMeTo = node.art.assign_me_to
+                raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
 
-            unless assignMeTo.nil?
-                if @art.respond_to?(assignMeTo.to_sym)
-                    @art.send(assignMeTo.to_sym, node.art)
-                else
-                    asn = "@#{assignMeTo}".to_sym
-                    av  = @art.instance_variable_get(asn)
-                    if av.kind_of?(Array)
-                        # check if the artifact is already in
-                        found = av.detect { | art | node.art.object_id == art.object_id }
+                asn = "@#{assignMeTo}".to_sym
+                av  = @art.instance_variable_get(asn)
+                if av.kind_of?(Array)
+                    # check if the artifact is already in
+                    found = av.detect { | art | node.art.object_id == art.object_id }
 
-                        if found.nil?
-                            av.push(node.art)
-                            @art.instance_variable_set(asn, av)
-                        end
-                    else
-                        @art.instance_variable_set(asn, node.art)
+                    if found.nil?
+                        av.push(node.art)
+                        @art.instance_variable_set(asn, av)
                     end
+                else
+                    @art.instance_variable_set(asn, node.art)
                 end
             end
 
@@ -950,28 +928,29 @@ class ArtifactTree
         unless @expired
             @art.instance_eval(&@art.ignored) unless @art.ignored.nil?
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
-        else
-            @children.each { | node | node.build() }
-            prev_art = $current_artifact
+            return
+        end
 
-            begin
-                $current_artifact = @art
-                wid = @art.what_it_does()
-                puts wid unless wid.nil?
-                @art.pre_build()
-                @art.build()
-                @art.instance_eval(&@art.done) unless @art.done.nil?
+        @children.each { | node | node.build() }
+        prev_art = $current_artifact
 
-                @art.build_done()
-            rescue
-                @art.build_failed()
-                level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
-                puts_exception($!, 0) if level == 0
-                puts_exception($!, 3) if level == 1
-                raise                 if level == 2
-            ensure
-                $current_artifact = prev_art
-            end
+        begin
+            $current_artifact = @art
+            wid = @art.what_it_does()
+            puts wid unless wid.nil?
+            @art.pre_build()
+            @art.build()
+            @art.instance_eval(&@art.done) unless @art.done.nil?
+
+            @art.build_done()
+        rescue
+            @art.build_failed()
+            level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
+            puts_exception($!, 0) if level == 0
+            puts_exception($!, 3) if level == 1
+            raise                 if level == 2
+        ensure
+            $current_artifact = prev_art
         end
     end
 
@@ -983,6 +962,14 @@ class ArtifactTree
     end
 
     def what_it_does() "Build '#{@name}' artifact dependencies tree" end
+
+
+    def self.build(art)
+        art = Project.artifact(art) unless art.is_a?(Artifact)
+        tree = ArtifactTree.new(art)
+        tree.build()
+        return art
+    end
 end
 
 #  Base file artifact
@@ -1011,8 +998,22 @@ class FileArtifact < Artifact
         end
     end
 
-    def go_to_homedir
-        Dir.chdir(homedir)
+    def go_to_homedir(&block)
+        chdir(homedir, &block)
+    end
+
+    def chdir(dir, &block)
+        if block.nil?
+            Dir.chdir(dir)
+        else
+            pwd = Dir.pwd
+            begin
+                Dir.chdir(dir)
+                block.call
+            ensure
+                Dir.chdir(pwd) unless pwd.nil?
+            end
+        end
     end
 
     # return path that is relative to the artifact homedir
@@ -1079,13 +1080,21 @@ class FileArtifact < Artifact
         }
     end
 
-    def list_items
+    def list_items(rel = nil)
         fp = fullpath
         if File.exists?(fp)
             yield fp, File.mtime(fp).to_i
         else
             yield fp, -1
         end
+    end
+
+    def list_items_to_array(rel = nil)
+        list = []
+        list_items(rel) { | path, m |
+            list << path
+        }
+        return list
     end
 
     def search(path)
@@ -1425,6 +1434,11 @@ class Directory < FileArtifact
         raise "File '#{fp}' is not a directory" if File.file?(fp)
     end
 
+    def mkdir
+        FileUtils.mkdir_p(fullpath) unless File.exists?(fullpath)
+    end
+
+    # return itself as a single item
     def list_items
         go_to_homedir()
         Dir[@name].each { | path |
@@ -1433,6 +1447,31 @@ class Directory < FileArtifact
         }
     end
 end
+
+# Directory content artifact
+class DirectoryContent < Directory
+    include LogArtifactState
+
+    def expired?
+        !File.directory?(fullpath)
+    end
+
+    def build()
+        super
+        fp = fullpath
+        raise "File '#{fp}' is not a directory" if File.file?(fp)
+    end
+
+    # return itself as a single item
+    def list_items
+        go_to_homedir()
+        Dir[File.join(@name, '*')].each { | path |
+            mt = File.mtime(path).to_i
+            yield path, mt
+        }
+    end
+end
+
 
 class ExistentDirectory < FileArtifact
     def build()
@@ -1465,15 +1504,6 @@ class FileMask < FileArtifact
 
     # called for every detected item as a part of build process
     def build_item(path, m) end
-
-    # list items to array
-    def list_items_to_array(rel = nil)
-        list = []
-        list_items(rel) { | path, m |
-            list << path
-        }
-        return list
-    end
 
     # List items basing on the mask returns items relatively to the
     # passed path
@@ -1853,7 +1883,7 @@ module ArtifactContainer
     end
 
     def delegate_to_owner_if_meta_cannot_be_found?
-        return false
+        false
     end
 end
 
@@ -1862,7 +1892,7 @@ class FileMaskContainer < FileMask
     include ArtifactContainer
 
     def delegate_to_owner_if_meta_cannot_be_found?
-        return true
+        true
     end
 end
 
@@ -1897,10 +1927,15 @@ class Project < ExistentDirectory
         @@curent_project.artifact(name, &block)
     end
 
+    def self.PROJECT(&block)
+        raise "Current project is not known" if self.current.nil?
+        self.current.instance_eval &block
+    end
+
     def self.build(name)
         raise 'Current project cannot be detected' if @@curent_project.nil?
 
-        # # build current project
+        # build current project
         tree = ArtifactTree.new(@@curent_project)
         tree.build()
 
@@ -2136,6 +2171,13 @@ module PATHS
 
     def EMPTY?
         return paths().length == 0
+    end
+
+    def list_items
+        @paths ||= []
+        @paths.each {  | p |
+            yield p, -1
+        }
     end
 
     def to_s(*args)
