@@ -602,13 +602,6 @@ class Artifact
         return @default_name
     end
 
-    # stub class to perform chain-able calls
-    class AssignRequiredTo
-        def initialize(item) @item = item end
-        def TO(an) @item[1] = an; return self end
-        def OWN() @item[2] = true; return self end
-    end
-
     # !!! this method creates wrapped with context class artifact
     # !!! to keep track for the current context (instance
     # !!! where a method has been executed)
@@ -781,7 +774,8 @@ class Artifact
             @requires.push([art, nil, false, block])
         end
 
-        return AssignRequiredTo.new(@requires[-1])
+        # return artifact itself
+        @requires[-1][0]
     end
 
     def DISMISS(art)
@@ -866,7 +860,7 @@ class ArtifactTree
         @art.requires { | dep, assignMeTo, is_own, block |
             foundNode, node = nil, ArtifactTree.new(dep, self, &block)
 
-            if block.nil?  # requires with a custom block cannot be removed from build tree
+            if block.nil?  # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
                 # optimize tree to exclude dependencies that are already in the tree
                 foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
 
@@ -896,14 +890,10 @@ class ArtifactTree
 
             #  resolve assign_me_to  property that says to which property the instance of the
             #  dependent artifact has to be assigned
-            if assignMeTo.nil?
-                if node.art.class < AssignableDependency
-                    assignMeTo = node.art.assign_me_to
-                    raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
-                end
-            end
+            if node.art.is_a?(AssignableDependency)
+                assignMeTo = node.art.assign_me_to
+                raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
 
-            unless assignMeTo.nil?
                 if @art.respond_to?(assignMeTo.to_sym)
                     @art.send(assignMeTo.to_sym, node.art)
                 else

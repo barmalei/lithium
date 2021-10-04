@@ -159,11 +159,10 @@ class Std
     def expose(msg, level = 0)
         # collect artifact related recognized entities
         cur_art = $current_artifact  # current artifact
-        msg, pt, mt = match_output(cur_art.class, msg)
+        msg, pt, mt = match_output(cur_art == nil ? Artifact : cur_art.class, msg)
         unless mt.nil?
             msg   = pattern_matched(msg, pt, mt)
             level = mt.level if mt.level > level
-
             #STDOUT.puts(mt.to_json)
         end
 

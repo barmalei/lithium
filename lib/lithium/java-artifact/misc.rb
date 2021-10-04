@@ -36,7 +36,7 @@ class GenerateJavaDoc < RunJavaTool
     def self.abbr() 'JDC' end
 end
 
-class LithiumJavaToolRunner < JavaFileRunner
+class LithiumJavaToolRunner < RunJavaTool
     @java_tool_command_name = 'Unknown java tool command'
 
     def self.java_tool_command_name
@@ -47,6 +47,10 @@ class LithiumJavaToolRunner < JavaFileRunner
         base = File.join($lithium_code, 'ext', 'java', 'lithium')
         super.JOIN(File.join(base, 'classes'))
              .JOIN(File.join(base, 'lib/*.jar'))
+    end
+
+    def run_with
+        @java.java
     end
 
     def run_with_target(src)
