@@ -8,7 +8,7 @@ require 'lithium/std-custom'
 
 require 'lithium/java-artifact/compiler'
 require 'lithium/java-artifact/runner'
-require 'lithium/file-artifact/archive'
+#require 'lithium/file-artifact/archive'
 require 'lithium/java-artifact/jar'
 require 'lithium/java-artifact/misc'
 require 'lithium/java-artifact/checkstyle'
