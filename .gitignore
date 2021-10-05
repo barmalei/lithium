@@ -1,6 +1,11 @@
 .logs
 classes
-tools
+ext/java/checkstyle
+ext/java/pmd
+ext/java/junit
+ext/java/jdt
+ext/java/jsonschema2pojo
 examples
 exa mples
 tmp
+vs/

@@ -130,7 +130,7 @@ class FindInClasspath < FileCommand
     def what_it_does() "Looking for '#{@target}' in classpath" end
 end
 
-# TODO: the name is almost similiar to prev class name, a bit cinfusion.
+# TODO: the name is almost similar to prev class name, a bit confusion.
 class FindClassInClasspath < FindInClasspath
     def initialize(*args)
         super
@@ -158,24 +158,4 @@ class FindClassInClasspath < FindInClasspath
     end
 
     def self.abbr() 'FCC' end
-end
-
-def SyncWarClasses(art, war_path)
-    war_dir  = File.dirname(war_path)
-    war_path = File.join($lithium_options['app_server_root'], war_path) if war_dir.nil? || war_dir == '.'
-
-    raise "Invalid WAR path '#{war_path}'" unless File.directory?(war_path)
-    dest = File.join(war_path, 'WEB-INF', 'classes')
-    raise "Invalid WAR classpath path '#{dest}'" unless File.directory?(dest)
-
-    art.list_dest_paths { | path, pkg |
-        puts "Copy '#{path}' to '#{dest}'"
-
-        FileArtifact.cpfile(path,
-            File.join(dest, pkg.gsub('.', '/'))
-        )
-    }
-
-    Touch.touch(File.join(war_path, 'WEB-INF', 'web.xml'))
-    Touch.touch(File.join(war_path, '..', "#{File.basename(war_path)}.deployed"))
 end

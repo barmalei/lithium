@@ -18,15 +18,17 @@
 
     RunMaven('mvn:*')
 
-    CopyToDirectory("test") {
+    GeneratedDirectory("test") {
         @full_copy = true
-        FileMaskSource('.lithium/lib/*')
-        FileMaskSource('classes/com/**/*')
-        MetaSourceFile('.lithium/meta/test.dir')
+        FileMask('.lithium/lib/*')
+        FileMask('classes/com/**/*')
+        MetaFile('.lithium/meta/test.dir')
     }
 
     ZipFile("test.zip") {
-        FileMaskSource('.lithium/lib/*', '.lithium/lib')
+        SOURCES {
+            FileMask('.lithium/lib/*').BASE('.lithium/lib')
+        }
     }
 
     JarFile("test.jar") {
