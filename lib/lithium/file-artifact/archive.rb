@@ -47,7 +47,7 @@ module ZipTool
 
         err = Artifact.exec(*args) { | stdin, stdout, th |
             stdout.each { | line |
-                yield line if patterns.length == 0 || !line.start_with?('caution:')
+                yield line.chomp if patterns.length == 0 || !line.start_with?('caution:')
             }
         }
 
@@ -77,7 +77,7 @@ class FindInZip < FileMask
         raise 'No any archive pattern has been defined' if @patterns.nil? || @patterns.length == 0
         counter = 0
         find(*(@patterns)) { | rel_path, zip_item_path |
-            puts "    #{rel_path} : #{zip_item_path}"
+            puts "    [#{rel_path} => #{zip_item_path}]"
             counter += 1
         }
 
