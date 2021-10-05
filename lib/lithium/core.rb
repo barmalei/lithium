@@ -700,7 +700,7 @@ class Artifact
     end
 
     # return cloned array of the artifact dependencies
-    # yield  (dep, assignMeTo, is_own, block)
+    # yield  (dep, is_own, block)
     def requires
         @requires ||= []
         req = @requires
@@ -724,7 +724,7 @@ class Artifact
         }.reverse
 
         req.each { | dep |
-            yield dep[0], dep[1], dep[2], dep[3]
+            yield dep[0], dep[1], dep[2]
         }
     end
 
@@ -769,9 +769,9 @@ class Artifact
             # build custom artifact that run the given block as build method
             init_name = File.join(self.name, '/#INIT-' + block.object_id.to_s)
             art = Artifact.new(init_name, _detect_required_owner(), &block)
-            @requires.push([art, nil, false, nil])
+            @requires.push([art, false, nil])
         else
-            @requires.push([art, nil, false, block])
+            @requires.push([art, false, block])
         end
 
         # return artifact itself
@@ -857,7 +857,7 @@ class ArtifactTree
     def build_tree(map = [])
         bt = @art.mtime()
 
-        @art.requires { | dep, assignMeTo, is_own, block |
+        @art.requires { | dep, is_own, block |
             foundNode, node = nil, ArtifactTree.new(dep, self, &block)
 
             if block.nil?  # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
@@ -2172,6 +2172,13 @@ module PATHS
 
     def EMPTY?
         return paths().length == 0
+    end
+
+    def list_items
+        @paths ||= []
+        @paths.each {  | p |
+            yield p, 1
+        }
     end
 
     def to_s(*args)
