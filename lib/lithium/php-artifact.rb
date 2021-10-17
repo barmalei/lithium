@@ -4,7 +4,7 @@ require 'lithium/file-artifact/command'
 class RunPhpScript < FileCommand
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         OPTS('-f')
         super
     end
@@ -22,7 +22,7 @@ end
 class ValidatePhpScript < FileMask
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         OPTS('-l', '-f')
         super
     end

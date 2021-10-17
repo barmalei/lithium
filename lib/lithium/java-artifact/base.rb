@@ -29,7 +29,7 @@ class JavaClasspath < Artifact
 end
 
 class DefaultClasspath < JavaClasspath
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         # if a user defines its own customization block ignore classpath auto-detection
         if block.nil?
@@ -43,7 +43,7 @@ class DefaultClasspath < JavaClasspath
 end
 
 class WarClasspath < JavaClasspath
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         base_lib = File.join(path_base_dir, 'WEB-INF')
         JOIN(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
@@ -54,7 +54,7 @@ end
 class WildflyWarClasspath < WarClasspath
     attr_reader :modules_path
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         @modules_path = FileArtifact.look_directory_up(project.homedir, 'modules')
         raise 'Invalid NIL WildFly module path' if modules_path.nil?
         raise "Invalid WildFly module path '#{@modules_path}'" unless File.directory?(@modules_path)
@@ -140,7 +140,7 @@ class InFileClasspath < FileArtifact
 
     log_attr :exclude
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         fp = fullpath
         @exclude ||= []
@@ -186,9 +186,9 @@ end
 class JVM < EnvArtifact
     include LogArtifactState
 
-    attr_reader :classpaths
+    attr_reader :classpaths # array of PATHS instances
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         @classpaths = []
         super
     end
@@ -254,8 +254,7 @@ class JAVA < JVM
 
     log_attr :java_home, :jdk_home, :java_version, :java_version_low, :java_version_high
 
-    def initialize(*args)
-    #REQUIRE(DefaultClasspath) # define class path here to let re-define it with a custom code in super calls
+    def initialize(name, &block)
         super
 
         # identify Java Home
@@ -330,7 +329,7 @@ class GROOVY < JVM
 
     log_attr :groovy_home
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         unless @groovy_home
@@ -348,7 +347,7 @@ end
 
 
 class KotlinClasspath < JavaClasspath
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         raise 'Kotlin home is not defined' if @kotlin_home.nil?
         raise "Kotlin home '#{@kotlin_home}' is invalid" unless File.directory?(@kotlin_home)
@@ -365,7 +364,7 @@ class KOTLIN < JVM
 
     log_attr :kotlin_home
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
         kotlinc_path = @kotlin_home
         unless @kotlin_home
@@ -389,7 +388,7 @@ class SCALA < JVM
 
     log_attr :scala_home
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         unless @scala_home
@@ -408,7 +407,9 @@ end
 
 
 class RunJavaTool < RunTool
-    def initialize(*args)
+    attr_reader :classpaths
+
+    def initialize(name, &block)
         REQUIRE JAVA
         super
     end

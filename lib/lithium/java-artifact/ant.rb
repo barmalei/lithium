@@ -10,7 +10,7 @@ class ANT < EnvArtifact
 
     log_attr :ant_home
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         unless @ant_home

@@ -66,9 +66,9 @@ end
 class FindInZip < FileMask
     include ZipTool
 
-    attr_accessor  :patterns
+    attr_accessor :patterns
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @patterns ||= $lithium_args.dup
     end
@@ -113,7 +113,7 @@ class ArchiveFile < GeneratedFile
 
         tmp = nil
         begin
-            tmp = GeneratedTmpDirectory.new(File.basename(fp), self.owner) {
+            tmp = GeneratedTmpDirectory.new(File.basename(fp), owner:self.owner) {
                 @full_copy = true
             }
             tmp.sources(*@sources)
@@ -169,7 +169,7 @@ class ArchiveFileContent < FileArtifact
     include ZipTool
     include FileSourcesSupport::FileSource
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         @vs_directory = File.join(homedir, vs_home())
         @base = vs_home()

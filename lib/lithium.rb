@@ -45,7 +45,7 @@ unless artifact_path.nil?
 
     if artifact_path == '.' || artifact_path == './'
         artifact_path = basedir
-    elsif artifact_path.start_with?('./')
+    elsif artifact_path.start_with?('./') || artifact_path.start_with?('../')
         artifact_path = File.join(basedir, artifact_path)
     end
 

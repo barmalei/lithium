@@ -11,6 +11,12 @@
     #     }
     # }
 
+    JAVA {
+        DefaultClasspath {
+            JOIN('.lithium/ext/java/lithium/classes')
+        }
+    }
+
 
     Touch('touch:*')
 

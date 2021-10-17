@@ -20,7 +20,7 @@ class RUBYPATH < Artifact
 end
 
 class DefaultRubypath < RUBYPATH
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         JOIN('lib') if block.nil? && File.exists?(File.join(path_base_dir, 'lib'))
     end
@@ -33,7 +33,7 @@ class RUBY < EnvArtifact
 
     log_attr :ruby_home
 
-    def initialize(name)
+    def initialize(name, &block)
         @ruby_paths = []
         REQUIRE DefaultRubypath
         super
@@ -67,7 +67,7 @@ end
 class RunRubyScript < FileCommand
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE RUBY
         super
     end
@@ -104,7 +104,7 @@ end
 class ValidateRubyScript < FileMask
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE RUBY
         OPT '-wc'
         super

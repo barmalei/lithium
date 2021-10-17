@@ -15,7 +15,7 @@ class JS < EnvArtifact
 
     attr_reader :nodejs, :npm
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         @nodejs ||= FileArtifact.which('node')
@@ -50,14 +50,15 @@ end
 
 # nodejs module
 class NodejsModule < FileArtifact
-    def initialize(name, &block)
+    def initialize(name ,&block)
         REQUIRE JS
 
         unless File.absolute_path?(name)
             bn = File.basename(File.dirname(name))
             name = File.join($NODEJS_MODULES_DIR, name) if bn != $NODEJS_MODULES_DIR
         end
-        super(name, &block)
+
+        super
 
         bn = File.basename(File.dirname(fullpath))
         if bn != $NODEJS_MODULES_DIR
@@ -92,7 +93,7 @@ end
 class RunNodejs < FileCommand
     include OptionsSupport
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE JS
         super
     end
@@ -111,7 +112,7 @@ end
 # nodejs uglyfier
 # @name : name of the uglified file
 class UglifiedJSFile < GeneratedFile
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE JS
         NodejsModule('uglify-js')
         super
@@ -190,7 +191,7 @@ class CombinedJSFile < GeneratedFile
 end
 
 class JavaScriptDoc < FileArtifact
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE JS
         super
         @config   ||= nil
@@ -252,7 +253,7 @@ end
 class TypeScriptCompiler < FileMask
     include OptionsSupport
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE JS
         super
     end
@@ -269,7 +270,7 @@ end
 
 
 class JavaScriptHint < FileMask
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE JS
         super
     end

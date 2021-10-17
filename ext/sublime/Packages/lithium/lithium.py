@@ -1461,8 +1461,8 @@ class liCompleteImportCommand(liJavaTextCommand):
                 try:
                     self.found_items = []
                     self.edit        = edit
-                    print("FindClassInClasspath:\"%s\" %s.class" % (li_home, self.word))
-                    self.process     = li_run("FindClassInClasspath:\"%s\" %s.class" % (li_home, "*/" + self.word), self.output, self.error, False)
+                    print("FindInClasspath:\"%s\" %s.class" % (li_home, self.word))
+                    self.process     = li_run("FindInClasspath:\"%s\" %s.class" % (os.path.join(li_home, ".env", "JAVA"), "*/" + self.word), self.output, self.error, False)
 
                 except Exception as ex:
                     self.process = None

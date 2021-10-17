@@ -5,7 +5,7 @@ require 'lithium/java-artifact/runner'
 class CPP < EnvArtifact
     include AutoRegisteredArtifact
 
-    def initialize(*args)
+    def initialize(name)
         @create_destination = true
         super
         @destination ||= 'bin'
@@ -33,7 +33,7 @@ class CPP < EnvArtifact
 end
 
 class CppRunTool < RunTool
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE CPP
         super
     end
@@ -44,7 +44,7 @@ class CppRunTool < RunTool
 end
 
 class CppCompiler < CppRunTool
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         @run_with ||= 'c++'
     end
@@ -60,7 +60,7 @@ class CppCompiler < CppRunTool
 end
 
 class CppCodeRunner < CppRunTool
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         @run_with ||= 'exec'
     end
@@ -74,7 +74,7 @@ end
 
 
 class RunMakefile < RunTool
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         @targets ||= []
     end

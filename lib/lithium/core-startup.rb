@@ -232,13 +232,13 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     end
 
     # load projects hierarchy artifacts
-    prjs_stack.each { | prj_home | prj = Project.new(prj_home, prj) }
+    prjs_stack.each { | prj_home | prj = Project.new(prj_home, owner:prj) }
 
     # reg self registered artifact in lithium project if they have not been defined yet
     top_prj = prj.top
     AutoRegisteredArtifact.artifact_classes.each { | clazz |
         meta = ArtifactName.new(clazz)
-        top_prj.ARTIFACT(meta) if prj.find_meta(meta).nil?
+        top_prj.DEFINE(meta) if prj.find_meta(meta).nil?
     }
 
     # print header

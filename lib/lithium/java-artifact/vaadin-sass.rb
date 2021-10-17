@@ -2,7 +2,7 @@ require 'lithium/java-artifact/runner'
 
 
 class BuildVaadinSass < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         @inputFile  = fullpath()

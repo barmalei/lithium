@@ -30,7 +30,7 @@ end
 class CopyOfFile < FileArtifact
     attr_reader :source
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         @source ||= $lithium_args[0]
     end
@@ -67,59 +67,6 @@ class CopyOfFile < FileArtifact
     def what_it_does() "    '#{@source}' => '#{fullpath}'" end
 end
 
-
-class SourceDirectory < FileMask
-    include AssignableDependency
-
-    def assign_me_to
-        :source
-    end
-end
-
-
-#  Copy of a file artifact
-class CopyOfDirectory < Directory
-    def expired?
-        true
-        # src = validate_source()
-        # return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
-    end
-
-    # def clean
-    #     if File.exists?(fullpath)
-    #         File.delete(fullpath)
-    #     else
-    #         puts_warning "File '#{fullpath}' doesn't exist"
-    #     end
-    # end
-
-    def build
-        super
-
-
-
-        puts @source.list_items_to_array()
-        @source.list_expired_items { |f, m|
-            puts f, m
-        }
-    end
-
-    def fetch(src, dest)
-        FileUtils.cp(src, dest)
-    end
-
-    def validate_source()
-        raise 'Source path is not defined' if @source.nil?
-        src = File.absolute_path?(@source) ? @source : fullpath(@source)
-        raise "Source '#{src}' doesn't exist or points to a directory" unless File.file?(src)
-        return src
-    end
-
-    def what_it_does() "    '#{@source}' => '#{fullpath}'" end
-end
-
-
-
 #  Remove a file or directory
 class RmFile < FileCommand
     def build()
@@ -144,7 +91,7 @@ end
 class GREP < FileMask
     attr_reader :grep, :matched
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @grep ||= $lithium_args.length > 0 ? $lithium_args[0] : 'TODO'
         @match_all = true if @match_all.nil?
@@ -186,7 +133,7 @@ class GREP < FileMask
 end
 
 class REGREP < GREP
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @grep = Regexp.new(@grep) unless @grep.kind_of?(Regexp)
     end

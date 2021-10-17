@@ -69,7 +69,7 @@ end
 class JarFileContent < ArchiveFileContent
     include JarTool
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         REQUIRE JAVA
         super
     end
@@ -87,7 +87,7 @@ end
 class JarFile < ArchiveFile
     include JarTool
 
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE JAVA
         super
     end
@@ -96,7 +96,7 @@ class JarFile < ArchiveFile
         zip(fullpath, *list)
     end
 
-    def self.abbr()
+    def self.abbr
         'JAR'
     end
 end

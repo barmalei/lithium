@@ -231,7 +231,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(prj.top, prj)
         assert_nil(prj.find_meta("abc"));
 
-        prj.ARTIFACT("a/b/c", FileArtifact)
+        prj.DEFINE("a/b/c", FileArtifact)
         mm = prj.find_meta("a/b/c")
         assert_not_nil(mm);
         assert_equal(mm.artname, "a/b/c")
@@ -275,9 +275,9 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.homedir, prj.homedir)
         assert_equal(aa.instance_variable_get("@test"), 100)
 
-        prj.ARTIFACT("a/**/*", FileArtifact) { @test = 200 }
-        prj.ARTIFACT("*", FileArtifact) { @test = 300 }
-        prj.ARTIFACT("a/b/*", FileArtifact) { @test = 400 }
+        prj.DEFINE("a/**/*", FileArtifact) { @test = 200 }
+        prj.DEFINE("*", FileArtifact) { @test = 300 }
+        prj.DEFINE("a/b/*", FileArtifact) { @test = 400 }
 
 
         aa = prj.artifact("a/b/y")
@@ -320,7 +320,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.homedir, prj.homedir)
         assert_equal(aa.instance_variable_get("@test"), 300)
 
-        prj.ARTIFACT("*", FileArtifact) {
+        prj.DEFINE("*", FileArtifact) {
             @test = 1000
         }
 
@@ -334,15 +334,15 @@ class TestCore < Test::Unit::TestCase
         assert_equal(aa.homedir, prj.homedir)
         assert_equal(aa.instance_variable_get("@test"), 1000)
 
-        prj.ARTIFACT("action:", '.', FileMask) {
+        prj.DEFINE("action:", '.', FileMask) {
             @test = 2000
         }
 
-        prj.ARTIFACT("action:test", FileArtifact) {
+        prj.DEFINE("action:test", FileArtifact) {
             @test = 3000
         }
 
-        prj.ARTIFACT("action:test/*", FileCommand) {
+        prj.DEFINE("action:test/*", FileCommand) {
             @test = 4000
         }
 
@@ -397,14 +397,14 @@ class TestCore < Test::Unit::TestCase
         assert_false(prj2 == art)
         assert_false(fart == art)
 
-        prj1.ARTIFACT(FileArtifact)
+        prj1.DEFINE(FileArtifact)
         assert_false(prj1 == prj2)
 
-        prj2.ARTIFACT(FileArtifact)
+        prj2.DEFINE(FileArtifact)
         assert_true(prj1 == prj2)
 
-        prj1.ARTIFACT("test:*", Project) {
-            ARTIFACT("s", FileArtifact)
+        prj1.DEFINE("test:*", Project) {
+            DEFINE("s", FileArtifact)
         }
         assert_false(prj1 == prj2)
     end

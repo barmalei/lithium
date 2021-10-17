@@ -10,7 +10,7 @@ end
 class DeployGoogleApp < FileCommand
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @version ||= '0.0'
         @project ||= 'noname'

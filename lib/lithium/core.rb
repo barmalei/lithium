@@ -491,6 +491,7 @@ class ArtifactName < String
     end
 
     def self.assert_notnil_name(name)
+        raise 'Invalid artifact name, string name is expected' if !name.nil? && !name.kind_of?(String)
         raise "Passed name is nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
         return name
     end
@@ -602,36 +603,24 @@ class Artifact
         return @default_name
     end
 
-    # !!! this method creates wrapped with context class artifact
-    # !!! to keep track for the current context (instance
-    # !!! where a method has been executed)
-    def Artifact.new(*args,  &block)
+    # !!! this method cares about owner and default name setup, otherwise
+    # !!! owner and default name initialization depends on when an artifact
+    # !!! instance call super
+    def self.new(name = nil, owner:nil, &block)
+        name = self.default_name if name.nil?
+        unless owner.nil? || owner.kind_of?(ArtifactContainer)
+            raise "Invalid owner '#{owner.class}' type for '#{name}' artifact, an artifact container class instance is expected"
+        end
         instance = allocate()
-        name     = args.length > 0 && !args[0].kind_of?(Artifact)  ? args[0]  : nil
-        owner    = args.length > 0 &&  args[-1].kind_of?(ArtifactContainer) ? args[-1] : nil
-
-        # setup owner before hand
         instance.owner = owner
-
-        # remove owner from arguments list
-        if !owner.nil? || (args.length > 1 && args[-1].nil?)
-            args = args.dup()
-            args.pop()
-        end
-
-        # if artifact name has not been passed let's try to use default one
-        if name.nil?
-            args = args.dup()
-            args.insert(0, instance.class.default_name )
-        end
 
         # call instance proxy constructor to be able to track caller stack if a
         # new artifact is created inside the constructor
-        instance.send(:initialize, *args, &block)
+        instance.send(:initialize, name, &block)
         return instance
     end
 
-    def initialize(name, &block)
+    def initialize(name = nil, &block)
         # test if the name of the artifact is not nil or empty string
         name = ArtifactName.assert_notnil_name(name)
         @name, @shortname = name, File.basename(name)
@@ -688,19 +677,22 @@ class Artifact
 
         # if artifact class is detected add it as required
         if meth.length > 2
-            clazz = Module.const_get(meth)
-            if clazz < Artifact
-                args = args.dup()
-                args.push(_detect_required_owner())
-                return REQUIRE(clazz.new(*args, &block))
+            clazz = nil
+            begin
+                clazz = Module.const_get(meth)
+            rescue
+                puts_error "'#{self.class}' artifact doesn't respond to '#{meth}'"
+                raise $!
             end
+
+            return REQUIRE(clazz.new(args.length > 0 ? args[0] : nil, owner:_detect_required_owner(), &block)) if clazz < Artifact
         end
 
         super(meth, *args, &block)
     end
 
     # return cloned array of the artifact dependencies
-    # yield  (dep, is_own, block)
+    # yield  (dep, block)
     def requires
         @requires ||= []
         req = @requires
@@ -724,7 +716,7 @@ class Artifact
         }.reverse
 
         req.each { | dep |
-            yield dep[0], dep[1], dep[2]
+            yield dep[0], dep[1]
         }
     end
 
@@ -751,7 +743,7 @@ class Artifact
 
     def to_s() shortname end
 
-    # make the block section callable in a contectxt of the class instance
+    # make the block section callable in a context of the class instance
     def call(&block)
         self.instance_eval &block
     end
@@ -768,10 +760,10 @@ class Artifact
         if art.nil?
             # build custom artifact that run the given block as build method
             init_name = File.join(self.name, '/#INIT-' + block.object_id.to_s)
-            art = Artifact.new(init_name, _detect_required_owner(), &block)
-            @requires.push([art, false, nil])
+            art = Artifact.new(init_name, owner:_detect_required_owner(), &block)
+            @requires.push([art, nil])
         else
-            @requires.push([art, false, block])
+            @requires.push([ art, block ])
         end
 
         # return artifact itself
@@ -857,7 +849,7 @@ class ArtifactTree
     def build_tree(map = [])
         bt = @art.mtime()
 
-        @art.requires { | dep, is_own, block |
+        @art.requires { | dep, block |
             foundNode, node = nil, ArtifactTree.new(dep, self, &block)
 
             if block.nil?  # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
@@ -884,12 +876,9 @@ class ArtifactTree
             # we have to check if the artifact is assignable to
             # its parent and assign it despite if the artifact has
             # been excluded from the tree
-
-            # has to be placed before recursive build tree method call
-            node.art.owner = @art.owner if is_own == true
-
-            #  resolve assign_me_to  property that says to which property the instance of the
-            #  dependent artifact has to be assigned
+            #
+            # resolve assign_me_to  property that says to which property the instance of the
+            # dependent artifact has to be assigned
             if node.art.is_a?(AssignableDependency)
                 assignMeTo = node.art.assign_me_to
                 raise "Nil assignable property name for #{node.art.class}:#{node.art.name}" if assignMeTo.nil?
@@ -928,7 +917,7 @@ class ArtifactTree
         @expired = @art.expired? if @expired.nil?
     end
 
-    def build
+    def build(&block)
         unless @expired
             @art.instance_eval(&@art.ignored) unless @art.ignored.nil?
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
@@ -940,8 +929,9 @@ class ArtifactTree
                 $current_artifact = @art
                 wid = @art.what_it_does()
                 puts wid unless wid.nil?
+
                 @art.pre_build()
-                @art.build()
+                @art.build(&block)
                 @art.instance_eval(&@art.done) unless @art.done.nil?
 
                 @art.build_done()
@@ -966,10 +956,10 @@ class ArtifactTree
 
     def what_it_does() "Build '#{@name}' artifact dependencies tree" end
 
-    def self.build(art)
+    def self.build(art, &block)
         art = Project.artifact(art) unless art.is_a?(Artifact)
         tree = ArtifactTree.new(art)
-        tree.build()
+        tree.build(&block)
         return art
     end
 end
@@ -1073,7 +1063,7 @@ class FileArtifact < Artifact
 
     def mtime
         f = fullpath()
-        return File.exists?(f) ? File.mtime(f).to_i() : -1
+        return File.exists?(f) ? File.mtime(f).to_i : -1
     end
 
     def puts_items
@@ -1397,7 +1387,7 @@ end
 
 # Permanent file shortcut
 class ExistentFile < FileArtifact
-    def initialize(*args)
+    def initialize(name)
         super
         assert_existence()
     end
@@ -1409,6 +1399,11 @@ class ExistentFile < FileArtifact
     def mtime
         assert_existence()
         return super()
+    end
+
+    def list_items(rel = nil)
+        assert_existence()
+        super
     end
 
     def assert_existence
@@ -1485,7 +1480,7 @@ end
 # File mask artifact that can identify set of file artifacts
 #
 class FileMask < FileArtifact
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @regexp_filter ||= nil
         @ignore_dirs   ||= false
@@ -1540,11 +1535,10 @@ class RunTool < FileMask
 
     log_attr :options, :arguments, :list_expired
 
-    def initialize(*args)
+    def initialize(name)
         @source_file_prefix = '@'
         @source_list_prefix = ''
-        @output_handler     = nil
-        @run_with           ||= nil
+        @run_with         ||= nil
         @list_expired       = false
         @source_as_file     = false  # store target files into temporary file
         super
@@ -1574,30 +1568,6 @@ class RunTool < FileMask
         else
             list_items { | n, t |  yield transform_source_path(n) }
         end
-    end
-
-    # TODO: experimental method, the idea is catching output and representing it as JSON of parsed patterns.
-    def run_with_parsed_output
-        clazz = self.class
-
-        @output_handler = ->(stdin, stdout, pr) {
-            puts '<<<BEGIN>>>'
-            puts "{\n\"class\": \"#{clazz}\",\n\"target\":\"#{self.fullpath}\",\n\"home\":\"#{homedir}\",\n\"output\":["
-            stdin.close
-
-            c = 0
-            while line = stdout.gets do
-                line, pt, mt =  match_output(clazz, line)
-                unless mt.nil?
-                    json = mt.to_json(true)
-                    json = ',' + json  if c > 0
-                    puts '    ' + json
-                    c = c + 1
-                end
-            end
-            puts "]}"
-            puts '<<<END>>>'
-        }
     end
 
     # Return:
@@ -1656,7 +1626,7 @@ class RunTool < FileMask
         @output_handler
     end
 
-    def build
+    def build(&block)
         super
 
         begin
@@ -1671,13 +1641,11 @@ class RunTool < FileMask
 
             go_to_homedir
 
-            output_handler = run_with_output_handler()
-            if output_handler.nil?
+            if block.nil?
                 ec = Artifact.exec(*cmd)
             else
-                ec = Artifact.exec(*cmd, &output_handler)
+                ec = Artifact.exec(*cmd, &block)
             end
-
 
             if error_exit_code?(ec)
                 # TODO: simplify detailed level fetching
@@ -1693,7 +1661,7 @@ class RunTool < FileMask
 end
 
 class RunShell < RunTool
-    def initialize(*args)
+    def initialize(name)
         @run_with = 'bash'
         super
     end
@@ -1784,7 +1752,7 @@ module ArtifactContainer
         name  = ArtifactName.new(name)
         clazz = meta.clazz
 
-        art = clazz.new(name.suffix, self,
+        art = clazz.new(name.suffix, owner:self,
             &(block.nil? ? meta.block : Proc.new {
                 self.instance_eval &meta.block unless meta.block.nil?
                 self.instance_eval &block
@@ -1826,7 +1794,7 @@ module ArtifactContainer
     # 2. (name  : String | ArtifactName)
     # 3. (meta  : ArtifavtMeta)
     # 4. (name, class)
-    def ARTIFACT(*args, &block)
+    def DEFINE(*args, &block)
         # if class has not been passed use default one
         args = args.dup().push(FileMaskContainer) if args.length == 1 && !args[0].kind_of?(ArtifactName) && !args[0].kind_of?(Class)
 
@@ -1847,18 +1815,18 @@ module ArtifactContainer
 
     def MATCH(file_mask, &block)
         raise "Block is expected for Match '#{file_mask}'" if block.nil?
-        ARTIFACT(file_mask, FileMaskContainer, &block)
+        DEFINE(file_mask, FileMaskContainer, &block)
     end
 
     def OTHERWISE(&block)
-        ARTIFACT('**/*', OTHERWISE, &block)
+        DEFINE('**/*', OTHERWISE, &block)
     end
 
     def method_missing(meth, *args, &block)
         if meth.length > 2
             begin
                 clazz = Module.const_get(meth)
-                return ARTIFACT(*args, clazz, &block) if clazz < Artifact
+                return DEFINE(*args, clazz, &block) if clazz < Artifact
             rescue NameError
             end
         end
@@ -1905,13 +1873,13 @@ class Project < ExistentDirectory
 
     @@curent_project = nil
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
-        @desc ||= File.basename(args[0])
+        @desc ||= File.basename(name)
         LOAD('project.rb')
     end
 
-    def self.new(*args, &block)
+    def self.new(name, owner:nil, &block)
         @@curent_project = super
         return @@curent_project
     end
@@ -2219,5 +2187,27 @@ class OTHERWISE < FileMask
                 self.instance_exec(f, &@callback)
             }
         end
+    end
+end
+
+
+# Action applied to the passed artifact
+class ArtifactAction < Artifact
+    attr_reader :target
+
+    def initialize(name, &block)
+        if name.kind_of?(Artifact)
+            super(name.name, &block)
+            @target = name
+            #@owner = @target.owner
+        else
+            super
+            @target = @owner.artifact(name)
+            #@owner = @target.owner
+        end
+    end
+
+    def expired?
+        true
     end
 end

@@ -19,7 +19,7 @@ class RunJavaClass < JavaFileRunner
 end
 
 class RunJavaCode < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         super
         # TODO: hard-coded artifact prefix
         REQUIRE "compile:#{name}"
@@ -35,7 +35,7 @@ class RunJavaCode < JavaFileRunner
 end
 
 class RunJUnit < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @junit_home ||= File.join($lithium_code, 'ext', 'java', 'junit')
         raise "JUnit tool directory '#{@junit_home}' doesn't exist" unless File.directory?(@junit_home)
@@ -122,7 +122,7 @@ class RunJAR < JavaFileRunner
 end
 
 class RunGroovyScript < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE GROOVY
         super
     end
@@ -141,7 +141,7 @@ class RunGroovyScript < JavaFileRunner
 end
 
 class RunKotlinCode < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE KOTLIN
         super
         REQUIRE "compile:#{name}"
@@ -167,7 +167,7 @@ class RunKotlinCode < JavaFileRunner
 end
 
 class RunScalaCode < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE SCALA
         super
         REQUIRE "compile:#{name}"

@@ -6,7 +6,7 @@ require 'lithium/core'
 class RemoteFile < FileArtifact
     attr_reader :uri
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @uri ||= $lithium_args[0]
     end

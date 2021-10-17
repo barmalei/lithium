@@ -3,7 +3,7 @@ require 'lithium/java-artifact/base'
 require 'lithium/file-artifact/archive'
 
 class GenerateJavaDoc < RunJavaTool
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @source_as_file = true
         @destination ||= 'apidoc'
@@ -59,7 +59,6 @@ class LithiumJavaToolRunner < RunJavaTool
         t.concat(super(src))
         return t
     end
-
 end
 
 class ShowClassMethods < LithiumJavaToolRunner
@@ -78,37 +77,52 @@ class ShowClassField < LithiumJavaToolRunner
     @java_tool_command_name = 'field'
 end
 
-# TODO: the class has to be re-worked since it add JAVA as
-# dependency whose classpath is used as the target. It is
-# better to pass the classpath somehow to the artifact.
-# The artifact name is used to detect proper home, so it
-# can be any file or directory
-class FindInClasspath < FileCommand
-    def initialize(*args)
-        REQUIRE JAVA
+class DetectJvmClassByName < LithiumJavaToolRunner
+    @java_tool_command_name = 'class'
+end
 
+class FindInClasspath < ArtifactAction
+    def initialize(name, &block)
         super
+        REQUIRE @target
         @patterns ||= $lithium_args.dup
-        raise 'Target class is not known' if @patterns.nil? || @patterns.length == 0
+        @findJvmClasses ||= true
     end
 
     def build()
-        unless @java.classpath.EMPTY?
-            count = 0
-            find(@java.classpath, *(@patterns)) { | path, item |
-                item_found(path, item)
-                count = count + 1
-            }
+        raise 'Patterns have not been defined' if @patterns.nil? || @patterns.length == 0
 
-            puts_warning "No item for '#{@patterns}' has been found" if count == 0
+        classpath = @target.classpath if @target.kind_of?(JVM)
+        classpath = @target           if @target.kind_of?(JavaClasspath)
+        res       = []
+
+        unless @target.classpath.EMPTY?
+            find(@target.classpath, *(@patterns)) { | path, item |
+                path   = File.absolute_path(path)
+                r_path = FileArtifact.relative_to(path, @target.homedir)
+                path   = r_path unless r_path.nil?
+                res.push([path, item])
+            }
         else
             puts_warning 'Classpath is empty'
         end
-    end
 
-    def item_found(path, item)
-        puts "    [#{path} => #{item}]"
-        #puts "  {\n    \"item\": \"#{item}\",\n    \"path\": \"#{path}\"\n  }"
+        if @findJvmClasses
+            @patterns.each { | pattern |
+                ArtifactTree.build(DetectJvmClassByName.new(pattern, owner:self.owner)) { |stdin, stdout, th|
+                    prefix = 'detected:'
+                    stdout.each { | line |
+                        res.push(['JVM', line.chomp[prefix.length..]]) if line.start_with?(prefix)
+                    }
+                }
+            }
+        end
+
+        res.each { | path, item |
+            puts "    [#{path} => #{item}]"
+        }
+
+        puts_warning "No item for '#{@patterns}' has been found" if res.length == 0
     end
 
     def find(classpath, *patterns)
@@ -116,12 +130,14 @@ class FindInClasspath < FileCommand
             if File.directory?(path)
                 patterns.each { | pattern |
                     Dir.glob(File.join(path, '**', pattern)).each  { | item |
-                        yield path, item
+                        item = Pathname.new(item)
+                        item = item.relative_path_from(path).to_s if item.absolute?
+                        yield path, item.to_s
                     }
                 }
             elsif path.end_with?('.jar') || path.end_with?('.zip')
                 # TODO: probably "find" should be static method
-                FindInZip.new(path, self.owner).find(*patterns) { | jar_path, item |
+                FindInZip.new(path, owner:self.owner).find(*patterns) { | jar_path, item |
                     yield jar_path, item
                 }
             else
@@ -131,29 +147,4 @@ class FindInClasspath < FileCommand
     end
 
     def what_it_does() "Looking for '#{@patterns}' in classpath" end
-end
-
-# TODO: the name is almost similar to prev class name, a bit confusion.
-# the only purpose of the class is fulfilling class lookup with detection
-# of Java standard classes by calling JavaTool code
-class FindClassInClasspath < FindInClasspath
-    def build
-        li_java_ext = File.join($lithium_code, 'ext', 'java', 'lithium')
-
-        # TODO: ugly implementation when we need to call external code that also has to follow
-        # defined format in its output
-        @patterns.each { | pattern |
-            pattern = File.basename(pattern)
-            Artifact.exec(
-                @java.java,
-                '-classpath',
-                "\"#{File.join(li_java_ext, 'classes')}\"#{File::PATH_SEPARATOR}\"#{File.join(li_java_ext, 'lib/*')}\"",
-                'lithium.JavaTools',
-                "class:#{pattern}")
-        }
-
-        super
-    end
-
-    def self.abbr() 'FCC' end
 end

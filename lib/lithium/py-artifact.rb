@@ -21,7 +21,7 @@ class PYPATH < Artifact
 end
 
 class DefaultPypath < PYPATH
-    def initialize(*args, &block)
+    def initialize(name, &block)
         super
         JOIN('lib') if block.nil? && File.exists?(File.join(path_base_dir, 'lib'))
     end
@@ -34,7 +34,7 @@ class PYTHON < EnvArtifact
 
     log_attr :python_home, :pyname
 
-    def initialize(*args)
+    def initialize(name, &block)
         @pypaths = []
         REQUIRE(DefaultPypath)
         super
@@ -81,7 +81,7 @@ end
 class RunPythonScript < FileCommand
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE PYTHON
         OPT '-u'
         super
@@ -106,7 +106,7 @@ end
 class ValidatePythonCode < FileMask
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE PYTHON
         super
     end
@@ -117,7 +117,7 @@ class ValidatePythonCode < FileMask
 end
 
 class ValidatePythonScript < FileCommand
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE PYTHON
         super
     end

@@ -6,7 +6,7 @@ require 'lithium/java-artifact/base'
 class JavaCompiler < RunJavaTool
     log_attr :destination, :create_destination
 
-    def initialize(*args)
+    def initialize(name, &block)
         @create_destination = false
         @description        = 'JAVA'
         @destination        = nil
@@ -96,7 +96,7 @@ class JavaCompiler < RunJavaTool
 end
 
 class JDTCompiler < JavaCompiler
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @description   = 'JDT'
         @jdt_home    ||= File.join($lithium_code, 'ext', 'java', 'jdt')
@@ -123,7 +123,7 @@ end
 
 # Groovy 
 class GroovyCompiler < JavaCompiler
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE GROOVY
         super
         @description = 'Groovy'
@@ -147,7 +147,7 @@ end
 #
 # Kotlin 
 class KotlinCompiler < JavaCompiler
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE KOTLIN
         super
         @description = 'Kotlin'
@@ -177,7 +177,7 @@ end
 
 # Scala 
 class ScalaCompiler < JavaCompiler
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE SCALA
         super
         @description = 'Scala'

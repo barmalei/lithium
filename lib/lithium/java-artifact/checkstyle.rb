@@ -5,7 +5,7 @@ require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
 class JavaCheckStyle < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
@@ -45,7 +45,7 @@ class JavaCheckStyle < JavaFileRunner
 end
 
 class UnusedJavaCheckStyle < JavaCheckStyle
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @checkstyle_config = File.join(@checkstyle_home, "unused.xml")
     end
@@ -53,7 +53,7 @@ end
 
 #  PMD code analyzer
 class PMD < JavaFileRunner
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @pmd_home = File.join($lithium_code, 'ext', 'java', 'pmd')
         raise "PMD home path cannot be found '#{@pmd_home}'" unless File.directory?(@pmd_home)
@@ -94,7 +94,7 @@ end
 
 # TODO: complete the code !
 class JsonSchemaToPojo < RunJAR
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @jsonSchemaToPojo_home = File.join($lithium_code, 'ext', 'java', 'jsonschema2pojo')
         raise "JSON Schema to POJO home path cannot be found '#{@pmd_home}'" unless File.directory?(@jsonSchemaToPojo_home)

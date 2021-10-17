@@ -5,23 +5,23 @@ require 'lithium/core'
 
 module FileSourcesSupport
     module FileSource
-    include AssignableDependency
+        include AssignableDependency
 
-    def assign_me_to
-        :sources
-    end
+        def assign_me_to
+            :sources
+        end
 
-    def relative_from
-        @base ||= nil
-        return @base
-    end
+        def relative_from
+            @base ||= nil
+            return @base
+        end
 
-    def BASE(base)
-        @base = base
-        @base = base[0 .. base.length - 1] unless base.nil? || base[-1] != '/'
-        return self
+        def BASE(base)
+            @base = base
+            @base = base[0 .. base.length - 1] unless base.nil? || base[-1] != '/'
+            return self
+        end
     end
-end
 
     def BASE(path)
         @sources ||= []
@@ -116,9 +116,9 @@ class MetaFile < ExistentFile
     attr_accessor :validate_items
     log_attr :base
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         BASE(args[1]) if args.length > 1
-        super(args[0], &block)
+        super
     end
 
     def list_items(rel = nil)
@@ -134,7 +134,7 @@ class MetaFile < ExistentFile
                 item = item.strip
                 next if item.length == 0 || item[0,1]=='#'  # skip comment and empty strings
 
-                files = FileMask.new(item, self.owner)
+                files = FileMask.new(item, owner:self.owner)
                 files.list_items(rel) { | path, m |
                     yield path, m
                 }
@@ -176,7 +176,7 @@ end
 class GeneratedDirectory < Directory
     include FileSourcesSupport
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
         @full_copy = false
         super
     end

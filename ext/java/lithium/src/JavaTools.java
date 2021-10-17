@@ -42,6 +42,7 @@ public class JavaTools {
         "java.nio",
         "java.nio.file",
         "java.nio.channels",
+        "java.nio.charset",
         "java.lang",
         "java.lang.reflect",
         "java.math",
@@ -363,8 +364,11 @@ public class JavaTools {
             }
 
             if ("class".equals(prefix)) {
-                for (Class clazz : classByShortName(suffix)) {
-                    System.out.println("[JAVA/rt.jar => " + clazz.getName() + "]");
+                String[] classNames = suffix.split(";");
+                for (String cn : classNames) {
+                    for (Class clazz : classByShortName(cn)) {
+                        System.out.println("detected:" + clazz.getName());
+                    }
                 }
             } else {
                 int i = suffix.indexOf('.');

@@ -12,7 +12,7 @@ class MVN < EnvArtifact
 
     log_attr :mvn_home
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
 
         unless @mvn_home
@@ -23,17 +23,75 @@ class MVN < EnvArtifact
         puts "Maven home: '#{@mvn_home}'"
     end
 
-    def expired?() false end
+    def expired?
+        false
+    end
 
-    def what_it_does() "Initialize Maven environment '#{@name}'" end
+    def what_it_does
+        "Initialize Maven environment '#{@name}'"
+    end
 
-    def mvn() File.join(@mvn_home, 'bin', 'mvn') end
+    def mvn
+        File.join(@mvn_home, 'bin', 'mvn')
+    end
 
-    def self.abbr() 'MVN' end
+    def self.abbr
+        'MVN'
+    end
+end
+
+module MavenDependencyPlugin
+    def TRANSITIVE(flag)
+        @excludeTransitive = flag
+    end
+
+    def GROUPS_OUT(*args)
+        @excludeGroupIds = []
+        @excludeGroupIds.concat(args)
+    end
+
+    def GROUPS_IN(*args)
+        @includeGroupIds = []
+        @includeGroupIds.concat(args)
+    end
+
+    def SCOPES_OUT(*args)
+        @excludeScopes = []
+        @excludeScopes.concat(args)
+    end
+
+    def SCOPES_IN(*args)
+        @includeScopes = []
+        @includeScopes.concat(args)
+    end
+
+    def DEP_TARGET(target)
+        @depTarget = target
+    end
+
+    def MVN_CMD
+        raise 'Maven dependency target was not defined' if @depTarget.nil?
+
+        cmd = [ @mvn.mvn, "dependency:#{@depTarget}" ]
+        cmd.push("-DexcludeTransitive=#{@excludeTransitive}")       unless @excludeTransitive.nil?
+        cmd.push("-DexcludeGroupIds=#{@excludeGroupIds.join(',')}") unless @excludeGroupIds.nil? || @excludeGroupIds.length == 0
+        cmd.push("-DincludeGroupIds=#{@includeGroupIds.join(',')}") unless @includeGroupIds.nil? || @includeGroupIds.length == 0
+
+        unless @includeScopes.nil? || @includeScopes.length == 0
+            cmd.concat(@includeScopes.map { | e |  "-DincludeScope=#{e}" })
+        end
+
+        unless @excludeScopes.nil? || @excludeScopes.length == 0
+            cmd.concat(@excludeScopes.map { | e |  "-DexcludeScope=#{e}" })
+        end
+
+        return cmd
+    end
 end
 
 class MavenRepoArtifact < FileArtifact
     include StdFormater
+    include MavenDependencyPlugin
 
     def initialize(name, &block)
         REQUIRE MVN
@@ -44,7 +102,9 @@ class MavenRepoArtifact < FileArtifact
 
         @group, @id, @ver = m[1], m[2], m[3]
         name[r] = ''
-        super(name, &block)
+        super
+
+        DEP_TARGET('copy')
     end
 
     def expired?
@@ -57,15 +117,15 @@ class MavenRepoArtifact < FileArtifact
     end
 
     def build
-        raise "Artifact '#{@group}:#{@id}:#{@ver}' cannot be copied" if 0 != Artifact.exec(
-            @mvn.mvn,
-            "dependency:copy",
-            "-Dartifact=#{@group}:#{@id}:#{@ver}",
-            "-DoutputDirectory=\"#{fullpath}\""
-        )
+        chdir(File.dirname(@pom.fullpath)) {
+            cmd = MVN_CMD()
+            cmd.push("-Dartifact=#{@group}:#{@id}:#{@ver}")
+            cmd.push("-DoutputDirectory=\"#{fullpath}\"")
+            raise "Artifact '#{@group}:#{@id}:#{@ver}' cannot be copied" if 0 != Artifact.exec(*cmd)
+        }
     end
 
-    def what_it_does()
+    def what_it_does
         "Fetch '#{@group}:#{@id}:#{@ver}' maven artifact\n   to '#{@name}'"
     end
 end
@@ -75,9 +135,9 @@ class PomFile < ExistentFile
     include StdFormater
     include AssignableDependency
 
-    def initialize(*args, &block)
+    def initialize(name = nil, &block)
         REQUIRE MVN
-        name = args.length > 0 && !args[0].nil? ? args[0] : homedir
+        name = homedir if name.nil?
         fp   = fullpath(name)
         pom  = FileArtifact.look_file_up(fp, 'pom.xml', homedir)
         raise "POM cannot be detected by '#{fp}' path" if pom.nil?
@@ -88,40 +148,32 @@ class PomFile < ExistentFile
         return 'pom'
     end
 
-    def list_items
-        f = fullpath
-        yield f, File.mtime(f).to_i
-    end
-
     def self.abbr() 'POM' end
 end
 
 class MavenClasspath < InFileClasspath
     include StdFormater
+    include MavenDependencyPlugin
 
     log_attr :excludeGroupIds, :excludeTransitive
 
     default_name(".lithium/li_maven_class_path")
 
-    def initialize(*args, &block)
+    def initialize(name, &block)
+        super
         REQUIRE MVN
-        @excludeTransitive = false
-        super(*args, &block)
-        REQUIRE(PomFile.new(homedir, self.owner))
-        @excludeGroupIds ||= []
+        REQUIRE(PomFile.new(homedir, owner:self.owner))
+        DEP_TARGET('build-classpath')
+        TRANSITIVE(false)
     end
 
     def build
         chdir(File.dirname(@pom.fullpath)) {
-            raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
-                @mvn.mvn,
-                "dependency:build-classpath",
-                "-DexcludeTransitive=#{@excludeTransitive}",
-                @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
-                "-Dmdep.outputFile=\"#{fullpath}\""
-            )
-            super
+            cmd = MVN_CMD()
+            cmd.push("-Dmdep.outputFile=\"#{fullpath}\"")
+            raise "Maven classpath '#{@name}' cannot be generated" if Artifact.exec(*cmd).exitstatus != 0
         }
+        super
     end
 
     def what_it_does
@@ -129,39 +181,30 @@ class MavenClasspath < InFileClasspath
     end
 end
 
-class MavenDependenciesDir < FileArtifact
+#
+# Build directory and copy maven dependencies to the folder
+#
+class MavenDependenciesDir < Directory
     include StdFormater
+    include MavenDependencyPlugin
 
     def initialize(name, &block)
-        REQUIRE MVN
-        @excludeTransitive = false
-        @excludeGroupIds   = []
-
         super
-
-        fp = fullpath()
-        raise "Invalid dependency dir '#{fp}'" unless File.directory?(fp)
-
-        REQUIRE(PomFile.new(@name, self.owner))
-    end
-
-    def EXCLUDE(groupId)
-        @excludeGroupIds.push(groupId)
+        REQUIRE MVN
+        REQUIRE(PomFile.new(@name, owner:self.owner))
+        DEP_TARGET('copy-dependencies')
     end
 
     def expired?
         true
     end
 
-    def build()
+    def build
+        super
         chdir(File.dirname(@pom.fullpath)) {
-            raise "Failed '#{art}' cannot be copied" if 0 != Artifact.exec(
-                @mvn.mvn,
-               "dependency:copy-dependencies",
-               "-DexcludeTransitive=#{@excludeTransitive}",
-               @excludeGroupIds.length > 0 ? "-DexcludeGroupIds=#{@excludeGroupIds.join(',')}" : '',
-               "-DoutputDirectory=#{fullpath}"
-            )
+            cmd = MVN_CMD()
+            cmd.push("-DoutputDirectory=\"#{fullpath}\"")
+            raise "Dependency directory '#{@name}' cannot be created" if Artifact.exec(*cmd).exitstatus != 0
         }
     end
 end
@@ -174,26 +217,26 @@ class RunMaven < PomFile
         @targets ||= [ 'clean', 'install' ]
     end
 
-    def expired?()
+    def expired?
         true
     end
 
     def TARGETS(*args)
         @targets = []
-        args.each { | target |
-            @targets.push(target)
-        }
+        @targets.concat(args)
     end
 
-    def build()
-        path = fullpath()
+    def build
+        path = fullpath
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
         chdir(File.dirname(path)) {
-            raise 'Maven running failed' if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')) != 0
+            if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
+                raise "Maven [#{@targets.join(',')}] running failed"
+            end
         }
     end
 
-    def what_it_does() 
+    def what_it_does
         "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}', '#{@mvn.OPTS()}'"
     end
 
@@ -217,7 +260,7 @@ class RunMavenTest < RunMaven
 end
 
 class MavenCompiler < RunMaven
-    def initialize(*args)
+    def initialize(name)
         super
         TARGETS('compile')
     end
@@ -228,7 +271,7 @@ class MavenCompiler < RunMaven
 
     def list_items
         dir = File.join(File.dirname(fullpath), 'src', '**', '*')
-        FileMask.new(dir, self.owner).list_items { |f, t|
+        FileMask.new(dir, owner:self.owner).list_items { | f, t |
             yield f, t
         }
 

@@ -2,7 +2,7 @@ require 'lithium/core'
 require 'lithium/file-artifact/command'
 
 class CompileSass < FileMask
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @sass_path ||= FileArtifact.which('sass')
         raise 'Sass compiler cannot be found' if @sass_path.nil?

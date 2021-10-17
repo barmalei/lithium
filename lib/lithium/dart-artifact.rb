@@ -8,7 +8,7 @@ class DART < EnvArtifact
 
     log_attr :libs, :pypath, :python_home, :pyname
 
-    def initialize(*args)
+    def initialize(name, &block)
         super
         @libs   ||= []
         @pypath ||= ENV['PYTHONPATH']
@@ -55,7 +55,7 @@ end
 class RunDartCode < FileCommand
     include OptionsSupport
 
-    def initialize(*args)
+    def initialize(name, &block)
         REQUIRE DART
         OPT '-u'
         super
