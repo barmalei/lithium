@@ -1425,7 +1425,7 @@ class Directory < FileArtifact
         !File.directory?(fullpath)
     end
 
-    def build()
+    def build
         super
         fp = fullpath
         raise "File '#{fp}' is not a directory" if File.file?(fp)
