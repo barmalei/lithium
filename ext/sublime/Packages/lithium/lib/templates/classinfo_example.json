@@ -1,0 +1,157 @@
+{
+    "name" : "com.class.Test",
+    "type" : "class",
+    "parent" : "java.util.Map",
+    "interfaces": [ "java.util.Collection",  "java.util.Set", "java.util.ArrayList", "java.util.Arrays"],
+    "fields": [
+        {
+            "name": "field1",
+            "type": "java.util.String",
+            "access": "private",
+            "level": [ "static" ],
+            "value": "sd",
+            "declareHere": true,
+            "kind": "field"
+        },
+        {
+            "name": "fieldsdsdsdsd2",
+            "type": "java.util.String",
+            "access": "private",
+            "level": [ "static" ],
+            "declareHere": true,
+            "value": "sd",
+            "kind": "field"
+        }
+    ],
+    "constructors" : [
+        {
+            "name"   : "constructor",
+            "access" : "public",
+            "args" : [
+                "int"
+            ],
+            "declareHere": true,
+            "kind": "constructor"
+        }
+
+    ],
+    "methods": [
+        {
+            "name"   : "indexOf",
+            "level"  : [ "static" ],
+            "access" : "public",
+            "args" : [
+                "int"
+            ],
+
+            "declareHere": true,
+            "type" : "void"
+        },
+
+        {
+            "name"   : "zindexOf2",
+            "level"  : [ "static" ],
+            "access" : "public",
+            "args" : [
+            ],
+            "declareHere": true,
+            "type" : "void"
+        },
+
+        {
+            "name" : "longNameMethod",
+            "access" : "public",
+            "level" : [ "abstract" ],
+            "args" : [
+                "int"
+            ],
+            "declareHere": true,
+            "type" : "void",
+            "kind": "method"
+        },
+
+        {
+            "name" : "longNameMethod2",
+            "access" : "public",
+            "level" : [ "-" ],
+            "args" : [
+                "int"
+            ],
+            "declareHere": true,
+            "type" : "void"
+        },
+
+        {
+            "name" : "longNameMethod3",
+            "access" : "public",
+            "level" : [ "-" ],
+            "args" : [
+                "int"
+            ],
+            "declareHere": true,
+            "type" : "void"
+        },
+
+        {
+            "name" : "parentMethod1",
+            "access" : "public",
+            "level" : [ "-" ],
+            "args" : [
+                "int"
+            ],
+            "declareHere": false,
+            "type" : "java.lang.Integer"
+        },
+
+        {
+            "name" : "longNameMethod4",
+            "access" : "public",
+            "level" : [ "-" ],
+            "args" : [
+                "int"
+            ],
+            "declareHere": true,
+            "type" : "void"
+        },
+
+        {
+            "name" : "longNameMethod5",
+            "access" : "private",
+            "level" : [ "-" ],
+            "args" : [
+                "int"
+            ],
+            "declareHere": true,
+            "type" : "void"
+        },
+
+
+        {
+            "name" : "methodK",
+            "access" : "protected",
+            "level" : [ "-" ],
+            "args" : [
+                "java.util.Date",
+                "com.test.insight.me.package.KeyStoreTypeMedia",
+                "com.test.insight.me.package.KeyStoreTypeMedia",
+                "com.test.insight.me.package.KeyStoreTypeMedia"
+            ],
+            "declareHere": true,
+            "type" : "void"
+        },
+
+        {
+            "name" : "methodK2",
+            "access" : "protected",
+            "level" : [ "-" ],
+            "args" : [
+                "java.util.Date",
+                "com.test.insight.me.package.KeyStoreTypeMedia",
+                "com.test.insight.me.package.KeyStoreTypeMedia",
+                "com.test.insight.me.package.KeyStoreTypeMedia"
+            ],
+            "declareHere": true,
+            "type" : "void"
+        }
+    ]
+}
