@@ -9,8 +9,8 @@ require 'pathname'
 #      ans "basedir" as an option makes possible to build an external
 #      artifact in a context of the given project
 # !==================================================================
-$lithium_version    = '4.2.2'
-$lithium_date       = 'Sep 2021'
+$lithium_version    = '4.7.0'
+$lithium_date       = 'Dec 2021'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
@@ -43,11 +43,9 @@ unless artifact_path.nil?
     artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil # store mask
     artifact_path = artifact_path[0, i] if !i.nil? && i >= 0             # cut mask from path
 
-    if artifact_path == '.' || artifact_path == './'
-        artifact_path = basedir
-    elsif artifact_path.start_with?('./') || artifact_path.start_with?('../')
-        artifact_path = File.join(basedir, artifact_path)
-    end
+    # if basedir has not been defined and path is not absolute let's try to
+    # lookup basedir by joining it with current directory (make it absolute)
+    artifact_path = File.join(basedir, artifact_path) unless (File.absolute_path?(artifact_path) || $lithium_options.has_key?('basedir'))
 
     if File.absolute_path?(artifact_path)
         # resolve link to real path for absolute paths
@@ -61,6 +59,12 @@ unless artifact_path.nil?
                 end
                 basedir = File.dirname(basedir)
             end
+        end
+    else
+        if artifact_path == '.' || artifact_path == './'
+            artifact_path = basedir
+        elsif artifact_path.start_with?('./') || artifact_path.start_with?('../')
+            artifact_path = File.join(basedir, artifact_path)
         end
     end
 

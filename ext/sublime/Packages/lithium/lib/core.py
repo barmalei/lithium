@@ -54,7 +54,7 @@ SETTINGS = LiConfig(LI_SETTINGS_FILE)
 
 # Log API
 class LiLog:
-    format_str = "[%s] %s\n"
+    format_str = "[%s] %s"
 
     @classmethod
     def is_debug(clz):

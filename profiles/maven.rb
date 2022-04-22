@@ -3,7 +3,9 @@
     REQUIRE {
         Directory('target') {
             DONE {
-                RunMaven.build('.', self.owner)
+                RunMaven {
+                    TARGETS('compile')
+                }
             }
         }
     }

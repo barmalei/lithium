@@ -6,49 +6,24 @@ class DART < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
-    log_attr :libs, :pypath, :python_home, :pyname
+    log_attr :dart_home
 
     def initialize(name, &block)
         super
-        @libs   ||= []
-        @pypath ||= ENV['PYTHONPATH']
-
-        if !@python_home
-            if @pyname
-                python_path = FileArtifact.which(@pyname)
-            else
-                python_path = FileArtifact.which('python')
-                if python_path
-                    @pyname = 'python'
-                else
-                    python_path = FileArtifact.which('python3')
-                    @pyname= 'python3' if python_path
-                end
-            end
-            @python_home = File.dirname(File.dirname(python_path)) if python_path
-        else
-            @pyname ||= 'python'
-        end
-
-        raise "Python home ('#{@python_home}') cannot be detected" if !@python_home || !File.directory?(@python_home)
-        raise "Python ('#{python()}') cannot be found"             unless File.file?(python()) 
-
-        puts "Python home '#{@python_home}', pyname = #{@pyname}"
-
-        # setup pypath
-        @libs.each { | lib |
-            lib = File.join(homedir, lib)       unless File.absolute_path?(lib)
-            raise "Invalid lib path - '#{lib}'" unless File.directory?(lib)
-            @pypath = @pypath ? lib + File::PATH_SEPARATOR + @pypath : lib
-        }
-        ENV['PYTHONPATH'] = @python_path
+        @dart_home = File.dirname(File.dirname(FileArtifact.which('dart'))) unless @dart_home
+        raise "DART home ('#{@dart_home}') cannot be detected" if !@dart_home || !File.directory?(@dart_home)
+        puts "DART home '#{@dart_home}'"
     end
 
-    def python
-        File.join(@python_home, 'bin', @pyname)
+    def dart
+        File.join(@dart_home, 'bin', 'dart')
     end
 
-    def what_it_does() "Initialize python environment '#{@name}'" end
+    def pub
+        File.join(@dart_home, 'bin', 'pub')
+    end
+
+    def what_it_does() "Initialize DART environment '#{@name}'" end
 end
 
 #  Run dart
@@ -57,26 +32,78 @@ class RunDartCode < FileCommand
 
     def initialize(name, &block)
         REQUIRE DART
-        OPT '-u'
         super
     end
 
     def build()
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
-        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, OPTS(), "\"#{fullpath}\"") != 0
+        raise "Run #{self.class.name} failed" if Artifact.exec(@dart.dart, OPTS(), "\"#{fullpath}\"") != 0
     end
 
-    def what_it_does() "Run '#{@name}' script" end
+    def what_it_does() "Run '#{@name}' dart script" end
+
+    def self.abbr() 'RDS' end
+end
+
+
+class PubspecFile < ExistentFile
+    include LogArtifactState
+    include StdFormater
+    include AssignableDependency
+
+    def initialize(name = nil, &block)
+        REQUIRE DART
+        name = homedir if name.nil?
+        fp   = fullpath(name)
+        pubspec  = FileArtifact.look_file_up(fp, 'pubspec.yaml', homedir)
+        raise "Pubspec cannot be detected by '#{fp}' path" if pubspec.nil?
+        super(pubspec, &block)
+    end
+
+    def assign_me_to
+        'pubspec'
+    end
+
+    def self.abbr() 'PSP' end
+end
+
+class RunDartPub < PubspecFile
+    include OptionsSupport
+
+    def initialize(name, &block)
+        super
+        @targets ||= [ 'get' ]
+    end
+
+    def expired?
+        true
+    end
+
+    def TARGETS(*args)
+        @targets = []
+        @targets.concat(args)
+    end
+
+    def build
+        path = fullpath
+        raise "Target pub artifact cannot be found '#{path}'" unless File.exists?(path)
+        chdir(File.dirname(path)) {
+            if Artifact.exec(@dart.pub, OPTS(), @targets.join(' ')).exitstatus != 0
+                raise "Pub [#{@targets.join(',')}] running failed"
+            end
+        }
+    end
+
+    def what_it_does
+        "Run pub: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}''"
+    end
 
     def self.abbr() 'RPS' end
 end
 
-
-class LintDartCode < FileMask
-    include OptionsSupport
-
-    def build_item(path, mt)
-        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', OPTS(), "\"#{fullpath(path)}\"") != 0
+class RunDartPubBuild < RunDartPub
+    def initialize(name, &block)
+        super
+        TARGETS('build')
     end
 end
-

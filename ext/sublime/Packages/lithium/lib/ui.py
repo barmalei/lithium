@@ -117,9 +117,9 @@ class LiOutPanel:
 
     def clear(self):
         self._re_create_view()
-        self.locations = None
         if self.selected_location >= 0:
             self.select_location(self.selected_location, False)
+        self.locations = None
         return self
 
     def select_location(self, index, select = True):

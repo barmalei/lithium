@@ -121,14 +121,14 @@ class RunJAR < JavaFileRunner
     end
 end
 
-class RunGroovyScript < JavaFileRunner
+class RunGroovyScript < RunJvmTool
     def initialize(name, &block)
         REQUIRE GROOVY
         super
     end
 
-    def classpath
-        super.JOIN(@groovy.classpaths)
+    def tool_classpath
+        @groovy.classpath
     end
 
     def run_with
@@ -140,15 +140,19 @@ class RunGroovyScript < JavaFileRunner
     end
 end
 
-class RunKotlinCode < JavaFileRunner
+class RunKotlinCode < RunJvmTool
     def initialize(name, &block)
         REQUIRE KOTLIN
         super
         REQUIRE "compile:#{name}"
     end
 
-    def classpath
-        super.JOIN(@kotlin.classpaths)
+    def tool_classpath
+        @kotlin.classpath
+    end
+
+    def run_with
+        @kotlin.kotlin
     end
 
     def transform_source_path(path)
@@ -166,15 +170,15 @@ class RunKotlinCode < JavaFileRunner
     end
 end
 
-class RunScalaCode < JavaFileRunner
+class RunScalaCode < RunJvmTool
     def initialize(name, &block)
         REQUIRE SCALA
         super
         REQUIRE "compile:#{name}"
     end
 
-    def classpath
-        super.JOIN(@scala.classpaths)
+    def tool_classpath
+        @scala.classpath
     end
 
     def transform_source_path(path)

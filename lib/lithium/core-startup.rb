@@ -14,6 +14,7 @@ require 'lithium/java-artifact/misc'
 require 'lithium/java-artifact/checkstyle'
 require 'lithium/java-artifact/vaadin-sass'
 require 'lithium/java-artifact/mvn'
+require 'lithium/java-artifact/gradle'
 require 'lithium/java-artifact/ant'
 
 require 'lithium/file-artifact/acquired'
@@ -23,6 +24,7 @@ require 'lithium/py-artifact'
 require 'lithium/rb-artifact'
 require 'lithium/php-artifact'
 require 'lithium/tt-artifact'
+require 'lithium/dart-artifact'
 require 'lithium/web-artifact'
 require 'lithium/c-artifact'
 
@@ -83,6 +85,12 @@ PATTERNS ({
 
     [ KotlinCompiler ] => [
         KotlinCompileErrorPattern.new()
+    ],
+
+    [ ScalaCompiler ] => [
+         StdPattern.new {
+            any('--\s*\[[0-9]+\]\s+[^:]+'); colon; any('\s*'); group(:location) { file('.scala'); colon; line; colon; column; }
+        }
     ],
 
     [ GroovyCompiler ] => [
@@ -174,6 +182,17 @@ PATTERNS ({
         JavaExceptionLocPattern.new()
     ],
 
+    RunGradle => [
+        # '\[ERROR\]\s+(?<file>${file_pattern}\.[a-zA-Z_]+)\:\[(?<line>[0-9]+)\s*,\s*(?<column>[0-9]+)\]'
+        StdPattern.new {
+            any('e\:\s*'); group(:location) { file; colon; any('\s*'); rbrackets { line; any('\s*,\s*'); column? }; colon; group(:message, '.*$') }
+        },
+
+        JavaExceptionLocPattern.new()
+    ],
+
+    #e: /Users/brigadir/projects/newtask/src/main/kotlin/com/signicat/interview/security/TokenFactory.kt: (30, 31): Expecting an element
+
     Artifact => [
         URLPattern.new,
         StdPattern.new(2) {
@@ -260,7 +279,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # build target artifact including its dependencies
     target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
 
-    puts "TARGET artifact: '#{target_artifact}'"
+    puts "TARGET artifact: '#{target_artifact}', #{Project.current} "
     built_art = Project.build(target_artifact)
 
     INFO.info(built_art) if $lithium_options.key?('i')

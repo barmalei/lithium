@@ -215,6 +215,19 @@ class JVM < EnvArtifact
         "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
     end
 
+    def SDKMAN(version, candidate = 'java')
+        raise "Invalid '#{candidate}' candidate"         if candidate.nil? || candidate.length < 3
+        raise "Invalid '#{version}' #{candidate} SDKMAN version" if version.nil?   || version.length   < 2
+
+        sdk_home = File.expand_path("~/.sdkman/candidates/#{candidate}")
+        raise "Invalid '#{sdk_home}' SDKMAN #{candidate} candidates folder" unless File.directory?(sdk_home)
+
+        candidates = Dir.glob(File.join(sdk_home, "*#{version}*")).filter { | path | File.directory?(path) }
+        raise "SDKMAN '#{version}' #{candidate} version cannot be detected" if candidates.length == 0
+
+        return File.join(candidates[0])
+    end
+
     def self.abbr() 'JVM' end
 
     def self.grep_package(path, pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
@@ -252,7 +265,7 @@ end
 class JAVA < JVM
     include AutoRegisteredArtifact
 
-    log_attr :java_home, :jdk_home, :java_version, :java_version_low, :java_version_high
+    log_attr :java_home, :jdk_home, :java_version
 
     def initialize(name, &block)
         super
@@ -278,19 +291,15 @@ class JAVA < JVM
         end
 
         @java_version_version = '?'
-        @java_version_low     = '?'
-        @java_version_high    = '?'
 
         lines = []
         IO.popen([java(), '-version',  :err=>[:child, :out]]) { | stdout |
             begin
                 stdout.each { |line|
                     lines.push(line)
-                    m = /version\s+\"([0-9]+)\.([0-9]+)\.([^\"]*)\"/.match(line.chomp)
+                    m = /version\s+\"([^\"]*)\"/.match(line.chomp)
                     if m
-                        @java_version_high = m[1]
-                        @java_version_low  = m[2]
-                        @java_version      = "#{@java_version_high}.#{@java_version_low}.#{m[3]}"
+                        @java_version = m[1]
                         stdout.close
                         break
                     end
@@ -313,6 +322,10 @@ class JAVA < JVM
     def javadoc() jtool('javadoc') end
     def java()    jtool('java')    end
     def jar()     jtool('jar')     end
+
+    def SDKMAN(version, candidate = 'java')
+        @java_home = super
+    end
 
     protected
 
@@ -339,6 +352,10 @@ class GROOVY < JVM
         raise "Cannot find groovy home '#{@groovy_home}'" unless File.exists?(@groovy_home)
 
         puts "Groovy home: '#{groovy_home}'"
+    end
+
+    def SDKMAN(version, candidate = 'groovy')
+        @groovy_home = super
     end
 
     def groovyc() File.join(@groovy_home, 'bin', 'groovyc') end
@@ -374,12 +391,18 @@ class KOTLIN < JVM
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
 
-        REQUIRE(KotlinClasspath) {
+        KotlinClasspath {
             @kotlin_home = kotlinc_path
         }
     end
 
+    def SDKMAN(version, candidate = 'kotlin')
+        @kotlin_home = super
+    end
+
     def kotlinc() File.join(@kotlin_home, 'bin', 'kotlinc') end
+
+    def kotlin() File.join(@kotlin_home, 'bin', 'kotlin') end
 end
 
 # Scala environment
@@ -400,19 +423,17 @@ class SCALA < JVM
         puts "Scala home: '#{@scala_home}'"
     end
 
+    def SDKMAN(version, candidate = 'scala')
+        @scala_home = super
+    end
+
     def scalac() File.join(@scala_home, 'bin', 'scalac') end
 
     def scala() File.join(@scala_home, 'bin', 'scala') end
 end
 
-
-class RunJavaTool < RunTool
+class RunJvmTool < RunTool
     attr_reader :classpaths
-
-    def initialize(name, &block)
-        REQUIRE JAVA
-        super
-    end
 
     # the method is called when required classpath is specified
     # (classpath classes are auto assignable artifact that has
@@ -423,13 +444,17 @@ class RunJavaTool < RunTool
     end
 
     def classpath
-        cp = @java.classpath
+        cp = tool_classpath()
         cp.JOIN(@classpaths) if @classpaths
         return cp
     end
 
     def error_exit_code?(ec)
-        return ec != 0
+        ec != 0
+    end
+
+    def tool_classpath
+        raise "#{self.class}.tool_classpath() is not implemented"
     end
 
     def run_with_options(opts)
@@ -438,3 +463,16 @@ class RunJavaTool < RunTool
         return opts
     end
 end
+
+class RunJavaTool < RunJvmTool
+    def initialize(name, &block)
+        REQUIRE JAVA
+        super
+    end
+
+    def tool_classpath
+        @java.classpath
+    end
+end
+
+

@@ -3,12 +3,11 @@ require 'fileutils'
 require 'lithium/java-artifact/base'
 
 #  Java 
-class JavaCompiler < RunJavaTool
+class JvmCompiler < RunJvmTool
     log_attr :destination, :create_destination
 
     def initialize(name, &block)
         @create_destination = false
-        @description        = 'JAVA'
         @destination        = nil
         super
     end
@@ -35,7 +34,6 @@ class JavaCompiler < RunJavaTool
 
             return @destination
         else
-            puts_warning 'Destination has not been specified, it will be auto-detected'
             pp = project
             while not pp.nil?
                 hd = pp.homedir
@@ -51,10 +49,6 @@ class JavaCompiler < RunJavaTool
             end
             return nil
         end
-    end
-
-    def run_with
-        @java.javac
     end
 
     def list_dest_paths()
@@ -91,9 +85,26 @@ class JavaCompiler < RunJavaTool
     end
 
     def what_it_does() "Compile (#{@description})\n    from: '#{@name}'\n    to:   '#{destination()}'" end
+end
+
+class JavaCompiler < JvmCompiler
+    def initialize(name, &block)
+        REQUIRE JAVA
+        super
+        @description = 'JAVA'
+    end
+
+    def run_with
+        @java.javac
+    end
+
+    def tool_classpath
+        @java.classpath
+    end
 
     def self.abbr() 'JVC' end
 end
+
 
 class JDTCompiler < JavaCompiler
     def initialize(name, &block)
@@ -122,15 +133,15 @@ end
 
 
 # Groovy 
-class GroovyCompiler < JavaCompiler
+class GroovyCompiler < JvmCompiler
     def initialize(name, &block)
         REQUIRE GROOVY
         super
         @description = 'Groovy'
     end
 
-    def classpath
-        super.JOIN(@groovy.classpaths)
+    def tool_classpath
+        @groovy.classpath
     end
 
     def run_with
@@ -146,15 +157,15 @@ end
 
 #
 # Kotlin 
-class KotlinCompiler < JavaCompiler
+class KotlinCompiler < JvmCompiler
     def initialize(name, &block)
         REQUIRE KOTLIN
         super
         @description = 'Kotlin'
     end
 
-    def classpath
-        super.JOIN(@kotlin.classpaths)
+    def tool_classpath
+        @kotlin.classpath
     end
 
     def run_with
@@ -176,10 +187,11 @@ class KotlinCompiler < JavaCompiler
 end
 
 # Scala 
-class ScalaCompiler < JavaCompiler
+class ScalaCompiler < JvmCompiler
     def initialize(name, &block)
         REQUIRE SCALA
         super
+        OPT "-no-colors"
         @description = 'Scala'
     end
 
@@ -187,8 +199,8 @@ class ScalaCompiler < JavaCompiler
         @scala.scalac
     end
 
-    def classpath
-        super.JOIN(@scala.classpaths)
+    def tool_classpath
+        @scala.classpath
     end
 
     def what_it_does

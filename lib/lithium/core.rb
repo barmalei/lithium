@@ -592,7 +592,7 @@ end
 #  "@name" - name of artifact
 #  "@shortname"
 class Artifact
-    attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored
+    attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored, :initialization_on
 
     @default_name = nil
 
@@ -616,7 +616,12 @@ class Artifact
 
         # call instance proxy constructor to be able to track caller stack if a
         # new artifact is created inside the constructor
-        instance.send(:initialize, name, &block)
+        begin
+            instance.initialization = true
+            instance.send(:initialize, name, &block)
+        ensure
+            instance.initialization = false
+        end
         return instance
     end
 
@@ -642,6 +647,14 @@ class Artifact
 
     def createdByMeta=(m)
         @createdByMeta = m
+    end
+
+    def initialization=(value)
+        @_initialization = value
+    end
+
+    def initialization?
+       @_initialization == true
     end
 
     def owner=(value)
@@ -685,7 +698,13 @@ class Artifact
                 raise $!
             end
 
-            return REQUIRE(clazz.new(args.length > 0 ? args[0] : nil, owner:_detect_required_owner(), &block)) if clazz < Artifact
+            raise "Invalid requirement/build artifact '#{clazz}' class" unless clazz < Artifact
+            art = clazz.new(args.length > 0 ? args[0] : nil, owner:_detect_required_owner(), &block)
+            if initialization?
+                return REQUIRE(art)
+            else
+                return ArtifactTree.build(art)
+            end
         end
 
         super(meth, *args, &block)
@@ -724,7 +743,9 @@ class Artifact
     end
 
     # test if the given artifact has expired and need to be built
-    def expired?() true end
+    def expired?
+        true
+    end
 
     # clean method should be implemented to clean artifact related
     # build stuff
@@ -782,10 +803,12 @@ class Artifact
         raise "'#{art}' DEPENDENCY cannot be found and dismissed" if ln2 == ln1
     end
 
+    # called after the artifact has been built
     def DONE(&block)
         @done = block
     end
 
+    # called when artifact has not been built since it did not expired
     def IGNORED(&block)
         @ignored = block
     end
@@ -815,7 +838,7 @@ class Artifact
                 stdin.close
 
                 while line = stdout.gets do
-                   $stdout.puts line
+                    $stdout.puts line
                 end
             else
                 block.call(stdin, stdout, thread)
@@ -1603,7 +1626,7 @@ class RunTool < FileMask
     end
 
     def run_with
-        raise "Tool name is not known for '#{self.class}'" if @run_with.nil?
+        raise "Run tool name is not known for '#{self.class}' artifact" if @run_with.nil?
         @run_with
     end
 
@@ -1960,7 +1983,6 @@ module AssignableDependency
     end
 end
 
-
 # Environment artifact
 class EnvArtifact < Artifact
     include AssignableDependency
@@ -1976,8 +1998,6 @@ class EnvArtifact < Artifact
 
         return @default_name
     end
-
-    def build() end
 end
 
 # The base class to support classpath / path like artifact

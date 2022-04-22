@@ -23,7 +23,7 @@
     UglifiedJSFile('minjs:**/*.min.js')
     NodejsModule('npm:**/node_modules/*')
 
-    RunMaven('mvn:*')
+    #RunMaven('mvn:*')
 
     GeneratedDirectory("test") {
         @full_copy = true
@@ -47,13 +47,6 @@
     }
 
     MATCH("run:*") {
-        RunJavaCode('.lithium/ext/java/lithium/src/*') {
-            DefaultClasspath("li_run_class_path") {
-                JOIN('.lithium/ext/java/lithium/classes')
-                JOIN('.lithium/ext/java/lithium/lib/*.jar')
-            }
-        }
-
         RunJavaCode      ('**/*.java')
         RunNodejs        ('**/*.js')
         RunPythonScript  ('**/*.py')
@@ -61,6 +54,8 @@
         RunShell         ('**/*.sh')
         RunJAR           ('**/*.jar')
         RunMaven         ('**/pom.xml')
+        RunGradle        ('**/build.gradle.kts')
+        RunGradle        ('**/build.gradle')
         RunGroovyScript  ('**/*.groovy')
         RunKotlinCode    ('**/*.kt')
         RunScalaCode     ('**/*.scala')
@@ -69,6 +64,8 @@
         RunRubyScript    ('**/*.rb') 
         CppCodeRunner    ('**/*.cpp')
         CppCodeRunner    ('**/*.c')
+        RunDartCode      ('**/*.dart')
+        RunDartPub       ('**/pubspec.yaml')
     }
 
     MATCH("test:*") {
@@ -80,15 +77,6 @@
     }
 
     MATCH("compile:*") {
-        JavaCompiler('.lithium/ext/java/lithium/src/*.java') {
-            DefaultClasspath("li_run_class_path") {
-                JOIN('.lithium/ext/java/lithium/classes')
-                JOIN('.lithium/ext/java/lithium/lib/*.jar')
-            }
-
-            @destination = '.lithium/ext/java/lithium/classes'
-        }
-
         JavaCompiler        ('**/*.java')
         GroovyCompiler      ('**/*.groovy')
         KotlinCompiler      ('**/*.kt')
@@ -99,6 +87,8 @@
         RunNodejs           ('**/*.js') { OPT '--check'  }
         ValidatePythonScript('**/*.py')
         MavenCompiler       ('**/pom.xml')
+        GradleCompiler      ('**/build.gradle.kts')
+        GradleCompiler      ('**/build.gradle')
         ValidateXML         ('**/*.xml')
         CompileTTGrammar    ('**/*.tt')
         CompileSass         ('**/*.sass')
@@ -106,6 +96,7 @@
         RunMakefile         ('**/Makefile')
         CppCompiler         ('**/*.cpp')
         CppCompiler         ('**/*.c')
+        RunDartPubBuild     ('**/pubspec.yaml')
 
         OTHERWISE { | path |
             Project.build("compile:#{path}")

@@ -118,6 +118,7 @@ class Std
         msg = msg.to_s
         if msg.length > 0
             level = $! ? 3 : 0 if level == -1
+
             begin
                 msg.each_line { | line |
                     if line[-1, 1] != "\n"

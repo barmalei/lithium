@@ -19,8 +19,13 @@ class MVN < EnvArtifact
             @mvn_home = FileArtifact.which('mvn')
             @mvn_home = File.dirname(File.dirname(@mvn_home)) unless @mvn_home.nil?
         end
-        raise "Maven home '#{@mvn_home}' cannot be found" if @mvn_home.nil? || !File.exist?(@mvn_home)
-        puts "Maven home: '#{@mvn_home}'"
+
+        if @mvn_home.nil? || !File.exist?(@mvn_home)
+            puts_error "Maven home '#{@mvn_home}' cannot be found"
+            puts_error 'Configure/install MAVEN if it is required for your project'
+        else
+            puts "Maven home: '#{@mvn_home}'"
+        end
     end
 
     def expired?
