@@ -25,6 +25,7 @@ require 'lithium/rb-artifact'
 require 'lithium/php-artifact'
 require 'lithium/tt-artifact'
 require 'lithium/dart-artifact'
+require 'lithium/gcloud-artifact'
 require 'lithium/web-artifact'
 require 'lithium/c-artifact'
 
@@ -103,7 +104,11 @@ PATTERNS ({
         }
     ],
 
-    [ ValidateRubyScript, RunRubyScript ] => [
+    ValidateRubyScript => [
+
+    ],
+
+    RunRubyScript  => [
         StdPattern.new(2) {
             any('^\s*from\s+'); location('rb')
             COMPLETE_PATH()

@@ -9,8 +9,8 @@ require 'pathname'
 #      ans "basedir" as an option makes possible to build an external
 #      artifact in a context of the given project
 # !==================================================================
-$lithium_version    = '4.7.0'
-$lithium_date       = 'Dec 2021'
+$lithium_version    = '4.8.0'
+$lithium_date       = 'May 2022'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
@@ -23,7 +23,6 @@ artifact            = ARGV[ $lithium_options.length ]
 artifact_path       = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/]
 artifact_prefix     = artifact.nil? ? nil : (artifact_path.nil? ? artifact : artifact.chomp(artifact_path))
 
-# artifact name is not a path
 if $lithium_options.has_key?('basedir')
     bd = $lithium_options['basedir']
     raise 'Nil basedir has been passed' if bd.nil?
@@ -34,17 +33,17 @@ else
     basedir = Dir.pwd
 end
 
-#
-# IF artifact path is absolute AND "basedir" has not been passed as an option then:
-#   -- basedir is computed by passed artifact path if possible, pwd otherwise
-#
+# if artifact path is an absolute and "basedir" has not been passed as
+# an option then basedir is computed by passed artifact path if possible
+# otherwise pwd is used
 unless artifact_path.nil?
-    i = artifact_path.index(/[\?\*\{\}]/)                                # cut mask
+    i = artifact_path.index(/[\?\*\{\}]/)                                # detect mask
     artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil # store mask
     artifact_path = artifact_path[0, i] if !i.nil? && i >= 0             # cut mask from path
 
-    # if basedir has not been defined and path is not absolute let's try to
-    # lookup basedir by joining it with current directory (make it absolute)
+    # if basedir has not been defined and path is not an absolute one let's try to
+    # lookup basedir by joining it with current directory (combine it to build an
+    # absolute path)
     artifact_path = File.join(basedir, artifact_path) unless (File.absolute_path?(artifact_path) || $lithium_options.has_key?('basedir'))
 
     if File.absolute_path?(artifact_path)

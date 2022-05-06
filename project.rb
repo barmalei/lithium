@@ -17,7 +17,6 @@
         }
     }
 
-
     Touch('touch:*')
 
     UglifiedJSFile('minjs:**/*.min.js')
@@ -66,6 +65,7 @@
         CppCodeRunner    ('**/*.c')
         RunDartCode      ('**/*.dart')
         RunDartPub       ('**/pubspec.yaml')
+        DeployGoogleApp  ('**/appengine-*.xml')
     }
 
     MATCH("test:*") {
@@ -99,7 +99,8 @@
         RunDartPubBuild     ('**/pubspec.yaml')
 
         OTHERWISE { | path |
-            Project.build("compile:#{path}")
+            raise "Unsupported '#{path}' file type"
+            #Project.build("compile:#{path}")
         }
     }
 
@@ -107,16 +108,15 @@
         JavaCheckStyle('**/*.java')
         JavaScriptHint('**/*.js')
 
-        OTHERWISE { | path |
-            Project.build("check:#{path}")
-        }
+        # OTHERWISE { | path |
+        #     raise "Unsupported '#{path}' file type"
+        # }
     }
 
     PMD('pmd:**/*.java')
     #MavenJarFile('mavenjar:**/*.jar')
 
-    # TODO: grep class already fetch lithium arguments
-    GREP('grep:') {
-        @grep = $lithium_args[0] if $lithium_args.length > 0
-    }
+    GREP('grep:')
+
+    REGREP('regrep:')
 }

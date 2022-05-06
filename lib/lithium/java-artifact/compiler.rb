@@ -51,7 +51,7 @@ class JvmCompiler < RunJvmTool
         end
     end
 
-    def list_dest_paths()
+    def list_dest_paths
         dest = destination()
         unless dest.nil?
             list_source_paths { | path |
@@ -171,13 +171,6 @@ class KotlinCompiler < JvmCompiler
     def run_with
         @kotlin.kotlinc
     end
-
-    # TODO: not clear what it is
-    # def build_destination()
-    #     dest = fullpath(destination())
-    #     return dest if File.extname(File.basename(dest)) == '.jar'
-    #     return super
-    # end
 
     def what_it_does
         "Compile Kotlin '#{@name}' code\n            to '#{destination()}'"

@@ -41,6 +41,9 @@
                     ,{ "caption": "Detect field", "command": "li_show_class_field"     }
                     ,{ "caption": "Show class info", "command": "li_show_class_info"     }
                     ,{ "caption": "Go to class", "command": "li_goto_class"     }
+
+                    ,{ "caption": "-" }
+                    ,{ "caption": "Deploy GCA",  "command": "li", "args": { "command": "DeployGoogleApp:{file}" } }
                 ]
             }
         ]

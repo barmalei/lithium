@@ -4,7 +4,7 @@ require 'lithium/core'
 require 'rexml/document'
 require 'tempfile'
 
-class JavaClasspath < Artifact
+class JavaClasspath < EnvArtifact
     include AssignableDependency
     include LogArtifactState
     include PATHS

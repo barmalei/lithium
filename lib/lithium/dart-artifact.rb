@@ -45,7 +45,6 @@ class RunDartCode < FileCommand
     def self.abbr() 'RDS' end
 end
 
-
 class PubspecFile < ExistentFile
     include LogArtifactState
     include StdFormater
@@ -105,5 +104,12 @@ class RunDartPubBuild < RunDartPub
     def initialize(name, &block)
         super
         TARGETS('build')
+    end
+end
+
+class RunDartPubGet < RunDartPub
+    def initialize(name, &block)
+        super
+        TARGETS('get')
     end
 end

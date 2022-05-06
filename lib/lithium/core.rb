@@ -130,13 +130,14 @@ module LogArtifactState
     #  Common logging API part
     #############################################################
     def logs_home_dir
-        raise 'Cannot detect log directory since project home is unknown' if !homedir()
-        h = File.join(homedir, '.lithium', '.logs')
-        unless File.exists?(h)
-            puts_warning "LOG directory '#{h}' cannot be found. Try to create it ..."
-            Dir.mkdir(h)
+        hd = homedir
+        raise 'Cannot detect log directory since project home is unknown' if !hd
+        log_hd = File.join(hd, '.lithium', '.logs')
+        unless File.exists?(log_hd)
+            puts_warning "LOG directory '#{log_hd}' cannot be found. Try to create it ..."
+            Dir.mkdir(log_hd)
         end
-        return h
+        return log_hd
     end
 
     # check if log can be done
@@ -369,49 +370,68 @@ end
 
 # Option support
 module OptionsSupport
+    @@NAMED_OPT = /^(\-{0,2})([^=]+)=(.*)/
+
     def OPTS(*args)
-        @options = options()
+        @_options = _options()
         if args.length > 0
-            @options = []
-            @options.push(*args)
+            @_options = []
+            @_options.push(*args)
         end
-        return @options.join(' ')
+        return @_options.join(' ')
     end
 
     def OPT(opt)
-        @options = options()
-        @options.push(opt)
+        _options().push(opt)
     end
 
     def OPT?(op)
-        @options = options()
-        return @options.include?(op)
+        _options().include?(op) || !self[op].nil?
     end
 
     def OPTS?
-        @options = options()
-        return @options.length > 0
+        _options().length > 0
+    end
+
+    def []=(n, v = nil)
+        raise 'Option name cannot be nil or empty' if n.nil? || n.strip() == ''
+        opt   = n.strip()
+        opt  += "=#{v.strip}" unless v.nil?
+        opts  = _options()
+
+        i = opts.index { | o |
+            m = @@NAMED_OPT.match(o)
+            !m.nil? && (n == m[2] || n == '-' + m[2] || n == '--' + m[2])
+        }
+
+        if i.nil?
+            opts.push(opt)
+        else
+            if opt[0] != '-'
+                m = /^(\-{0,2})/.match(opts[i])
+                opt = m[1] + opt unless m.nil?
+            end
+            opts[i] = opt
+        end
+    end
+
+    def [](n)
+        _options().each { | o |
+            m = @@NAMED_OPT.match(o)
+            return m[3] if !m.nil? && (m[2] == n || '-' + m[2] == n || '--' + m[2] == n)
+        }
+        return nil
     end
 
     # return valid not nil attribute value in a case of making it loggable.
     # Otherwise 'option' attribute can equal [] after building (since OPTS)
     # method has been called, but be nil before an artifact building
-    def options
-        @options ||= []
-        return @options
+    def _options
+        @_options ||= []
+        return @_options
     end
 end
 
-#  TODO: Problem list
-#   + Project.current should be replaced with target
-#   + normalize homedir()
-#   + Lithium project defined artifact has to be re-populated with owner of current project otherwise
-#      compile/run common artifact will get lithium as its owner
-#      - Shared flag has been added to say if teh given artifact has to be instantiated in context
-#        of the calling project context. May be shared should be defined on the level of artifact ?
-#   - usage of $lithium_code should be minimized
-#   + re-use artifact implementation
-#
 #   Artifact name keeps order of artifact following the rules below:
 #     1) aliased artifact precede not aliased artifact and sorted alphabetically
 #     2) the same aliased artifact with path specified sorted by this path
@@ -454,7 +474,7 @@ class ArtifactName < String
             raise "Unexpected number of parameters #{args.length}, #{args}, one or two parameters are expected"
         end
 
-        name = ArtifactName.assert_notnil_name(name)
+        name = ArtifactName.assert_notnil_name(name, clazz)
 
         @mask_type = File::FNM_DOTMATCH
         @prefix, @path, @path_mask, @suffix = nil, nil, nil, nil
@@ -490,9 +510,9 @@ class ArtifactName < String
         return artname
     end
 
-    def self.assert_notnil_name(name)
-        raise 'Invalid artifact name, string name is expected' if !name.nil? && !name.kind_of?(String)
-        raise "Passed name is nil" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
+    def self.assert_notnil_name(name, clazz = nil)
+        raise "Invalid artifact name, string name is expected class = '#{clazz}'" if !name.nil? && !name.kind_of?(String)
+        raise "Passed name is nil class = '#{clazz}'" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
         return name
     end
 
@@ -594,13 +614,18 @@ end
 class Artifact
     attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored, :initialization_on
 
-    @default_name = nil
+    @default_name  = nil
+    @default_block = nil
 
     # set or get default artifact name
     def Artifact.default_name(*args)
         @default_name = args[0] if args.length > 0
-        @default_name = File.join('.env', self.name) if @default_name.nil?
-        return @default_name
+        @default_name
+    end
+
+    def Artifact.default_block(&block)
+        @default_block = block unless block.nil?
+        @default_block
     end
 
     # !!! this method cares about owner and default name setup, otherwise
@@ -627,7 +652,7 @@ class Artifact
 
     def initialize(name = nil, &block)
         # test if the name of the artifact is not nil or empty string
-        name = ArtifactName.assert_notnil_name(name)
+        name = ArtifactName.assert_notnil_name(name, self.class)
         @name, @shortname = name, File.basename(name)
 
         # block can be passed to artifact
@@ -845,6 +870,18 @@ class Artifact
             end
             return thread.value
         }
+    end
+
+    def Artifact.execInTerm(hd, cmd)
+        pl = Gem::Platform.local.os
+        if  pl == 'darwin'
+            `osascript -e 'tell app "Terminal"
+                activate
+                do script "cd #{hd}; #{cmd}"
+            end tell'`
+        else
+            raise "Terminal execution is not supported for '#{pl}' platform"
+        end
     end
 end
 
@@ -1501,7 +1538,6 @@ class ExistentDirectory < FileArtifact
 end
 
 # File mask artifact that can identify set of file artifacts
-#
 class FileMask < FileArtifact
     def initialize(name, &block)
         super
@@ -1556,7 +1592,7 @@ class RunTool < FileMask
     include LogArtifactState
     include OptionsSupport
 
-    log_attr :options, :arguments, :list_expired
+    log_attr :_options, :arguments, :list_expired
 
     def initialize(name)
         @source_file_prefix = '@'
@@ -1654,15 +1690,11 @@ class RunTool < FileMask
 
         begin
             src, len = source
-
             puts_warning "Source files cannot be detected by '#{@name}'" if src.nil?
 
-            cmd = [ run_with ]
-            cmd.concat(run_with_options(options().dup))
-            cmd.concat(run_with_target(src))
-            cmd.concat(@arguments)
+            cmd = [ run_with ].concat(run_with_options(_options().dup), run_with_target(src), @arguments)
 
-            go_to_homedir
+            go_to_homedir()
 
             if block.nil?
                 ec = Artifact.exec(*cmd)
@@ -1690,7 +1722,6 @@ class RunShell < RunTool
     end
 end
 
-
 module ArtifactContainer
     #  (name : String | ArtifactName | Class)
     def artifact(name, &block)
@@ -1701,6 +1732,7 @@ module ArtifactContainer
 
         # fund local info about the given artifact
         meta = find_meta(artname)
+
         if meta.nil?
             unless owner.nil?
                 # There are two types of container: project and file mask containers. File mask containers
@@ -1712,9 +1744,9 @@ module ArtifactContainer
                 return owner.artifact(name, &block) if delegate_to_owner_if_meta_cannot_be_found?
             end
 
-            meta = _meta_from_owner(name)
+            meta, meta_ow = _meta_from_owner(name)
             unless meta.nil?
-                # attempt to handle situation when an artifact meta the container has been
+                # attempt to handle situation an artifact meta of the given container has been
                 # created is going to be applied to artifact creation. It can indicate we
                 # have cyclic come back
                 raise "There is no an artifact META associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
@@ -1765,9 +1797,8 @@ module ArtifactContainer
     end
 
     def _remove_from_cache(name)
-        #TODO: WTF?
-        # name = ArtifactName.new(name)
-        # _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
+        name = ArtifactName.new(name)
+        _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
     end
 
     # instantiate the given artifact by its meta
@@ -1776,9 +1807,10 @@ module ArtifactContainer
         clazz = meta.clazz
 
         art = clazz.new(name.suffix, owner:self,
-            &(block.nil? ? meta.block : Proc.new {
+            &(block.nil? && clazz.default_block.nil? ? meta.block : Proc.new {
+                self.instance_eval &clazz.default_block unless clazz.default_block.nil?
                 self.instance_eval &meta.block unless meta.block.nil?
-                self.instance_eval &block
+                self.instance_eval &block unless block.nil?
             })
         )
 
@@ -1787,14 +1819,17 @@ module ArtifactContainer
     end
 
     def _meta_from_owner(name)
-        name = ArtifactName.new(name)
-        ow   = owner
-        meta = nil
+        name    = ArtifactName.new(name)
+        ow      = owner
+        meta    = nil
+        meta_ow = nil
         while !ow.nil? && meta.nil? do
             meta = ow.find_meta(name)
+            meta_ow = ow unless meta.nil?
             ow = ow.owner
         end
-        return meta;
+
+        return meta, meta_ow;
     end
 
     # meta hosts ArtifactName instances
@@ -1825,15 +1860,15 @@ module ArtifactContainer
         name = ArtifactName.new(*args, &block)
         raise "Unknown class for '#{name}' artifact" if name.clazz.nil?
 
-        # delete artifacts that are already exists
+        # delete artifacts that already exists
         s_name = name.to_s
         _meta.delete_if { | e |
             e.to_s == s_name
         }
 
         _meta.push(name)
-        # sort meta array
-        _meta.sort
+         # sort meta array
+        _meta.sort!
     end
 
     def MATCH(file_mask, &block)
@@ -1857,21 +1892,32 @@ module ArtifactContainer
         super
     end
 
-    # TODO: this method most likely should be removed
     def REUSE(name, &block)
         raise "Project '#{self}' doesn't have parent project to re-use its artifacts" if owner.nil?
         artname = ArtifactName.new(name)
-        meta    = _meta_from_owner(name)
+        meta, meta_ow = _meta_from_owner(name)
         raise "Cannot find '#{artname}' in parent projects" if meta.nil?
 
         _meta.push(meta.reuse(&block))
 
         # sort meta array
-        _meta.sort
+        _meta.sort!
     end
 
     def REMOVE(name)
-        # TODO: implement it
+        artname = ArtifactName.new(name)
+        meta, meta_ow = _meta_from_owner(name)
+
+        raise "Cannot find '#{artname}' in parent projects" if meta.nil?
+        raise "Artifact '#{artname}' definition cannot be detected in an owner container" if meta_ow._meta.delete(meta).nil?
+
+        # sort meta array
+        meta_ow._meta.sort!
+    end
+
+    # define a default block that will be applied to all instances of the given class
+    def _(clazz, &block)
+        clazz.default_block(&block)
     end
 
     def delegate_to_owner_if_meta_cannot_be_found?
@@ -1882,6 +1928,13 @@ end
 # mask container
 class FileMaskContainer < FileMask
     include ArtifactContainer
+
+    def initialize(name, &block)
+        super
+
+        # sort artifacts that have been created with passed block
+        _meta.sort!
+    end
 
     def delegate_to_owner_if_meta_cannot_be_found?
         true
@@ -2185,7 +2238,7 @@ end
 class OTHERWISE < FileMask
     def initialize(name, &block)
         super(name) {} # prevent passing &block to super with empty one
-        raise "Block is required for #{self.class} artifact" if block.nil?
+        raise "Block is required for '#{self.class}' artifact" if block.nil?
         @callback = block
         @ignore_dirs = true
         @build_ext_pattern = true
@@ -2210,8 +2263,8 @@ class OTHERWISE < FileMask
     end
 end
 
-
 # Action applied to the passed artifact
+# TODO: revise the artifact may it should be removed
 class ArtifactAction < Artifact
     attr_reader :target
 

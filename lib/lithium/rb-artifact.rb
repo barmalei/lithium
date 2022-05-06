@@ -1,6 +1,6 @@
 require 'lithium/file-artifact/command'
 
-class RUBYPATH < Artifact
+class RUBYPATH < EnvArtifact
     include AssignableDependency
     include LogArtifactState
     include PATHS

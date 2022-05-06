@@ -4,7 +4,7 @@ require 'lithium/core'
 
 #  Touch file - change the file updated time stamp
 class Touch < FileArtifact
-    def build()
+    def build
         super
 
         path = fullpath()
@@ -21,7 +21,7 @@ class Touch < FileArtifact
         Touch.new(path).build
     end
 
-    def what_id_does()
+    def what_id_does
         "Touch '#{fullpath}'"
     end
 end
@@ -50,14 +50,10 @@ class CopyOfFile < FileArtifact
 
     def build
         super
-        fetch(validate_source, fullpath)
+        FileUtils.cp(validate_source, fullpath)
     end
 
-    def fetch(src, dest)
-        FileUtils.cp(src, dest)
-    end
-
-    def validate_source()
+    def validate_source
         raise 'Source path is not defined' if @source.nil?
         src = File.absolute_path?(@source) ? @source : fullpath(@source)
         raise "Source '#{src}' doesn't exist or points to a directory" unless File.file?(src)
@@ -69,7 +65,7 @@ end
 
 #  Remove a file or directory
 class RmFile < FileCommand
-    def build()
+    def build
         super
 
         path = fullpath
@@ -82,7 +78,7 @@ class RmFile < FileCommand
         end
     end
 
-    def expired?()
+    def expired?
         File.exists?(fullpath)
     end
 end
@@ -154,3 +150,16 @@ class REGREP < GREP
     end
 end
 
+class RunInTerminal < ExistentFile
+    def build
+        Artifact.execInTerm(homedir, command)
+    end
+
+    def command
+        IO.read(fullpath())
+    end
+
+    def expired?
+        true
+    end
+end

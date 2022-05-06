@@ -135,7 +135,6 @@ class GradleCompiler < RunGradle
     end
 end
 
-
 class GradleClasspath < InFileClasspath
     include StdFormater
 

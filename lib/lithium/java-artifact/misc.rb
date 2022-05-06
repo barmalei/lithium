@@ -96,8 +96,8 @@ class FindInClasspath < ArtifactAction
         classpath = @target           if @target.kind_of?(JavaClasspath)
         res       = []
 
-        unless @target.classpath.EMPTY?
-            find(@target.classpath, *(@patterns)) { | path, item |
+        unless classpath.EMPTY?
+            find(classpath, *(@patterns)) { | path, item |
                 path   = File.absolute_path(path)
                 r_path = FileArtifact.relative_to(path, @target.homedir)
                 path   = r_path unless r_path.nil?

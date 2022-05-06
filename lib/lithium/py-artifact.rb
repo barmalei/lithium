@@ -1,7 +1,7 @@
 require 'lithium/core'
 require 'lithium/file-artifact/command'
 
-class PYPATH < Artifact
+class PYPATH < EnvArtifact
     include AssignableDependency
     include LogArtifactState
     include PATHS

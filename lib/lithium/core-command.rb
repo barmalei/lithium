@@ -107,7 +107,7 @@ class REQUIRE < Artifact
         puts "Artifact '#{@shortname}' dependencies list {"
         Project.artifact(@name).requires { | dep, block |
             aname = dep.kind_of?(Artifact) ? ArtifactName.new(dep.name, dep.class, &block) : ArtifactName.new(dep, &block)
-            printf("    %-20s : '%s'\n", dep.name, dep)
+            printf("    %-20s : '%s'\n", aname, dep)
         }
         puts '}'
     end
