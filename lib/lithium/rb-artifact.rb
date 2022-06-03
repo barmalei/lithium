@@ -1,7 +1,6 @@
 require 'lithium/file-artifact/command'
 
 class RUBYPATH < EnvArtifact
-    include AssignableDependency
     include LogArtifactState
     include PATHS
 
@@ -9,10 +8,6 @@ class RUBYPATH < EnvArtifact
 
     def assign_me_to
        :add_rubypath
-    end
-
-    def expired?
-        false
     end
 
     def build
@@ -27,25 +22,14 @@ class DefaultRubypath < RUBYPATH
 end
 
 # Ruby environment
-class RUBY < EnvArtifact
-    include LogArtifactState
-    include AutoRegisteredArtifact
-
-    log_attr :ruby_home
+class RUBY < SdkEnvironmen
+    @tool_name = 'ruby'
+    @abbr      = 'RUB'
 
     def initialize(name, &block)
         @ruby_paths = []
         REQUIRE DefaultRubypath
         super
-
-        @ruby_home ||= nil
-        if @ruby_home.nil?
-            @ruby_home = FileArtifact.which('ruby')
-            raise 'Ruby cannot be found' if @ruby_home.nil?
-            @ruby_home = File.dirname(File.dirname(@ruby_home))
-        end
-
-        puts "Ruby home   : '#{@ruby_home}'\n     library: '#{rubypath}'"
     end
 
     def add_rubypath(rp)
@@ -56,16 +40,18 @@ class RUBY < EnvArtifact
         PATHS.new(project.homedir).JOIN(@ruby_paths)
     end
 
-    def ruby() File.join(@ruby_home, 'bin', 'ruby') end
+    def ruby
+        tool_path('ruby')
+    end
 
     def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{rubypath}'" end
-
-    def self.abbr() 'RUB' end
 end
 
 # Run ruby script
-class RunRubyScript < FileCommand
+class RunRubyScript < ExistentFile
     include OptionsSupport
+
+    @abbr = 'RRS'
 
     def initialize(name, &block)
         REQUIRE RUBY
@@ -92,17 +78,17 @@ class RunRubyScript < FileCommand
     end
 
     def build
-        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, OPTS(), cmd_rubypath, "\"#{fullpath}\"") != 0
+        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, OPTS(), cmd_rubypath, q_fullpath) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
-
-    def self.abbr() 'RRS' end
 end
 
 # Validate RUBY script
 class ValidateRubyScript < FileMask
     include OptionsSupport
+
+    @abbr = 'VRS'
 
     def initialize(name, &block)
         REQUIRE RUBY
@@ -112,10 +98,8 @@ class ValidateRubyScript < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if Artifact.exec(@ruby.ruby, OPTS(), "\"#{fullpath(path)}\"") != 0
+        raise "Validation RUBY script '#{path}' failed" if Artifact.exec(@ruby.ruby, OPTS(), q_fullpath(path)) != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end
-
-    def self.abbr() 'VRS' end
 end

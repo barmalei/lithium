@@ -2,28 +2,21 @@ require 'lithium/core'
 require 'lithium/properties'
 require 'lithium/file-artifact/command'
 
-class GCE < EnvArtifact
-    include LogArtifactState
-    include AutoRegisteredArtifact
-    include OptionsSupport
-
-    def initialize(name, &block)
-        super
-        @gce_home = File.dirname(File.dirname(FileArtifact.which('gcloud'))) unless @gce_home
-        raise "GCE home ('#{@gce_home}') cannot be detected" if !@gce_home || !File.directory?(@gce_home)
-        puts "GCE home '#{@gce_home}'"
-    end
+class GCE < SdkEnvironmen
+    @tool_name = 'gcloud'
 
     def gcloud
-        File.join(@gce_home, 'bin', 'gcloud')
+        tool_path('gcloud')
     end
 
     def what_it_does() "Initialize GCE environment '#{@name}'" end
 end
 
 class GoogleAppFile < ExistentFile
+    @abbr = 'GAF'
+
     def initialize(name = nil, &block)
-        app_file_path = [ 'appengine-web.xml' ].map { | app_file_name |
+        app_file_path = [ 'appengine-web.xml', 'app.yaml' ].map { | app_file_name |
             if !name.nil? && app_file_name == File.basename(name)
                 break fullpath(name)
             else
@@ -33,19 +26,18 @@ class GoogleAppFile < ExistentFile
                 raise "Few '#{fp}' application XMLs were found by '#{target}' path" if paths.length > 1
                 break paths[0] if paths.length == 1
             end
-            break nil
         }
 
-        raise 'Application file cannot be detected' if app_file_path.nil?
+        raise 'Application file cannot be detected' if app_file_path.nil? || app_file_path.length == 0
         super(app_file_path, &block)
         puts "Detected Google application file: '#{fullpath}'"
     end
-
-    def self.abbr() 'GAF' end
 end
 
 class DeployGoogleApp < GoogleAppFile
     include OptionsSupport
+
+    @abbr = 'DGA'
 
     def initialize(name, &block)
         REQUIRE GCE
@@ -65,6 +57,4 @@ class DeployGoogleApp < GoogleAppFile
     def what_it_does
         "Deploy google app '#{name}'"
     end
-
-    def self.abbr() 'DGA' end
 end

@@ -5,43 +5,11 @@ require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
 require 'lithium/std-core'
 
-class MVN < EnvArtifact
-    include LogArtifactState
-    include AutoRegisteredArtifact
-    include OptionsSupport
-
-    log_attr :mvn_home
-
-    def initialize(name, &block)
-        super
-
-        unless @mvn_home
-            @mvn_home = FileArtifact.which('mvn')
-            @mvn_home = File.dirname(File.dirname(@mvn_home)) unless @mvn_home.nil?
-        end
-
-        if @mvn_home.nil? || !File.exist?(@mvn_home)
-            puts_error "Maven home '#{@mvn_home}' cannot be found"
-            puts_error 'Configure/install MAVEN if it is required for your project'
-        else
-            puts "Maven home: '#{@mvn_home}'"
-        end
-    end
-
-    def expired?
-        false
-    end
-
-    def what_it_does
-        "Initialize Maven environment '#{@name}'"
-    end
+class MVN < SdkEnvironmen
+    @tool_name = 'mvn'
 
     def mvn
-        File.join(@mvn_home, 'bin', 'mvn')
-    end
-
-    def self.abbr
-        'MVN'
+        tool_path('mvn')
     end
 end
 
@@ -113,7 +81,7 @@ class MavenRepoArtifact < FileArtifact
     end
 
     def expired?
-        return !File.exists?(File.join(fullpath, "#{@id}-#{@ver}.jar"))
+        !File.exists?(File.join(fullpath, "#{@id}-#{@ver}.jar"))
     end
 
     def clean
@@ -150,7 +118,11 @@ class PomFile < ExistentFile
     end
 
     def assign_me_to
-        return 'pom'
+        'pom'
+    end
+
+    def expired?
+        false
     end
 
     def self.abbr() 'POM' end
@@ -217,13 +189,11 @@ end
 class RunMaven < PomFile
     include OptionsSupport
 
+    @abbr = 'RMV'
+
     def initialize(name, &block)
         super
         @targets ||= [ 'clean', 'install' ]
-    end
-
-    def expired?
-        true
     end
 
     def TARGETS(*args)
@@ -244,8 +214,6 @@ class RunMaven < PomFile
     def what_it_does
         "Run maven: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}', '#{@mvn.OPTS()}'"
     end
-
-    def self.abbr() 'RMV' end
 end
 
 class RunMavenTest < RunMaven

@@ -5,39 +5,16 @@ require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
 require 'lithium/std-core'
 
-# TODO: copy paste of MVN
-class GRADLE < EnvArtifact
-    include LogArtifactState
-    include AutoRegisteredArtifact
-    include OptionsSupport
-
-    log_attr :gradle_home
-
-    def initialize(name, &block)
-        super
-
-        unless @gradle_home
-            @gradle_home = FileArtifact.which('gradle')
-            @gradle_home = File.dirname(File.dirname(@gradle_home)) unless @gradle_home.nil?
-        end
-        raise "Gradle home '#{@gradle_home}' cannot be found" if @gradle_home.nil? || !File.exist?(@gradle_home)
-        puts "Gradle home: '#{@gradle_home}'"
-    end
-
-    def expired?
-        false
-    end
+class GRADLE < SdkEnvironmen
+    @tool_name = 'gradle'
+    @abbr      = 'GRD'
 
     def what_it_does
         "Initialize Gradle environment '#{@name}'"
     end
 
     def gradle
-        File.join(@gradle_home, 'bin', 'gradle')
-    end
-
-    def self.abbr
-        'GRD'
+        tool_path('gradle')
     end
 end
 
@@ -60,19 +37,17 @@ class GradleFile < ExistentFile
         return 'gradle'
     end
 
-    def self.abbr() 'GRD' end
+    def self.abbr() 'GRF' end
 end
 
 class RunGradle < GradleFile
     include OptionsSupport
 
+    @abbr = 'RGR'
+
     def initialize(name, &block)
         super
         @targets ||= [ 'build' ]
-    end
-
-    def expired?
-        true
     end
 
     def TARGETS(*args)
@@ -93,8 +68,6 @@ class RunGradle < GradleFile
     def what_it_does
         "Run gradle: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}', '#{@gradle.OPTS()}'"
     end
-
-    def self.abbr() 'RGR' end
 end
 
 class RunGradleTest < RunGradle

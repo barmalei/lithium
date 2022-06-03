@@ -26,6 +26,7 @@ module FileSourcesSupport
     def BASE(path)
         @sources ||= []
         @sources.each { | src |  src.BASE(path) unless src.relative_from.nil? }
+        return self
     end
 
     def sources(*src)
@@ -81,10 +82,10 @@ module FileSourcesSupport
         end
     end
 
-    def SOURCES(&block)
+    def REQUIRES(as_sources:true, &block)
         begin
             @add_as_sources = true
-            self.instance_eval &block
+            super(&block)
         ensure
             @add_as_sources = false
         end
@@ -100,7 +101,6 @@ module FileSourcesSupport
                 end
             end
         end
-
         super(art)
     end
 end
@@ -115,11 +115,6 @@ class MetaFile < ExistentFile
 
     attr_accessor :validate_items
     log_attr :base
-
-    def initialize(name, &block)
-        BASE(args[1]) if args.length > 1
-        super
-    end
 
     def list_items(rel = nil)
         fp = fullpath
@@ -161,20 +156,22 @@ end
 class GeneratedFile < FileArtifact
     include FileSourcesSupport
 
+    def expired?
+        !File.exists?(fullpath)
+    end
+
     def clean
         fp = fullpath
         raise "Path to generated file '#{fp}' points to directory" if File.directory?(fp)
         File.delete(fp) if File.file?(fp)
-    end
-
-    def expired?
-        !File.exists?(fullpath)
     end
 end
 
 # Generate directory
 class GeneratedDirectory < Directory
     include FileSourcesSupport
+
+    @abbr = 'DIR'
 
     def initialize(name, &block)
         @full_copy = false
@@ -298,10 +295,6 @@ class GeneratedDirectory < Directory
 
     def what_it_does
         "Generate folder '#{fullpath}' and its content"
-    end
-
-    def self.abbr
-        'DIR'
     end
 end
 

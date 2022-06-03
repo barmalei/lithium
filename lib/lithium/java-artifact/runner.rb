@@ -19,6 +19,8 @@ class RunJavaClass < JavaFileRunner
 end
 
 class RunJavaCode < JavaFileRunner
+    @abbr = 'JRF'
+
     def initialize(name, &block)
         super
         # TODO: hard-coded artifact prefix
@@ -30,8 +32,6 @@ class RunJavaCode < JavaFileRunner
     end
 
     def what_it_does() "Run JAVA '#{@name}' code" end
-
-    def self.abbr() 'JRF' end
 end
 
 class RunJUnit < JavaFileRunner
@@ -44,6 +44,8 @@ class RunJUnit < JavaFileRunner
     def classpath
         cp = super
         juv = detect_junit_version(cp) if juv.nil?
+
+        puts
 
         if juv == 5
             unless cp.INCLUDE?("**/junit-platform-console-standalone*.jar")

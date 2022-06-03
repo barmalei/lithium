@@ -5,7 +5,6 @@ require 'rexml/document'
 require 'tempfile'
 
 class JavaClasspath < EnvArtifact
-    include AssignableDependency
     include LogArtifactState
     include PATHS
 
@@ -13,11 +12,6 @@ class JavaClasspath < EnvArtifact
 
     def assign_me_to
         :add_classpath
-    end
-
-    # keep it to track the artifact logged expiration state
-    def expired?
-        false
     end
 
     def build
@@ -177,6 +171,10 @@ class InFileClasspath < FileArtifact
         return lines
     end
 
+    def expired?
+        false
+    end
+
     def EXCLUDE(*path)
         @exclude ||= []
         @exclude.push(*path)
@@ -227,8 +225,6 @@ class JVM < EnvArtifact
 
         return File.join(candidates[0])
     end
-
-    def self.abbr() 'JVM' end
 
     def self.grep_package(path, pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
         res = FileArtifact.grep_file(path, pattern)
@@ -290,33 +286,10 @@ class JAVA < JVM
             raise "JDK '#{@jdk_home}' directory is invalid" unless File.directory?(@jdk_home)
         end
 
-        @java_version_version = '?'
-
-        lines = []
-        IO.popen([java(), '-version',  :err=>[:child, :out]]) { | stdout |
-            begin
-                stdout.each { |line|
-                    lines.push(line)
-                    m = /version\s+\"([^\"]*)\"/.match(line.chomp)
-                    if m
-                        @java_version = m[1]
-                        stdout.close
-                        break
-                    end
-                }
-            rescue Errno::EIO
-                puts_warning 'Java version cannot be detected'
-            end
-        }
-
-        if @java_version.nil?
-            puts_error(lines.join(''))
-            raise "Java version cannot be identified for #{@java_home}"
-        end
+        @java_version = Artifact.grep_exec(File.join(@java_home, 'bin', 'java'), "-version", pattern:/version\s+\"([^\"]+)\"/)
+        raise "Java version cannot be identified for #{@java_home}" if @java_version.nil?
         puts "Java version '#{@java_version}', home '#{@java_home}'"
     end
-
-    def expired?() false end
 
     def javac()   jtool('javac')   end
     def javadoc() jtool('javadoc') end
@@ -474,5 +447,3 @@ class RunJavaTool < RunJvmTool
         @java.classpath
     end
 end
-
-

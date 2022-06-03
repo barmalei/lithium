@@ -205,7 +205,7 @@ class StdPattern
         raise 'Invalid level' if level.nil?
         @level, @stack, @matched = level, [], nil
         flush()
-        instance_eval(&block) unless block.nil?
+        instance_exec(&block) unless block.nil?
     end
 
     def MATCHED(&block)
@@ -331,7 +331,7 @@ class StdPattern
             @stack.push(_add_group(name))
 
             @re_parts.push("(?<#{name}>")
-            instance_eval(&block)
+            instance_exec(&block)
             @re_parts.push(')')
 
             @stack.pop
@@ -377,25 +377,25 @@ class StdPattern
 
     def rbrackets(&block)
         _append('\(')
-        instance_eval(&block)
+        instance_exec(&block)
         _append('\)')
     end
 
     def brackets(&block)
         _append('\[')
-        instance_eval(&block)
+        instance_exec(&block)
         _append('\]')
     end
 
     def quotes(&block)
         _append('\'')
-        instance_eval(&block)
+        instance_exec(&block)
         _append('\'')
     end
 
     def dquotes(&block)
         _append('\"')
-        instance_eval(&block)
+        instance_exec(&block)
         _append('\"')
     end
 
@@ -507,7 +507,7 @@ class StdPattern
                 end
             }
             stdMatch = StdMatch.new(msg, @groups, level)
-            stdMatch.instance_eval(&@matched) unless @matched.nil?
+            stdMatch.instance_exec(&@matched) unless @matched.nil?
             return stdMatch
         else
             return nil

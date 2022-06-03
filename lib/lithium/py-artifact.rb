@@ -2,7 +2,6 @@ require 'lithium/core'
 require 'lithium/file-artifact/command'
 
 class PYPATH < EnvArtifact
-    include AssignableDependency
     include LogArtifactState
     include PATHS
 
@@ -10,10 +9,6 @@ class PYPATH < EnvArtifact
 
     def assign_me_to
        :add_pypath
-    end
-
-    def expired?
-        false
     end
 
     def build
@@ -32,14 +27,14 @@ class PYTHON < EnvArtifact
     include LogArtifactState
     include AutoRegisteredArtifact
 
-    log_attr :python_home, :pyname
+    log_attr :sdk_home, :pyname
 
     def initialize(name, &block)
         @pypaths = []
         REQUIRE(DefaultPypath)
         super
 
-        if !@python_home
+        if !@sdk_home
             if @pyname
                 python_path = FileArtifact.which(@pyname)
             else
@@ -51,15 +46,15 @@ class PYTHON < EnvArtifact
                     @pyname= 'python3' if python_path
                 end
             end
-            @python_home = File.dirname(File.dirname(python_path)) if python_path
+            @sdk_home = File.dirname(File.dirname(python_path)) if python_path
         else
             @pyname ||= 'python'
         end
 
-        raise "Python home ('#{@python_home}') cannot be detected" if !@python_home || !File.directory?(@python_home)
+        raise "Python home ('#{@sdk_home}') cannot be detected" if !@sdk_home || !File.directory?(@sdk_home)
         raise "Python ('#{python()}') cannot be found"             unless File.file?(python())
 
-        puts "Python home '#{@python_home}', pyname = #{@pyname}"
+        puts "Python home '#{@sdk_home}', pyname = #{@pyname}"
     end
 
     def add_pypath(pp)
@@ -71,15 +66,17 @@ class PYTHON < EnvArtifact
     end
 
     def python
-        File.join(@python_home, 'bin', @pyname)
+        File.join(@sdk_home, 'bin', @pyname)
     end
 
     def what_it_does() "Initialize python environment '#{@name}'" end
 end
 
 #  Run python
-class RunPythonScript < FileCommand
+class RunPythonScript < ExistentFile
     include OptionsSupport
+
+    @abbr = 'RPS'
 
     def initialize(name, &block)
         REQUIRE PYTHON
@@ -95,12 +92,10 @@ class RunPythonScript < FileCommand
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
         pp = pypath()
         ENV['PYTHONPATH'] = pp.to_s unless pp.EMPTY?
-        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, OPTS(), "\"#{fullpath}\"") != 0
+        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
-
-    def self.abbr() 'RPS' end
 end
 
 class ValidatePythonCode < FileMask
@@ -112,11 +107,11 @@ class ValidatePythonCode < FileMask
     end
 
     def build_item(path, mt)
-        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', OPTS(), "\"#{fullpath(path)}\"") != 0
+        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', OPTS(), q_fullpath(path)) != 0
     end
 end
 
-class ValidatePythonScript < FileCommand
+class ValidatePythonScript < ExistentFile
     def initialize(name, &block)
         REQUIRE PYTHON
         super

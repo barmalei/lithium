@@ -34,6 +34,8 @@ end
 class META < Artifact
     include OptionsSupport
 
+    @abbr = 'MET'
+
     def initialize(name, &block)
         super
         OPT($lithium_options['meta.opt'])
@@ -69,7 +71,7 @@ class META < Artifact
         if index >= 0
             prj = stack[index]
             artname = ArtifactName.relative_to(@name, prj.homedir)
-            puts "#{shift}[+] Meta data for '#{prj}' project {\n"
+            puts "#{shift}[+] PROJECT:'#{prj}' {\n"
             puts_prj_metas(prj, artname, shift)
             traverse(stack, index - 1, shift + '    ')
             puts "#{shift}}"
@@ -81,7 +83,7 @@ class META < Artifact
         prj._meta.each { | m |
             ps = ''
             unless prj.owner.nil?
-                pmeta = prj.owner.find_meta(m)
+                pmeta = prj.owner.match_meta(m)
                 ps = " (#{prj.owner}:#{pmeta})" unless pmeta.nil?
             end
             pp = m.match(artname) ? " : [ '#{artname}' ]" : ''
@@ -98,14 +100,13 @@ class META < Artifact
     def what_it_does
         "List meta tree"
     end
-
-    def self.abbr() 'MET' end
 end
 
 class REQUIRE < Artifact
     def build
-        puts "Artifact '#{@shortname}' dependencies list {"
-        Project.artifact(@name).requires { | dep, block |
+        puts "Artifact '#{@shortname}:' dependencies list {"
+        art = Project.artifact(@name)
+        art.each_required { | dep, block |
             aname = dep.kind_of?(Artifact) ? ArtifactName.new(dep.name, dep.class, &block) : ArtifactName.new(dep, &block)
             printf("    %-20s : '%s'\n", aname, dep)
         }
@@ -116,6 +117,8 @@ class REQUIRE < Artifact
 end
 
 class TREE < Artifact
+    @abbr = 'TRE'
+
     def initialize(name)
         @show_id, @show_owner, @show_mtime = true, true, true
         super
@@ -134,7 +137,7 @@ class TREE < Artifact
             (@show_id ? " ##{root.art.object_id}" : '') +
             (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
             (@show_mtime ? " #{root.art.mtime}ms" : '') +
-            (@show_owner ? ":<#{root.art.owner.class}:#{root.art.owner.createdByMeta}>" : '')
+            (@show_owner ? ":<#{root.art.owner.class}:#{root.art.owner}>" : '')
 
         s = "#{' '*shift}" + (parent ? '+-' : '') + "#{name} (#{root.art.class})"  + e
         b = parent && root != parent.children.last
@@ -162,8 +165,6 @@ class TREE < Artifact
     end
 
     def what_it_does() "Show '#{@name}' dependencies tree" end
-
-    def self.abbr() 'TRE' end
 end
 
 # list expired items or/and attributes for the given artifact
@@ -201,6 +202,8 @@ class EXPIRED < Artifact
 end
 
 class INFO < Artifact
+    @abbr = 'INF'
+
     def self.info(art)
         art  = Project.artifact(art) unless art.kind_of?(Artifact)
 
@@ -243,11 +246,9 @@ class INFO < Artifact
         val = val[0 .. 128] + " [more ..] " if val.length > 128
         return val
     end
-
-    def self.abbr() 'INF' end
 end
 
-class INIT < FileCommand
+class INIT < ExistentFile
     def build
         path = fullpath()
 

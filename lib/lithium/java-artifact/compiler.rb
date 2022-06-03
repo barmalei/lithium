@@ -127,13 +127,13 @@ class JDTCompiler < JavaCompiler
     def what_it_does
         "Compile JAVA '#{@name}' code with JDT\n        to:  '#{destination()}'"
     end
-
-    def self.abbr() 'JDT' end
 end
 
 
 # Groovy 
 class GroovyCompiler < JvmCompiler
+    @abbr = 'GTC'
+
     def initialize(name, &block)
         REQUIRE GROOVY
         super
@@ -151,13 +151,13 @@ class GroovyCompiler < JvmCompiler
     def what_it_does
         "Compile groovy '#{@name}' code"
     end
-
-    def self.abbr() 'GTC' end
 end
 
 #
 # Kotlin 
 class KotlinCompiler < JvmCompiler
+    @abbr = 'KTC'
+
     def initialize(name, &block)
         REQUIRE KOTLIN
         super
@@ -175,12 +175,12 @@ class KotlinCompiler < JvmCompiler
     def what_it_does
         "Compile Kotlin '#{@name}' code\n            to '#{destination()}'"
     end
-
-    def self.abbr() 'KTC' end
 end
 
 # Scala 
 class ScalaCompiler < JvmCompiler
+    @abbr = 'STC'
+
     def initialize(name, &block)
         REQUIRE SCALA
         super
@@ -199,6 +199,4 @@ class ScalaCompiler < JvmCompiler
     def what_it_does
         "Compile Scala '#{@name}' code"
     end
-
-    def self.abbr() 'STC' end
 end

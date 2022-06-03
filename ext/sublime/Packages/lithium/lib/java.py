@@ -7,7 +7,10 @@ class LiJava:
     # retrieve java package and return it
     @classmethod
     def java_package(clz, view):
-        regs = view.find_by_selector('source.java meta.package-declaration.java meta.path.java entity.name.namespace.java')
+        # old value 'source.java meta.package-declaration.java meta.path.java entity.name.namespace.java' has been
+        # updated in sublime 4131
+        regs = view.find_by_selector('source.java meta.namespace.package.identifier.java meta.path.java variable.namespace.java')
+
         if regs is not None and len(regs) > 0:
             return view.substr(regs[0])
         else:
@@ -17,6 +20,7 @@ class LiJava:
     @classmethod
     def java_view_classname(clz, view):
         regions = view.find_by_selector("entity.name.class.java")
+        #source.java meta.class.identifier.java entity.name.class.java
         if regions is None or len(regions) == 0:
             return None
         else:
@@ -126,7 +130,7 @@ class LiJava:
         elif LiHelper.has_in_scope(view, region.a, const_name_scope):
             const_name.append(symbol)
         elif LiHelper.has_in_scope(view, region.a, 'entity.name.class.java'):
-            pkg_name   = java_package(view).split('.')
+            pkg_name   = clz.java_package(view).split('.')
             class_name = [ symbol ]
         elif LiHelper.has_in_scope(view, region.a, 'entity.other.inherited-class.java'):
             class_name = [ symbol ]

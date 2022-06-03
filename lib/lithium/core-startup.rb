@@ -165,6 +165,16 @@ PATTERNS ({
         }
     ],
 
+    ValidateDartCode => [
+        StdPattern.new {
+            any('^\s+error\s*-\s*')
+            group(:location) {
+                file('dart'); colon; line; colon; column
+            }
+        }
+    ],
+    # error - test.dart:8:1 - Expected to find ';'. - expected_token
+
     [ ValidatePhpScript, RunPhpScript ] => [
         StdPattern.new {
             any('Parse error\:'); any; any('in\s+'); group(:location) {
@@ -262,7 +272,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     top_prj = prj.top
     AutoRegisteredArtifact.artifact_classes.each { | clazz |
         meta = ArtifactName.new(clazz)
-        top_prj.DEFINE(meta) if prj.find_meta(meta).nil?
+        top_prj.DEFINE(meta) if prj.match_meta(meta).nil?
     }
 
     # print header

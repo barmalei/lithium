@@ -3,6 +3,8 @@ require 'lithium/java-artifact/base'
 require 'lithium/file-artifact/archive'
 
 class GenerateJavaDoc < RunJavaTool
+    @abbr = 'JDC'
+
     def initialize(name, &block)
         super
         @source_as_file = true
@@ -33,8 +35,6 @@ class GenerateJavaDoc < RunJavaTool
     def what_it_does
         "Generate javadoc to '#{destination()}' folder"
     end
-
-    def self.abbr() 'JDC' end
 end
 
 class LithiumJavaToolRunner < RunJavaTool

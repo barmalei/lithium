@@ -15,8 +15,6 @@ class Touch < FileArtifact
         end
     end
 
-    def expired?() true end
-
     def self.touch(path)
         Touch.new(path).build
     end
@@ -64,7 +62,7 @@ class CopyOfFile < FileArtifact
 end
 
 #  Remove a file or directory
-class RmFile < FileCommand
+class RmFile < ExistentFile
     def build
         super
 
@@ -91,6 +89,9 @@ class GREP < FileMask
         super
         @grep ||= $lithium_args.length > 0 ? $lithium_args[0] : 'TODO'
         @match_all = true if @match_all.nil?
+        @match_all = $lithium_args.length > 1 ? $lithium_args[1] : @match_all
+        @show_matched_only = false if @show_matched_only.nil?
+        #@show_matched_only = $lithium_args.length > 1 ? $lithium_args[1] : @match_all
     end
 
     def MATCHED(&block)
@@ -113,7 +114,11 @@ class GREP < FileMask
     end
 
     def puts_matched_line(fp, line_num, line, value)
-        puts "    #{fp}:#{line_num}:#{value}"
+        if @show_matched_only
+            puts value
+        else
+            puts "    #{fp}:#{line_num}:#{value}"
+        end
     end
 
     def match_line(line_num, line)
@@ -157,9 +162,5 @@ class RunInTerminal < ExistentFile
 
     def command
         IO.read(fullpath())
-    end
-
-    def expired?
-        true
     end
 end

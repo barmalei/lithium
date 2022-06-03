@@ -6,14 +6,14 @@ require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/runner'
 require 'lithium/file-artifact/acquired'
 
-
 $NODEJS_MODULES_DIR = 'node_modules'
 
 # node js  environment
 class JS < EnvArtifact
     include AutoRegisteredArtifact
+    include LogArtifactState
 
-    attr_reader :nodejs, :npm
+    log_attr :nodejs, :npm
 
     def initialize(name, &block)
         super
@@ -41,10 +41,62 @@ class JS < EnvArtifact
         return module_home
     end
 
-    def what_it_does() "Initialize Node JS environment '#{@name}'" end
+    def what_it_does
+        "Initialize Node JS environment '#{@name}'"
+    end
+end
+
+class NodeJsPackageFile < ExistentFile
+    include LogArtifactState
+
+    @abbr = 'NPF'
+
+    def initialize(name = nil, &block)
+        REQUIRE JS
+        name         = homedir if name.nil?
+        fp           = fullpath(name)
+        packageFile  = FileArtifact.look_file_up(fp, 'package.json', homedir)
+        raise "Package file cannot be detected by '#{fp}' path" if packageFile.nil?
+        super(packageFile, &block)
+    end
+end
+
+class InstallNodeJsPackage < NodeJsPackageFile
+    include OptionsSupport
+
+    @abbr = 'RNP'
+
+    def initialize(name, &block)
+        super
+        @targets ||= [ 'install' ]
+    end
+
+    def TARGETS(*args)
+        @targets = []
+        @targets.concat(args)
+    end
 
     def expired?
-        false
+        true
+    end
+
+    def build
+        path = fullpath
+        raise "Target package JSON artifact cannot be found '#{path}'" unless File.exists?(path)
+        target_dir = File.dirname(path)
+        chdir(target_dir) {
+            if Artifact.exec(*command()).exitstatus != 0
+                raise "Pub [#{@targets.join(',')}] running failed"
+            end
+        }
+    end
+
+    def command
+        [ @js.npm, OPTS(), @targets.join(' ') ]
+    end
+
+    def what_it_does
+        "Run NPM '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}'"
     end
 end
 
@@ -72,15 +124,15 @@ class NodejsModule < FileArtifact
         raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'install', File.basename(fullpath)) != 0
     end
 
-    def expired?
-        !File.exists?(fullpath)
-    end
-
     def clean
         if File.exists?(fullpath)
             project.go_to_homedir
             raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0
         end
+    end
+
+    def expired?
+        !File.exists?(fullpath)
     end
 
     def what_it_does
@@ -90,8 +142,10 @@ end
 
 
 # Run JS with nodejs
-class RunNodejs < FileCommand
+class RunNodejs < ExistentFile
     include OptionsSupport
+
+    @abbr = 'RJS'
 
     def initialize(name, &block)
         REQUIRE JS
@@ -99,14 +153,12 @@ class RunNodejs < FileCommand
     end
 
     def build
-        raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), "\"#{fullpath}\"") != 0
+        raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does
         "Run JS '#{@name}' script with nodejs"
     end
-
-    def self.abbr() 'RJS' end
 end
 
 # nodejs uglyfier
@@ -114,7 +166,10 @@ end
 class UglifiedJSFile < GeneratedFile
     def initialize(name, &block)
         REQUIRE JS
-        NodejsModule('uglify-js')
+        REQUIRES {
+            JS
+            NodejsModule('uglify-js')
+        }
         super
     end
 
@@ -133,12 +188,8 @@ class UglifiedJSFile < GeneratedFile
             OPTS(), 
             list.map { | s |  "\"#{s}\"" }.join(' '), 
             '-o',
-            "\"#{fullpath}\""
+            q_fullpath
         ) != 0
-    end
-
-    def expired?
-        !File.exists?(fullpath)
     end
 
     def clean
@@ -179,10 +230,6 @@ class CombinedJSFile < GeneratedFile
         f.close()
     end
 
-    def expired?
-        !File.exists?(fullpath)
-    end
-
     def clean
        File.delete(fullpath()) if File.exists?(fullpath())
     end
@@ -203,7 +250,7 @@ class JavaScriptDoc < FileArtifact
     end
 
     def expired?
-       return !File.exists?(fullpath)
+       !File.exists?(fullpath)
     end
 
     def clean
@@ -260,7 +307,7 @@ class TypeScriptCompiler < FileMask
 
     def build
         go_to_homedir
-        raise "Compilation of '#{@name}' has failed" if Artifact.exec('tsc', OPTS(), "\"#{fullpath}\"") != 0
+        raise "Compilation of '#{@name}' has failed" if Artifact.exec('tsc', OPTS(), q_fullpath) != 0
     end
 
     def what_it_does

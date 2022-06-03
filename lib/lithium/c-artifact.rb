@@ -3,7 +3,10 @@ require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/runner'
 
 class CPP < EnvArtifact
+    include LogArtifactState
     include AutoRegisteredArtifact
+
+    log_attr :destination
 
     def initialize(name)
         @create_destination = true
@@ -26,10 +29,6 @@ class CPP < EnvArtifact
     end
 
     def what_it_does() "Initialize C environment '#{@name}'" end
-
-    def expired?
-        false
-    end
 end
 
 class CppRunTool < RunTool
@@ -44,6 +43,8 @@ class CppRunTool < RunTool
 end
 
 class CppCompiler < CppRunTool
+    @abbr = 'CCC'
+
     def initialize(name, &block)
         super
         @run_with ||= 'c++'
@@ -55,11 +56,11 @@ class CppCompiler < CppRunTool
         opts.push('-o', "\"#{File.join(dst, fn)}\"")
         return opts
     end
-
-    def self.abbr() 'CCC' end
 end
 
 class CppCodeRunner < CppRunTool
+    @abbr = 'RCC'
+
     def initialize(name, &block)
         super
         @run_with ||= 'exec'
@@ -68,12 +69,12 @@ class CppCodeRunner < CppRunTool
     def transform_source_path(path)
         return File.join(destination, File.basename(path, '.*'))
     end
-
-    def self.abbr() 'RCC' end
 end
 
 
 class RunMakefile < RunTool
+    @abbr = 'RMF'
+
     def initialize(name, &block)
         super
         @targets ||= []
@@ -88,7 +89,5 @@ class RunMakefile < RunTool
     def what_it_does
         "Run make file for '#{@name}'"
     end
-
-    def self.abbr() 'RMF' end
 end
 

@@ -1,5 +1,5 @@
 -> {
-    $lithium_options['v'] = 2
+    $lithium_options['v'] = 1
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
     # REQUIRE  {
@@ -12,8 +12,23 @@
     # }
 
     JAVA {
-        DefaultClasspath {
-            JOIN('.lithium/ext/java/lithium/classes')
+        REQUIRES {
+            DefaultClasspath {
+                JOIN('.lithium/ext/java/lithium/classes')
+            }
+
+            puts @requires[-1][0].class
+
+            puts "FIRST JAVA BLOCK #{classpath}"
+        }
+    }
+
+    JAVA! {
+        REQUIRES {
+            puts "SECOND JAVA BLOCK #{classpath}"
+            DefaultClasspath! {
+                JOIN('.lithium/ext/java/lithium/classes2')
+            }
         }
     }
 
@@ -24,25 +39,29 @@
 
     #RunMaven('mvn:*')
 
-    GeneratedDirectory("test") {
+    GeneratedDirectory("test22") {
         @full_copy = true
-        FileMask('.lithium/lib/*')
-        FileMask('classes/com/**/*')
-        MetaFile('.lithium/meta/test.dir')
+        REQUIRES(as_sources:true) {
+            FileMask('.lithium/lib/*')
+            FileMask('classes/com/**/*')
+        }
+        #MetaFile('.lithium/meta/test.dir')
     }
 
     ZipFile("test.zip") {
-        SOURCES {
+        REQUIRES {
             FileMask('.lithium/lib/*').BASE('.lithium/lib')
         }
     }
 
     JarFile("test.jar") {
-        FileMaskSource('.lithium/lib/*')
+        REQUIRES {
+            FileMaskSource('.lithium/lib/*')
+        }
     }
 
     UglifiedJSFile("test.min.js") {
-        FileMaskSource('.lithium/exa mples/easyoop.js')
+        REQUIRES { FileMaskSource('.lithium/examples/easyoop.js') }
     }
 
     MATCH("run:*") {
@@ -60,12 +79,14 @@
         RunScalaCode     ('**/*.scala')
         RunJavaClass     ('**/*.class')
         RunHtml          ('**/*.html')
-        RunRubyScript    ('**/*.rb') 
+        RunRubyScript    ('**/*.rb')
         CppCodeRunner    ('**/*.cpp')
         CppCodeRunner    ('**/*.c')
         RunDartCode      ('**/*.dart')
         RunDartPub       ('**/pubspec.yaml')
+        InstallNodeJsPackage('**/package.json')
         DeployGoogleApp  ('**/appengine-*.xml')
+        DeployGoogleApp  ('**/app*.yaml')
     }
 
     MATCH("test:*") {
@@ -97,6 +118,7 @@
         CppCompiler         ('**/*.cpp')
         CppCompiler         ('**/*.c')
         RunDartPubBuild     ('**/pubspec.yaml')
+        ValidateDartCode    ('**/*.dart')
 
         OTHERWISE { | path |
             raise "Unsupported '#{path}' file type"

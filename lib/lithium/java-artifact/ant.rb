@@ -4,33 +4,22 @@ require 'lithium/java-artifact/base'
 #
 # ANT Environment
 #
-class ANT < EnvArtifact
-    include LogArtifactState
-    include AutoRegisteredArtifact
-
-    log_attr :ant_home
-
-    def initialize(name, &block)
-        super
-
-        unless @ant_home
-            @ant_home = FileArtifact.which('ant')
-            @ant_home = File.dirname(File.dirname(@ant_home)) unless @ant_home.nil?
-        end
-        raise "ANT home '#{@ant_home}' cannot be found" if @ant_home.nil? || !File.exist?(@ant_home)
-        puts "ANT home: '#{@ant_home}'"
-    end
+class ANT < SdkEnvironmen
+    @tool_name = 'ant'
+    @abbr      = 'ANT'
 
     def what_it_does() "Initialize ANT environment '#{@name}'" end
 
-    def ant() File.join(@ant_home, 'bin', 'ant') end
-
-    def self.abbr() 'ANT' end
+    def ant
+        tool_path('ant')
+    end
 end
 
 # Simple ant runner
-class RunANT < FileCommand
+class RunANT < ExistentFile
     include OptionsSupport
+
+    @abbr = 'RAN'
 
     def initialize(name, &block)
         REQUIRE ANT
@@ -47,7 +36,5 @@ class RunANT < FileCommand
     end
 
     def what_it_does() "Run ANT '#{fullpath()}'" end
-
-    def self.abbr() 'RAN' end
 end
 

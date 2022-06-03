@@ -153,12 +153,10 @@ end
 class ZipFile < ArchiveFile
     include ZipTool
 
+    @abbr = 'ZIP'
+
     def generate(src_list)
         zip(fullpath, *src_list)
-    end
-
-    def self.abbr
-        'ZIP'
     end
 end
 
@@ -168,6 +166,8 @@ end
 class ArchiveFileContent < FileArtifact
     include ZipTool
     include FileSourcesSupport::FileSource
+
+    @abbr = 'AFC'
 
     def initialize(name, &block)
         super
@@ -229,9 +229,5 @@ class ArchiveFileContent < FileArtifact
 
     def what_it_does
         "Represent '#{fullpath}' archive file content"
-    end
-
-    def self.abbr
-        'AFC'
     end
 end

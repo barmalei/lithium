@@ -5,6 +5,8 @@ require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
 class JavaCheckStyle < JavaFileRunner
+    @abbr = 'CHS'
+
     def initialize(name, &block)
         super
 
@@ -40,8 +42,6 @@ class JavaCheckStyle < JavaFileRunner
     end
 
     def what_it_does() "Check '#{@name}' java code style" end
-
-    def self.abbr() 'CHS' end
 end
 
 class UnusedJavaCheckStyle < JavaCheckStyle
@@ -53,6 +53,8 @@ end
 
 #  PMD code analyzer
 class PMD < JavaFileRunner
+    @abbr = 'PMD'
+
     def initialize(name, &block)
         super
         @pmd_home = File.join($lithium_code, 'ext', 'java', 'pmd')
@@ -88,8 +90,6 @@ class PMD < JavaFileRunner
     end
 
     def what_it_does() "Validate '#{@name}' code applying PMD:#{@pmd_rules}" end
-
-    def self.abbr() 'PMD' end
 end
 
 # TODO: complete the code !

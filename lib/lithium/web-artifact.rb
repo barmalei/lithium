@@ -19,14 +19,14 @@ class CompileSass < FileMask
             out = out[0..-(ext.length + 1)].concat(".css")
         end
 
-        raise 'Sass compiler failed' if Artifact.exec(@sass_path, "\"#{fullpath(path)}\" \"#{out}\"")  != 0
+        raise 'Sass compiler failed' if Artifact.exec(@sass_path, "#{q_fullpath(path)} \"#{out}\"")  != 0
     end
 
     def what_it_does() "Compile '#{@name}' sass to CSS" end
 end
 
 
-class RunHtml < FileCommand
+class RunHtml < ExistentFile
     def build
         `open #{fullpath()}`
     end

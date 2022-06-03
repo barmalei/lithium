@@ -4,7 +4,9 @@ require 'lithium/rb-artifact'
 #
 #   Tree top grammar compiler
 #
-class CompileTTGrammar < FileCommand
+class CompileTTGrammar < ExistentFile
+    @abbr = 'CTT'
+
     def initialize(name, &block)
         REQUIRE RUBY
         super
@@ -26,10 +28,12 @@ class CompileTTGrammar < FileCommand
         opath = File.join(@output_dir, oname)
         File.delete(opath) if File.exists?(opath)
 
-        raise "Grammar '#{path}' compilation failed" if Artifact.exec(@ruby.ruby, cmd_rubypath, @tt, "\"#{fullpath(path)}\"", '-o', "\"#{opath}\"") != 0
+        raise "Grammar '#{path}' compilation failed" if Artifact.exec(@ruby.ruby, cmd_rubypath, @tt, q_fullpath(path), '-o', "\"#{opath}\"") != 0
     end
 
-    def what_it_does() "Compile '#{@name}' tree top grammar to '#{@output_dir}'" end
+    def what_it_does
+        "Compile '#{@name}' tree top grammar to '#{@output_dir}'"
+    end
 end
 
 

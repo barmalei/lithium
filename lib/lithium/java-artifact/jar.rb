@@ -69,6 +69,8 @@ end
 class JarFileContent < ArchiveFileContent
     include JarTool
 
+    @abbr = 'JRC'
+
     def initialize(name, &block)
         REQUIRE JAVA
         super
@@ -77,15 +79,13 @@ class JarFileContent < ArchiveFileContent
     def what_it_does
         "Represent '#{fullpath}' JAR file content"
     end
-
-    def self.abbr
-        'JRC'
-    end
 end
 
 # generate JAR file
 class JarFile < ArchiveFile
     include JarTool
+
+    @abbr = 'JAR'
 
     def initialize(name, &block)
         REQUIRE JAVA
@@ -94,9 +94,5 @@ class JarFile < ArchiveFile
 
     def generate(list)
         zip(fullpath, *list)
-    end
-
-    def self.abbr
-        'JAR'
     end
 end
