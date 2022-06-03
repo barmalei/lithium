@@ -12,7 +12,7 @@
     # }
 
     JAVA {
-        REQUIRES {
+        REQUIRE {
             DefaultClasspath {
                 JOIN('.lithium/ext/java/lithium/classes')
             }
@@ -23,11 +23,19 @@
         }
     }
 
-    JAVA! {
-        REQUIRES {
+    JAVA('.env/JAVA2') {
+        REQUIRE {
             puts "SECOND JAVA BLOCK #{classpath}"
-            DefaultClasspath! {
+            DefaultClasspath {
                 JOIN('.lithium/ext/java/lithium/classes2')
+            }
+        }
+    }
+
+    Directory('tt') {
+        DONE {
+            BUILD('test', FileArtifact) {
+                puts "HELLO !!!"
             }
         }
     }
@@ -41,27 +49,24 @@
 
     GeneratedDirectory("test22") {
         @full_copy = true
-        REQUIRES(as_sources:true) {
-            FileMask('.lithium/lib/*')
-            FileMask('classes/com/**/*')
+        REQUIRE {
+            FileMaskSource('.lithium/lib/*')
+            FileMaskSource('classes/com/**/*')
         }
-        #MetaFile('.lithium/meta/test.dir')
     }
 
     ZipFile("test.zip") {
-        REQUIRES {
-            FileMask('.lithium/lib/*').BASE('.lithium/lib')
+        REQUIRE('.lithium/lib/*', FileMaskSource) {
+            BASE('.lithium/lib')
         }
     }
 
     JarFile("test.jar") {
-        REQUIRES {
-            FileMaskSource('.lithium/lib/*')
-        }
+        REQUIRE('.lithium/lib/*', FileMaskSource)
     }
 
     UglifiedJSFile("test.min.js") {
-        REQUIRES { FileMaskSource('.lithium/examples/easyoop.js') }
+        REQUIRE { FileMaskSource('.lithium/examples/easyoop.js') }
     }
 
     MATCH("run:*") {

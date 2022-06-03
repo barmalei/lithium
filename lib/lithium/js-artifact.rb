@@ -165,9 +165,8 @@ end
 # @name : name of the uglified file
 class UglifiedJSFile < GeneratedFile
     def initialize(name, &block)
-        REQUIRE JS
-        REQUIRES {
-            JS
+        REQUIRE {
+            JS()
             NodejsModule('uglify-js')
         }
         super

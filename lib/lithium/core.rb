@@ -445,67 +445,82 @@ class ArtifactName < String
     attr_reader :prefix, :suffix, :path, :path_mask, :mask_type, :clazz, :block
 
     # return artifact name as is if it is passed as an instance of artifact name
-    def self.new(*args, &block)
-        if args[0].kind_of?(ArtifactName)
-            raise "ArtifactName('#{args[0]}') instance cannot be passed as a single argument of ArtifactName constructor" if args.length != 1
-            raise "Block cannot be customized for existent ArtifactName('#{args[0]}') instance"                         unless block.nil?
-            return args[0]
+    def self.new(name, clazz = nil, &block)
+        if name.kind_of?(ArtifactName)
+            raise "ArtifactName('#{name}') instance has to be passed as a single argument of constructor" unless clazz.nil?
+            raise "Block cannot be customized for existent ArtifactName('#{name}') class instance"        unless block.nil?
+            return name
         else
-            super(*args, &block)
+            super(name, clazz, &block)
         end
     end
 
-    # 1) (name | class | Symbol)
-    # 2) (name | Symbol, clazz)
-    def initialize(*args, &block)
-        @clazz = nil
+    def self.from_class(clazz)
 
-        name = args[0]
-        if args.length == 1
-            if name.kind_of?(Symbol)
-                name = name.to_s
-            elsif name.kind_of?(Class)
-                @clazz = name
-                name = @clazz.default_name
-                raise "Artifact default name cannot be detected by #{@clazz} class" if name.nil?
-            elsif !name.kind_of?(String)
-                raise "Invalid artifact name type '#{name.class}'"
-            end
-        elsif args.length == 2
-            name = name.to_s if name.kind_of?(Symbol)
-            raise "Invalid class type '#{args[1]}'" if !args[1].nil? && !args[1].kind_of?(Class)
-            @clazz = args[1]
-        else
-            raise "Unexpected number of parameters #{args.length}, #{args}, one or two parameters are expected"
+    end
+
+    # Construct artifact name.
+    # @param name?  - name of the artifact, name can contain class prefix e.g "ArtifactClass:name"
+    # @param clazz? - artifact class
+    #
+    # ArtifactName(
+    #    name  : { String }
+    # )
+    #
+    # ArtifactName(
+    #    clazz : { Class < Artifact }
+    # )
+    #
+    # ArtifactName(
+    #    name  : { String }
+    #    clazz : {Class < Artifact, nil}
+    # )
+    #
+    def initialize(name, clazz = nil, &block)
+        @clazz = clazz
+        if name.kind_of?(Class)
+            raise "Input '#{clazz}' class argument is ambiguous since it is already defined as '#{name}' class" unless clazz.nil?
+            @clazz = name
+            name   = nil
         end
 
-        name = ArtifactName.assert_notnil_name(name, clazz)
+        if name.nil? && !@clazz.nil?
+            name = @clazz.default_name
+            raise "Artifact default name cannot be detected by '#{@clazz}'' class" if name.nil?
+        end
+
+
+        name = ArtifactName.assert_notnil_name(name)
 
         @mask_type = File::FNM_DOTMATCH
-        @prefix, @path, @path_mask, @suffix = nil, nil, nil, nil
         @prefix = name[/^\w\w+\:/]
         @suffix = @prefix.nil? ? name : name[@prefix.length .. name.length]
         @suffix = nil if !@suffix.nil? && @suffix.length == 0
 
+        @path = @path_mask = nil
         @path = @suffix[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/] unless @suffix.nil?
         unless @path.nil?
             @path, @path_mask = FileArtifact.cut_fmask(@path)
-            @path = Pathname.new(@path).cleanpath.to_s unless @path.nil?
-            @mask_type = @mask_type | File::FNM_PATHNAME if @path_mask != '*' || !@path.nil?
+            @path      = Pathname.new(@path).cleanpath.to_s unless @path.nil?
+            @mask_type = @mask_type | File::FNM_PATHNAME    if     @path_mask != '*' || !@path.nil?
         end
 
-        if args.length == 1 && @clazz.nil? && !@prefix.nil?
+        if @clazz.nil? && !@prefix.nil?
             begin
                 @clazz = Module.const_get(@prefix[0..-2])
             rescue
             end
         end
 
+        raise "Class '#{@clazz}' is not an Artifact class for '#{name}' name" unless @clazz.nil? || @clazz < Artifact
         @block = block
 
         super(name)
     end
 
+    #
+    # @param name { String, Symbol, Class, ArtifactName } name of artifact
+    # @return ArtifactName
     def self.relative_to(name, to)
         artname = ArtifactName.new(name)
         unless artname.path.nil?
@@ -515,30 +530,28 @@ class ArtifactName < String
         return artname
     end
 
-    def self.assert_notnil_name(name, clazz = nil)
-        raise "Invalid artifact name, string name is expected class = '#{clazz}'" if !name.nil? && !name.kind_of?(String)
-        raise "Passed name is nil class = '#{clazz}'" if name.nil? || (name.kind_of?(String) && name.strip.length == 0)
-        return name
+    def self.assert_notnil_name(name)
+        raise "Artifact name '#{name}' is nil, empty or is not an instance of String class" if name.nil? || !name.kind_of?(String) || name.strip.length == 0
+        name.strip
     end
 
     def self.name_from(prefix, path, path_mask)
         path = nil if !path.nil? && path.length == 0
-        name  = ''
-        name += path                                               unless path.nil?
+        name  = path.nil? ? '' : path
         name  = path.nil? ? path_mask : File.join(name, path_mask) unless path_mask.nil?
         name  = prefix + name                                      unless prefix.nil?
         return name
     end
 
     def env_path?
-        !path.nil? && path.start_with?(".env/")
+        !path.nil? && path.start_with?('.env/')
     end
 
-    def match(name)
-        name = ArtifactName.new(name)
+    def match(name, clazz = nil)
+        name = ArtifactName.new(name, clazz)
 
         # prefix doesn't match each other
-        return false if @prefix != name.prefix
+        return false if @prefix != name.prefix || name.clazz != @sclazz
 
         unless @path_mask.nil?
             # Condition "(name.env_path? ^ env_path?)" helps to prevent eating environment
@@ -580,6 +593,11 @@ class ArtifactName < String
         (an.class == self.class && an.suffix == @suffix && an.prefix == @prefix &&
          an.path == @path && an.path_mask == @path_mask && an.mask_type == @mask_type &&
          an.clazz == @clazz && an.block == @block)
+    end
+
+    def combine_block(b)
+        @block = Artifact.combine_blocks(@block, b)
+        return self
     end
 
     def _block(b)
@@ -646,7 +664,7 @@ class Artifact
 
     def initialize(name = nil, &block)
         # test if the name of the artifact is not nil or empty string
-        name = ArtifactName.assert_notnil_name(name, self.class)
+        name = ArtifactName.assert_notnil_name(name)
         @name, @shortname = name, File.basename(name)
 
         # block can be passed to artifact
@@ -705,66 +723,44 @@ class Artifact
     #  - pre_build
     #
     def method_missing(meth, *args, &block)
+        puts "method_missing(): meth = #{meth}"
+
         # detect if there is an artifact class exits with the given name to treat it as
         # required artifact. It is done only if we are still in "requires" method call
-        if meth.length > 2 && @caller == :requires
+        if meth.length > 2 && @caller == :require
             # TODO: revised, most likely the code is not required since REQUIRE can be executed outside of constructor
             raise "REQUIRED artifacts can be defined only in '#{self}' artifact constructor" unless initialize_called?
 
+            name = args.length == 0 ? nil : args[0]
             clazz, is_internal = Artifact._name_to_clazz(meth)
             if is_internal
+                raise "Block was not defined for updating '#{clazz}:#{name}' requirement" if block.nil?
                 @requires ||= []
-                art = @requires.detect { | a | a[0].is_a?(Class) && a[0] == clazz }
-                raise "Required '#{clazz}' artifact cannot be detected" if art.nil?
-                art[1] = Artifact.combine_blocks(art[1], block)
-                return art[0]
+                art_name = ArtifactName.new(name, clazz)
+                idx      = @requires.index { | a | a.is_a?(ArtifactName) && art_name.to_s == a.to_s }
+                raise "Required '#{clazz}' artifact cannot be detected" if idx.nil?
+                @requires[idx].combine_block(block)
             else
-                if args.length == 0
-                    return REQUIRE(clazz, &block)
-                else
-                    return REQUIRE(clazz.new(args.length > 0 ? args[0] : nil, owner:_detect_required_owner()), &block)
-                end
+                puts "method_missing() REQUIRE by '#{self.name}'  -> clazz = #{clazz}, name = #{name}"
+                REQUIRE(name, clazz, &block)
             end
-        end
-        super(meth, *args, &block)
-    end
-
-    def REQUIRES(&block)
-        raise "REQUIRES() method is called within another REQUIRES() method of '#{@self.name}' artifact" if @caller == :requires
-        prev = @caller
-        begin
-            @caller = :requires
-            self.instance_exec &block
-        ensure
-            @caller = prev
+        # TODO: dirty code, should be re-worked
+        elsif meth.length > 2 && @caller == :done
+            clazz, is_internal = Artifact._name_to_clazz(meth)
+            ArtifactTree.build(clazz.new(args[0], &block))
+        else
+            super(meth, *args, &block)
         end
     end
 
-    # yield  (dep, block)
     def each_required
         @requires ||= []
         req = @requires
 
         # artifacts have to be unique by its names
-        req = req.reverse.uniq { | e |
-            art = e[0]
-            if art.kind_of?(Artifact)
-                art.name
-            elsif art.kind_of?(Class)
-                if art < EnvArtifact  # only one environment of the given type can be required
-                    art.name # class name
-                else
-                    art.default_name
-                end
-            elsif art.kind_of?(String)
-                art
-            else
-                raise "Unknown artifact type '#{art}' dependency"
-            end
-        }.reverse
-
+        req = req.reverse.uniq { | name | name.is_a?(Artifact) ? name.name : name.to_s }.reverse
         req.each { | dep |
-            yield dep[0], dep[1]
+            yield dep
         }
     end
 
@@ -774,7 +770,12 @@ class Artifact
     def build
     end
 
+    def build_ignored
+        self.instance_exec(&@ignored) unless @ignored.nil?
+    end
+
     def build_done
+        self.instance_exec(&@done) unless @done.nil?
     end
 
     def build_failed
@@ -802,39 +803,31 @@ class Artifact
 
     def to_s() shortname end
 
-    # make the block section callable in a context of the class instance
-    def call(&block)
-        # TODO: remove the class
-        #self.instance_exec(&block)
-        raise 'The callable artifact method is deprecated'
-    end
-
-    # @param art - artifact can be one of the following type:
-    #   -- String for reference to an artifact
-    #   -- Class for either artifact instantiation () or for late
-    # art   - name of artifact or instance of artifact
+    # @param art : { String, Symbol, Class } - artifact can be one of the following type:
     # block - custom block for artifact or if art is nil block is build method for
-    def REQUIRE(art, *args, &block)
-        raise 'Passed required artifact is nil' if art.nil?
-        @requires ||= []
-
-        i = @requires.index { | req | req[0] == art && req[1] == block }
-        unless i.nil?
-            puts_warning "Artifact '#{art}' requirement has been already defined"
-            @requires[i] = [ art, block ]
+    def REQUIRE(name = nil, clazz = nil, &block)
+        if name.nil? && clazz.nil?
+            raise "REQUIRE block has to be defined for '#{self.name}' artifact"                        if block.nil?
+            raise "REQUIRE block is called within another REQUIRE() method of '#{self.name}' artifact" if @caller == :require
+            prev = @caller
+            begin
+                @caller = :require
+                self.instance_exec &block
+            ensure
+                @caller = prev
+            end
         else
-            @requires.push([ art, block ])
+            add_reqiured(name, clazz, &block)
         end
-
-        return art
     end
 
-    def DISMISS(art)
-        raise 'Passed dismiss artifact is nil' if art.nil?
+    def DISMISS(name, clazz = nil)
+        raise 'Passed dismiss artifact name is nil' if name.nil?
         @requires ||= []
         ln = @requires.length
-        @requires.delete_if { | req | req[0] == art }
-        raise "'#{art}' DEPENDENCY cannot be found and dismissed" if ln == @requires.length
+        name = ArtifactName.new(name, clazz).to_s
+        @requires.delete_if { | req | req.is_a?(ArtifactName) && req.to_s == name }
+        raise "'#{name}' DEPENDENCY cannot be found and dismissed" if ln == @requires.length
     end
 
     # called after the artifact has been built
@@ -847,6 +840,28 @@ class Artifact
         @ignored = block
     end
 
+    def BUILD(name, clazz = nil, &block)
+        art_name = ArtifactName.new(name, clazz)
+        art_own  = self.is_a?(ArtifactContainer) ? self : self.owner
+        ArtifactTree.build(art_name.clazz.new(art_name.to_s, owner:art_own, &block))
+    end
+
+    def add_reqiured(name = nil, clazz = nil, &block)
+        @requires ||= []
+        if name.is_a?(Artifact)
+            raise "Artifact instance '#{name}' cannot be used as an requirements"
+        else
+            art_name = ArtifactName.new(name, clazz, &block)
+            i = @requires.index { | req | req.is_a?(ArtifactName) && req.to_s == art_name.to_s && req.clazz == art_name.clazz }
+            if i.nil?
+                @requires.push(art_name)
+            else
+                puts_warning "Artifact '#{art_name}' requirement has been already defined"
+                @requires[i] =  art_name
+            end
+        end
+    end
+
     def EXPIRED?(call_super = false, &block)
         @expired = block
         @call_super = call_super
@@ -857,13 +872,9 @@ class Artifact
         end
     end
 
-    def _detect_required_owner
-        self.kind_of?(ArtifactContainer) ? self : self.owner
-    end
-
     def self.abbr()
         return @abbr unless @abbr.nil?
-        return self.name[0..2].upcase
+        return "%3s" % self.name[0..2].upcase
     end
 
     # *args - command arguments
@@ -963,18 +974,19 @@ class ArtifactTree
         raise 'Artifact cannot be nil' if art.nil?
 
         if art.kind_of?(Artifact)
-            art.instance_exec(&block) unless block.nil?
+            raise "Instantiated artifact '#{art.class}:#{art.name}' cannot be applied to a block" unless block.nil?
+            @art = art
         else
-            p = parent.nil? ? Project :  parent.art.owner
-            raise "Owner artifact cannot be detected for '#{art}' by its parent '#{parent.art}' artifact" if p.nil?
-
-
-            art = p.artifact(art, &block)
+            raise "Parent artifact cannot be nil for '#{art}' artifact definition" if parent.nil?
+            own = parent.art.kind_of?(ArtifactContainer) ? parent.art : parent.art.owner
+            raise "Owner of '#{art}' artifact cannot be detected by '#{parent.art}' parent artifact" if own.nil?
+            @art = own.artifact(art, &block)
         end
 
-        @children, @art, @parent, @expired, @expired_by_kid = [], art, parent, nil, nil
+        @children, @parent, @expired, @expired_by_kid = [], parent, nil, nil
 
-        # TODO: explain
+        # If parent is nil then the given tree node is considered as root node.
+        # The root node initiate building tree
         build_tree() if parent.nil?
     end
 
@@ -982,12 +994,16 @@ class ArtifactTree
     def build_tree(map = [])
         bt = @art.mtime
 
-        @art.each_required { | dep, block |
-            foundNode, node = nil, ArtifactTree.new(dep, self, &block)
+        @art.each_required { | name |
+            foundNode, node = nil, ArtifactTree.new(name, self)
 
-            if block.nil?  # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
+            # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
+            if name.is_a?(ArtifactName) && name.block.nil?
                 # optimize tree to exclude dependencies that are already in the tree
                 foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
+
+
+                puts "build_tree(): DETECTED DUP: #{foundNode.art.name}" if !foundNode.nil?
 
                 # save in list if a new artifact has been detected
                 map.push(node) if foundNode.nil?
@@ -1031,7 +1047,7 @@ class ArtifactTree
 
     def build(&block)
         unless @expired
-            @art.instance_exec(&@art.ignored) unless @art.ignored.nil?
+            @art.build_ignored()
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
         else
             @children.each { | node | node.build() }
@@ -1041,11 +1057,8 @@ class ArtifactTree
                 $current_artifact = @art
                 wid = @art.what_it_does()
                 puts wid unless wid.nil?
-
                 @art.pre_build()
                 @art.build(&block)
-                @art.instance_exec(&@art.done) unless @art.done.nil?
-
                 @art.build_done()
             rescue
                 @art.build_failed()
@@ -1777,15 +1790,19 @@ class RunShell < RunTool
 end
 
 module ArtifactContainer
-    #  (name : String | ArtifactName | Class)
-    def artifact(name, &block)
-        artname = ArtifactName.new(name)
+    # Create and return artifact identified by the given name.
+    #  @param name: { String, Symbol, ArtifactName, Class }
+    #  @return Artifact
+    def artifact(name, clazz = nil, &block)
+        artname = ArtifactName.new(name, clazz)
 
         # check if artifact name points to current project
-        return Project.current if artname.to_s == Project.current.name.to_s
+        #c TODO: revise the logic in respect name / to_s compassion !!!
+        #return Project.current if artname.to_s == Project.current.name.to_s && artname.clazz < Project
+        return self if self.class == artname.clazz && artname.to_s == self.name
 
         # fund local info about the given artifact
-        meta = match_meta(artname)
+        meta, meta_ow = match_meta(artname)
         if meta.nil?
             unless owner.nil?
                 # There are two types of container: project and file mask containers. File mask containers
@@ -1794,10 +1811,10 @@ module ArtifactContainer
                 # to avoid duplication of multiple artifacts created with the same meta. For instance
                 # JAVA artifact instance for java compiler (.*) and Java runner mask containers have to
                 # the same if it is not re-defined on the level of the container.
-                return owner.artifact(name, &block) if delegate_to_owner_if_meta_cannot_be_found?
+                return owner.artifact(artname, &block) if delegate_to_owner_if_meta_cannot_be_found?
             end
 
-            meta, meta_ow = _meta_from_owner(name)
+            meta, meta_ow = match_meta(artname, from:owner, recursive:true)
             unless meta.nil?
                 # attempt to handle situation an artifact meta of the given container has been
                 # created is going to be applied to artifact creation. It can indicate we
@@ -1807,7 +1824,7 @@ module ArtifactContainer
                 meta = artname unless artname.clazz.nil?
             end
 
-            raise NameError.new("No artifact definition is associated with '#{name}'") if meta.nil?
+            raise "No artifact definition is associated with '#{name}'" if meta.nil?
         end
 
         # manage cache
@@ -1825,19 +1842,19 @@ module ArtifactContainer
     end
 
     # cache artifact only if it is not identified by a mask or is an artifact container
-    def _cache_artifact(name, art)
-        name = ArtifactName.new(name)
-        if name.path_mask.nil? || art.kind_of?(ArtifactContainer)
-            _artifacts_cache[name] = art
+    def _cache_artifact(artname, art)
+        raise "Invalid '#{artname.class}' parameter type, ArtifactName instance is expected" unless artname.kind_of?(ArtifactName)
+        if artname.path_mask.nil? || art.kind_of?(ArtifactContainer)
+            _artifacts_cache[artname] = art
         end
         return art
     end
 
     # fetch an artifact from cache
-    def _artifact_from_cache(name)
-        name = ArtifactName.new(name)
-        unless _artifacts_cache[name].nil?
-            return _artifacts_cache[name]
+    def _artifact_from_cache(artname)
+        raise "Invalid '#{artname.class}' parameter type, ArtifactName instance is expected" unless artname.kind_of?(ArtifactName)
+        unless _artifacts_cache[artname].nil?
+            return _artifacts_cache[artname]
         else
             return nil
         end
@@ -1849,17 +1866,17 @@ module ArtifactContainer
         @artifacts
     end
 
-    def _remove_from_cache(name)
-        name = ArtifactName.new(name)
+    def _remove_from_cache(name, clazz = nil)
+        name = ArtifactName.new(name, clazz)
         _artifacts_cache.delete(name) unless _artifacts_cache[name].nil?
     end
 
     # instantiate the given artifact by its meta
-    def _artifact_by_meta(name, meta, &block)
-        name  = ArtifactName.new(name)
+    def _artifact_by_meta(artname, meta, &block)
+        raise "Invalid '#{artname.class}' parameter type, ArtifactName instance is expected" unless artname.kind_of?(ArtifactName)
         clazz = meta.clazz
 
-        art = clazz.new(name.suffix, owner:self,
+        art = clazz.new(artname.suffix, owner:self,
             &(block.nil? && clazz.default_block.nil? ? meta.block : Proc.new {
                 self.instance_exec &clazz.default_block unless clazz.default_block.nil?
                 self.instance_exec &meta.block unless meta.block.nil?
@@ -1871,54 +1888,63 @@ module ArtifactContainer
         return art
     end
 
-    def _meta_from_owner(name)
-        name    = ArtifactName.new(name)
-        ow      = owner
-        meta    = nil
-        meta_ow = nil
-        while !ow.nil? && meta.nil? do
-            meta = ow.match_meta(name)
-            meta_ow = ow unless meta.nil?
-            ow = ow.owner
-        end
-
-        return meta, meta_ow;
-    end
-
     # meta hosts ArtifactName instances
     def _meta
         @meta = [] unless defined? @meta
         return @meta
     end
 
-    # find appropriate for the given artifact name registered meta if possible
-    # @param name can be String, Symbol or Class
-    def match_meta(name)
-        #return _meta.detect { | p | p.clazz == name }
-        if name.is_a?(Class)
-            raise "'#{clazz}' is not a lithium artifact" unless name < Artifact
-            name = name.default_name
+    # Find appropriate for the given artifact name a registered meta
+    # @param name: { String, Symbol, Class, ArtifactName } artifact name
+    # @param from: { ArtifactContainer } container to look for an artifact meta
+    # @param recursive: { boolean } flag that says if meta has to be search over
+    # the all parent hierarchy starting from "from" container
+    #
+    # @return (ArtifactName, ArtifactContainer)
+    def match_meta(name, clazz = nil, from:nil, recursive:false)
+        from = self if from.nil?
+        raise "Passed '#{from}' artifact is nil or not a container" unless from.is_a?(ArtifactContainer)
+
+        meta = nil
+        name = ArtifactName.relative_to(
+            ArtifactName.new(name, clazz),
+            homedir
+        )
+
+        while !from.nil? do
+            meta = from._meta.detect { | m | m.match(name) }
+            break if !meta.nil? || recursive == false
+            from = from.owner
         end
-        end_meta.detect { | p | p.clazz == name } if name.is_a?(Class)
-        name = ArtifactName.relative_to(name.to_s, homedir)
-        return _meta.detect { | p | p.match(name) }
+
+        return meta.nil? ? nil : meta, from
     end
 
     def ==(prj)
         super(prj) && _meta == prj._meta
     end
 
-    # 1. (class : Class)
-    # 2. (name  : String | ArtifactName)
-    # 3. (meta  : ArtifavtMeta)
-    # 4. (name, class)
-    def DEFINE(*args, &block)
-        artname = ArtifactName.new(*args, &block)
+    #
+    # DEFINE(
+    #   name  : { String },
+    #   clazz : { Class < Artifact, nil}
+    # )
+    #
+    # DEFINE(
+    #   clazz : { Class < Artifact }
+    # )
+    #
+    # DEFINE(
+    #   name : { String, ArtifactName }
+    # )
+    #
+    def DEFINE(name, clazz = nil, &block)
+        artname = ArtifactName.new(name, clazz, &block)
         raise "Unknown class for '#{artname}' artifact" if artname.clazz.nil?
 
         # delete artifact meta if it already exists
-        old_meta = match_meta(artname)
-        _meta.delete(old_meta) unless old_meta.nil?
+        old_meta, old_meta_ow = match_meta(artname)
+        old_meta_ow._meta.delete(old_meta) unless old_meta.nil?
 
         _meta.push(artname)
          # sort meta array
@@ -1935,59 +1961,42 @@ module ArtifactContainer
     end
 
     def method_missing(meth, *args, &block)
-        if meth.length > 2 && @caller != :requires
+        if meth.length > 2 && @caller != :require
             clazz, is_reuse = Artifact._name_to_clazz(meth)
-            return REUSE(clazz, &block) if is_reuse
-            return DEFINE(*args, clazz, &block)
+            name = args.length == 0 ? nil : args[0]
+            if is_reuse
+                REUSE(name, clazz, &block)   # TODO: what about name ?
+            else
+                DEFINE(name, clazz, &block)
+            end
+        else
+            super
         end
-        super
     end
 
-    def REUSE(name, &block)
+    def REUSE(name, clazz = nil, &block)
         # find meta currently defined in the given container
-        meta    = match_meta(name)
-        meta_ow = nil
+        meta, meta_ow = match_meta(name, clazz, from:self, recursive:true)
+        raise "Cannot find '#{name}' definition in containers hierarchy" if meta.nil?
 
-        if meta.nil?
-            raise "Project '#{self}' doesn't have parent project to re-use '#{name}' artifacts" if owner.nil?
-            artname = ArtifactName.new(name)
-            meta, meta_ow = _meta_from_owner(name)
-            raise "Cannot find '#{artname}' in parent projects" if meta.nil?
-        end
+        meta_ow._remove_from_cache(name, clazz)
+        meta_ow._meta.delete(meta)
+        meta_ow._meta.sort!
 
-        _remove_from_cache(name)
-        _meta.delete(meta)
         _meta.push(meta.dup._block(Artifact.combine_blocks(meta.block, block)))
-
-        # sort meta array
         _meta.sort!
     end
 
     def REMOVE(name)
-        artname = ArtifactName.new(name)
-        meta, meta_ow = _meta_from_owner(name)
-
-        raise "Cannot find '#{artname}' in parent projects" if meta.nil?
+        meta, meta_ow = match_meta(name, from:self, recursive:true)
+        raise "Cannot find '#{artname}' definition in containers hierarchy" if meta.nil?
         raise "Artifact '#{artname}' definition cannot be detected in an owner container" if meta_ow._meta.delete(meta).nil?
-
-        # sort meta array
         meta_ow._meta.sort!
     end
 
-    # def DECLARE(&block)
-    #     raise 'Declaration block is nil' if block.nil?
-    #     raise "DECLARATION phase was already initiated for '#{self}' artifact" if @phase == :declare
-    #     begin
-    #         @phase = :declare
-    #         instance_exec &block
-    #     ensure
-    #         @phase = nil
-    #     end
-    # end
-
     # define a default block that will be applied to all instances of the given class
+    # TODO: check if the method is needed
     def _(clazz, &block)
-        puts ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>! #{clazz}"
         clazz.default_block(&block)
     end
 
@@ -2421,4 +2430,3 @@ class SdkEnvironmen < EnvArtifact
         @tool_name
     end
 end
-

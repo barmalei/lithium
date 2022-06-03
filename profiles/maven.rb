@@ -1,9 +1,9 @@
 
 -> {
-    REQUIRES {
+    REQUIRE {
         Directory('target') {
             DONE {
-                RunMaven {
+                BUILD(homedir, RunMaven) {
                     TARGETS('compile')
                 }
             }
@@ -11,12 +11,11 @@
     }
 
     JAVA {
-        REQUIRES {
+        REQUIRE {
             DefaultClasspath {
                 JOIN('target/classes')
                 JOIN('target/test-classes')
             }
-
             MavenClasspath()
         }
     }
@@ -30,18 +29,8 @@
     }
 
     Directory("apidoc") {
-        REQUIRES {
+        REQUIRE {
             GenerateJavaDoc("src/main/java/**/*.java")
         }
-
-        # BUILD {
-        #     DONE {
-
-        #     }
-        # }
-
-        # DONE {
-        #     GenerateJavaDoc.build("src/main/java/**/*.java")
-        # }
     }
 }

@@ -83,8 +83,9 @@ class META < Artifact
         prj._meta.each { | m |
             ps = ''
             unless prj.owner.nil?
-                pmeta = prj.owner.match_meta(m)
-                ps = " (#{prj.owner}:#{pmeta})" unless pmeta.nil?
+                pmeta, ow = prj.owner.match_meta(m)
+                ps = " (#{prj.owner.name}:#{pmeta.to_s})" unless pmeta.nil?
+                #ps = " (#{prj.owner} #{pmeta.class})" unless pmeta.nil?
             end
             pp = m.match(artname) ? " : [ '#{artname}' ]" : ''
             if OPT?('path') == false || pp.length > 0
@@ -106,9 +107,9 @@ class REQUIRE < Artifact
     def build
         puts "Artifact '#{@shortname}:' dependencies list {"
         art = Project.artifact(@name)
-        art.each_required { | dep, block |
-            aname = dep.kind_of?(Artifact) ? ArtifactName.new(dep.name, dep.class, &block) : ArtifactName.new(dep, &block)
-            printf("    %-20s : '%s'\n", aname, dep)
+        art.each_required { | art |
+            aname = art.kind_of?(Artifact) ? ArtifactName.new(art.name, art.class) : name
+            printf("    %-20s : '%s'\n", aname, art)
         }
         puts '}'
     end
@@ -117,15 +118,14 @@ class REQUIRE < Artifact
 end
 
 class TREE < Artifact
-    @abbr = 'TRE'
-
     def initialize(name)
         @show_id, @show_owner, @show_mtime = true, true, true
         super
     end
 
     def build
-        show_tree(ArtifactTree.new(@name))
+        #show_tree(ArtifactTree.new(@name))
+        show_tree(ArtifactTree.new(Project.current.artifact(@name)))
     end
 
     def show_tree(root) puts tree2string(nil, root) end
@@ -307,7 +307,7 @@ eval \"$vc\"
 "
 @win_script="
 @set LITHIUM_HOME=#{$lithium_code}
-@ruby %LITHIUM_HOME%/lib/lithium.rb %*
+@ruby %LITHIUM_HOME%/lib/lithium.rb %
 "
         if @os == :unix
             @script_path = "/usr/local/bin/#{@script_name}"

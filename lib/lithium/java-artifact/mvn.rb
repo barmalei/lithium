@@ -138,8 +138,13 @@ class MavenClasspath < InFileClasspath
 
     def initialize(name, &block)
         super
-        REQUIRE MVN
-        REQUIRE(PomFile.new(homedir, owner:self.owner))
+        REQUIRE {
+            MVN()
+            pom  = FileArtifact.look_file_up(homedir, 'pom.xml', homedir)
+            #look_up_file('pom.xml')
+            PomFile(pom)
+        }
+        #REQUIRE(homedir, PomFile)
         DEP_TARGET('build-classpath')
         TRANSITIVE(false)
     end
@@ -167,8 +172,10 @@ class MavenDependenciesDir < Directory
 
     def initialize(name, &block)
         super
-        REQUIRE MVN
-        REQUIRE(PomFile.new(@name, owner:self.owner))
+        REQUIRE { 
+            MVN()
+            PomFile(@name)
+        }
         DEP_TARGET('copy-dependencies')
     end
 

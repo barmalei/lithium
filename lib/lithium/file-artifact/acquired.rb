@@ -81,28 +81,6 @@ module FileSourcesSupport
             return path
         end
     end
-
-    def REQUIRES(as_sources:true, &block)
-        begin
-            @add_as_sources = true
-            super(&block)
-        ensure
-            @add_as_sources = false
-        end
-    end
-
-    def REQUIRE(art)
-        if @add_as_sources == true
-            raise "Source artifact '#{art.class}:#{art.name}' doesn't implement 'list_items' method" unless art.respond_to?(:list_items)
-
-            unless art.is_a?(FileSource)
-                class << art
-                    include FileSource
-                end
-            end
-        end
-        super(art)
-    end
 end
 
 class FileMaskSource < FileMask

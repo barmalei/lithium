@@ -117,8 +117,10 @@ class GradleClasspath < InFileClasspath
 
     def initialize(name, &block)
         super
-        REQUIRE GRADLE
-        REQUIRE(GradleFile.new(homedir, owner:self.owner))
+        REQUIRE { 
+            GRADLE()
+            GradleFile(homedir)
+        }
     end
 
     def build
