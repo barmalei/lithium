@@ -294,8 +294,8 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # build target artifact including its dependencies
     target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
 
-    puts "TARGET artifact: '#{target_artifact}', #{Project.current} "
-    built_art = Project.build(target_artifact)
+    puts "TARGET '#{target_artifact}' in '#{Project.current}' home"
+    built_art = Project.current.BUILD(target_artifact)
 
     INFO.info(built_art) if $lithium_options.key?('i')
 

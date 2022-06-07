@@ -238,14 +238,15 @@ end
 
 class JavaScriptDoc < FileArtifact
     def initialize(name, &block)
-        REQUIRE JS
+        REQUIRE {
+            JS()
+            NodejsModule('yuidocjs')
+        }
         super
         @config   ||= nil
         @template ||= nil
         @input    ||= '.'
         raise 'Name has to be directory' unless File.directory?(fullpath)
-
-        NodejsModule('yuidocjs')
     end
 
     def expired?

@@ -547,12 +547,11 @@ class ArtifactName < String
         !path.nil? && path.start_with?('.env/')
     end
 
-    def match(name, clazz = nil)
-        name = ArtifactName.new(name, clazz)
+    def match(name)
+        name = ArtifactName.new(name)
 
         # prefix doesn't match each other
-        return false if @prefix != name.prefix || name.clazz != @sclazz
-
+        return false if @prefix != name.prefix
         unless @path_mask.nil?
             # Condition "(name.env_path? ^ env_path?)" helps to prevent eating environment
             # artifact with file masks. For instance imagine we have file mask "**/*"
@@ -624,7 +623,7 @@ end
 class Artifact
     @abbr = 'ART'
 
-    attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored, :expired, :caller
+    attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored, :expired, :caller, :requires
 
     # the particular class static variables
     @default_name  = nil
@@ -671,6 +670,10 @@ class Artifact
         # it is expected the block setup class instance
         # variables like '{ @a = 10 ... }'
         self.instance_exec(&block) if block
+    end
+
+    def inspect
+        "#{self.class}:#{@name}"
     end
 
     # top owner (container) artifact
@@ -723,8 +726,6 @@ class Artifact
     #  - pre_build
     #
     def method_missing(meth, *args, &block)
-        puts "method_missing(): meth = #{meth}"
-
         # detect if there is an artifact class exits with the given name to treat it as
         # required artifact. It is done only if we are still in "requires" method call
         if meth.length > 2 && @caller == :require
@@ -741,13 +742,14 @@ class Artifact
                 raise "Required '#{clazz}' artifact cannot be detected" if idx.nil?
                 @requires[idx].combine_block(block)
             else
-                puts "method_missing() REQUIRE by '#{self.name}'  -> clazz = #{clazz}, name = #{name}"
                 REQUIRE(name, clazz, &block)
             end
-        # TODO: dirty code, should be re-worked
+        # TODO: revise the code
         elsif meth.length > 2 && @caller == :done
+            name = args.length == 0 ? nil : args[0]
             clazz, is_internal = Artifact._name_to_clazz(meth)
-            ArtifactTree.build(clazz.new(args[0], &block))
+            tree = ArtifactTree.new(clazz.new(name, owner:self.owner.is_a?(ArtifactContainer) ? self : self.owner, &block))
+            tree.build
         else
             super(meth, *args, &block)
         end
@@ -775,7 +777,13 @@ class Artifact
     end
 
     def build_done
-        self.instance_exec(&@done) unless @done.nil?
+        prev = @caller
+        begin
+            @caller = :done
+            self.instance_exec(&@done) unless @done.nil?
+        ensure
+            @caller = prev
+        end
     end
 
     def build_failed
@@ -790,7 +798,9 @@ class Artifact
     # build stuff
     def clean() end
 
-    def what_it_does() "Build '#{to_s}' artifact" end
+    def what_it_does
+        "Build '#{self.class}:#{@shortname}' artifact"
+    end
 
     # Overload "eq" operation of two artifact instances.
     def ==(art)
@@ -799,9 +809,13 @@ class Artifact
     end
 
     # return last time the artifact has been modified
-    def mtime() -1 end
+    def mtime
+        -1
+    end
 
-    def to_s() shortname end
+    def to_s
+        @shortname
+    end
 
     # @param art : { String, Symbol, Class } - artifact can be one of the following type:
     # block - custom block for artifact or if art is nil block is build method for
@@ -838,12 +852,6 @@ class Artifact
     # called when artifact has not been built since it did not expired
     def IGNORED(&block)
         @ignored = block
-    end
-
-    def BUILD(name, clazz = nil, &block)
-        art_name = ArtifactName.new(name, clazz)
-        art_own  = self.is_a?(ArtifactContainer) ? self : self.owner
-        ArtifactTree.build(art_name.clazz.new(art_name.to_s, owner:art_own, &block))
     end
 
     def add_reqiured(name = nil, clazz = nil, &block)
@@ -1001,10 +1009,6 @@ class ArtifactTree
             if name.is_a?(ArtifactName) && name.block.nil?
                 # optimize tree to exclude dependencies that are already in the tree
                 foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
-
-
-                puts "build_tree(): DETECTED DUP: #{foundNode.art.name}" if !foundNode.nil?
-
                 # save in list if a new artifact has been detected
                 map.push(node) if foundNode.nil?
             end
@@ -1043,6 +1047,7 @@ class ArtifactTree
         # check if expired attribute has not been set (if there ware no deps
         # that expired the given art)
         @expired = @art.expired? if @expired.nil?
+        return self
     end
 
     def build(&block)
@@ -1056,6 +1061,7 @@ class ArtifactTree
             begin
                 $current_artifact = @art
                 wid = @art.what_it_does()
+
                 puts wid unless wid.nil?
                 @art.pre_build()
                 @art.build(&block)
@@ -1070,6 +1076,7 @@ class ArtifactTree
                 $current_artifact = prev_art
             end
         end
+        return @art
     end
 
     def traverse(level = 0, &block)
@@ -1079,13 +1086,8 @@ class ArtifactTree
         block.call(self, level)
     end
 
-    def what_it_does() "Build '#{@name}' artifact dependencies tree" end
-
-    def self.build(art, &block)
-        art = Project.artifact(art) unless art.is_a?(Artifact)
-        tree = ArtifactTree.new(art)
-        tree.build(&block)
-        return art
+    def what_it_does
+        "Build '#{@name}' artifact dependencies tree"
     end
 end
 
@@ -1152,7 +1154,7 @@ class FileArtifact < Artifact
 
     def fullpath(path = @name)
         # TODO: have no idea if the commented code will have a side effect !
-        # return path if path.start_with?('.env/')
+        return path if path.start_with?('.env/')
 
         if path == '.' || path == './'
             return Pathname.new(File.join(Dir.pwd, path)).cleanpath.to_s
@@ -1179,11 +1181,12 @@ class FileArtifact < Artifact
         raise 'Invalid empty or nil path' if path.nil? || path.length == 0
 
         # current directory always match
-        return true if path == '.'
+        # TODO: most likely the commented code below is incorrect
+        #return true if path == '.'
 
         pp = path.dup
         path, mask = FileArtifact.cut_fmask(path)
-        raise "Path '#{pp}' contains only mask" if path.nil?
+        raise "Path '#{pp}' includes mask only" if path.nil?
 
         path  = Pathname.new(path).cleanpath
         home  = Pathname.new(homedir)
@@ -1796,11 +1799,6 @@ module ArtifactContainer
     def artifact(name, clazz = nil, &block)
         artname = ArtifactName.new(name, clazz)
 
-        # check if artifact name points to current project
-        #c TODO: revise the logic in respect name / to_s compassion !!!
-        #return Project.current if artname.to_s == Project.current.name.to_s && artname.clazz < Project
-        return self if self.class == artname.clazz && artname.to_s == self.name
-
         # fund local info about the given artifact
         meta, meta_ow = match_meta(artname)
         if meta.nil?
@@ -1812,16 +1810,16 @@ module ArtifactContainer
                 # JAVA artifact instance for java compiler (.*) and Java runner mask containers have to
                 # the same if it is not re-defined on the level of the container.
                 return owner.artifact(artname, &block) if delegate_to_owner_if_meta_cannot_be_found?
+                meta, meta_ow = owner.match_meta(artname, true)
             end
 
-            meta, meta_ow = match_meta(artname, from:owner, recursive:true)
-            unless meta.nil?
+            if meta.nil?
+                meta = artname unless artname.clazz.nil?
+            else
                 # attempt to handle situation an artifact meta of the given container has been
                 # created is going to be applied to artifact creation. It can indicate we
                 # have cyclic come back
                 raise "There is no an artifact META associated with '#{name}'" if !createdByMeta.nil? && meta.object_id == createdByMeta.object_id
-            else
-                meta = artname unless artname.clazz.nil?
             end
 
             raise "No artifact definition is associated with '#{name}'" if meta.nil?
@@ -1836,9 +1834,7 @@ module ArtifactContainer
         art = _cache_artifact(artname, art)            if block.nil? # cache only if a custom block has been passed
 
         # if the artifact is a container handling of target (suffix) is delegated to the container
-        return art.artifact(artname.suffix) if art.kind_of?(ArtifactContainer)
-
-        return art
+        return art.is_a?(ArtifactContainer) ? art.artifact(artname.suffix) : art
     end
 
     # cache artifact only if it is not identified by a mask or is an artifact container
@@ -1896,28 +1892,19 @@ module ArtifactContainer
 
     # Find appropriate for the given artifact name a registered meta
     # @param name: { String, Symbol, Class, ArtifactName } artifact name
-    # @param from: { ArtifactContainer } container to look for an artifact meta
     # @param recursive: { boolean } flag that says if meta has to be search over
     # the all parent hierarchy starting from "from" container
     #
     # @return (ArtifactName, ArtifactContainer)
-    def match_meta(name, clazz = nil, from:nil, recursive:false)
-        from = self if from.nil?
-        raise "Passed '#{from}' artifact is nil or not a container" unless from.is_a?(ArtifactContainer)
+    def match_meta(name, recursive = false)
+        art_name = ArtifactName.relative_to(name, homedir)
+        meta = _meta.detect { | m |
+            m.match(art_name)
+        }
 
-        meta = nil
-        name = ArtifactName.relative_to(
-            ArtifactName.new(name, clazz),
-            homedir
-        )
-
-        while !from.nil? do
-            meta = from._meta.detect { | m | m.match(name) }
-            break if !meta.nil? || recursive == false
-            from = from.owner
-        end
-
-        return meta.nil? ? nil : meta, from
+        return meta, self unless meta.nil?
+        return owner.match_meta(name, recursive) if recursive == true && !owner.nil?
+        return nil
     end
 
     def ==(prj)
@@ -1961,11 +1948,12 @@ module ArtifactContainer
     end
 
     def method_missing(meth, *args, &block)
-        if meth.length > 2 && @caller != :require
+        # TODO: review this code
+        if meth.length > 2 && @caller != :require && @caller != :done
             clazz, is_reuse = Artifact._name_to_clazz(meth)
             name = args.length == 0 ? nil : args[0]
             if is_reuse
-                REUSE(name, clazz, &block)   # TODO: what about name ?
+                REUSE(name, clazz, &block)
             else
                 DEFINE(name, clazz, &block)
             end
@@ -1975,11 +1963,13 @@ module ArtifactContainer
     end
 
     def REUSE(name, clazz = nil, &block)
+        name  = ArtifactName.new(name, clazz)
+
         # find meta currently defined in the given container
-        meta, meta_ow = match_meta(name, clazz, from:self, recursive:true)
+        meta, meta_ow = match_meta(name, true)
         raise "Cannot find '#{name}' definition in containers hierarchy" if meta.nil?
 
-        meta_ow._remove_from_cache(name, clazz)
+        meta_ow._remove_from_cache(name)
         meta_ow._meta.delete(meta)
         meta_ow._meta.sort!
 
@@ -1987,8 +1977,12 @@ module ArtifactContainer
         _meta.sort!
     end
 
+    # TODO: the method doesn't work for predefined artifacts
+    # TODO: the method doesn't match the passed name against meta, instead meta is matched against the name.
+    # That means  name = "cmd:*" doesn't match meta = "cme:*.java".
     def REMOVE(name)
-        meta, meta_ow = match_meta(name, from:self, recursive:true)
+        artname = ArtifactName.new(name)
+        meta, meta_ow = match_meta(name, true)
         raise "Cannot find '#{artname}' definition in containers hierarchy" if meta.nil?
         raise "Artifact '#{artname}' definition cannot be detected in an owner container" if meta_ow._meta.delete(meta).nil?
         meta_ow._meta.sort!
@@ -2002,6 +1996,20 @@ module ArtifactContainer
 
     def delegate_to_owner_if_meta_cannot_be_found?
         false
+    end
+
+    def BUILD(name = nil, clazz = nil, &block)
+        art       = artifact(name, clazz, &block)
+        container = art.owner
+        while !container.nil? do
+            tree = ArtifactTree.new(container)
+            tree.build()
+            container = container.owner
+        end
+
+        tree = ArtifactTree.new(art)
+        tree.build()
+        return tree.art
     end
 end
 
@@ -2048,8 +2056,8 @@ class Project < ExistentDirectory
         @@curent_project
     end
 
-    def self.artifact(name, &block)
-        @@curent_project.artifact(name, &block)
+    def self.artifact(name, clazz = nil, &block)
+        self.current.artifact(name, clazz, &block)
     end
 
     def self.PROJECT(&block)
@@ -2057,23 +2065,11 @@ class Project < ExistentDirectory
         self.current.instance_exec &block
     end
 
-    def self.build(name)
-        raise 'Current project cannot be detected' if @@curent_project.nil?
-
-        # build current project
-        tree = ArtifactTree.new(@@curent_project)
-        tree.build()
-
-        # make sure we are not going to build the current project again
-        an = ArtifactName.new(name)
-        if an.clazz.nil? || an.clazz != @@curent_project.class || @@curent_project.fullpath(an.path) != @@curent_project.fullpath
-            art = @@curent_project.artifact(name)
-            if art != @@curent_project
-                tree = ArtifactTree.new(art)
-                tree.build()
-            end
-        end
-        return tree.art
+    def artifact(name, clazz = nil, &block)
+        art_name = ArtifactName.new(name, clazz)
+        # detect if the path point to project itself
+        return self if (art_name.clazz.nil? || art_name.clazz == self.class) && art_name.to_s == @name
+        super
     end
 
     def PROFILE(name)
@@ -2090,8 +2086,7 @@ class Project < ExistentDirectory
     end
 
     def homedir
-        return @name if @is_absolute
-        return super
+        @is_absolute ? @name : super
     end
 
     def what_it_does
@@ -2168,7 +2163,7 @@ module PATHS
         end
 
         def path_base_dir
-            return @path_base_dir
+            @path_base_dir
         end
     end
 
@@ -2182,8 +2177,7 @@ module PATHS
     end
 
     def INCLUDE?(path)
-        return true if matched_path(path) >= 0
-        return false
+        matched_path(path) >= 0
     end
 
     def FILTER(fpath)
@@ -2349,7 +2343,7 @@ class OTHERWISE < FileMask
         @build_ext_pattern = true
     end
 
-    def build()
+    def build
         if @build_ext_pattern
             exts = []
             list_items { | f, m |
@@ -2364,24 +2358,6 @@ class OTHERWISE < FileMask
             list_items { | f, m |
                 self.instance_exec(f, &@callback)
             }
-        end
-    end
-end
-
-# Action applied to the passed artifact
-# TODO: revise the artifact may it should be removed
-class ArtifactAction < Artifact
-    attr_reader :target
-
-    def initialize(name, &block)
-        if name.kind_of?(Artifact)
-            super(name.name, &block)
-            @target = name
-            #@owner = @target.owner
-        else
-            super
-            @target = @owner.artifact(name)
-            #@owner = @target.owner
         end
     end
 end

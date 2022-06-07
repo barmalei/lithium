@@ -3,7 +3,7 @@
     REQUIRE {
         Directory('target') {
             DONE {
-                BUILD(homedir, RunMaven) {
+                RunMaven(homedir) {
                     TARGETS('compile')
                 }
             }

@@ -2,43 +2,36 @@
     $lithium_options['v'] = 1
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
-    # REQUIRE  {
-    #     puts ".............. #{@name}  '#{self.owner.nil?}' "
-    #     DONE {
-    #         puts ">>>>>>>>>>>>>>>>>>> #{self.name}"
-    #         art = Directory.build('target')
-    #         puts ">>>>>>>>>>>>>>>>>>> #{art.owner}"
-    #     }
-    # }
+    REQUIRE  {
+        DONE {
+            Directory('target')
+        }
+    }
 
     JAVA {
         REQUIRE {
             DefaultClasspath {
                 JOIN('.lithium/ext/java/lithium/classes')
             }
-
-            puts @requires[-1][0].class
-
-            puts "FIRST JAVA BLOCK #{classpath}"
         }
     }
 
     JAVA('.env/JAVA2') {
         REQUIRE {
-            puts "SECOND JAVA BLOCK #{classpath}"
             DefaultClasspath {
                 JOIN('.lithium/ext/java/lithium/classes2')
             }
         }
     }
 
-    Directory('tt') {
-        DONE {
-            BUILD('test', FileArtifact) {
-                puts "HELLO !!!"
-            }
+    MATCH('cmd:*.java') {
+        FileArtifact("test.java") {
+            REQUIRE JAVA
         }
     }
+
+    REMOVE('cmd:*.java')
+
 
     Touch('touch:*')
 
@@ -92,6 +85,11 @@
         InstallNodeJsPackage('**/package.json')
         DeployGoogleApp  ('**/appengine-*.xml')
         DeployGoogleApp  ('**/app*.yaml')
+
+        REQUIRE {
+            Directory(".lithium") {
+            }
+        }
     }
 
     MATCH("test:*") {

@@ -81,25 +81,26 @@ class DetectJvmClassByName < LithiumJavaToolRunner
     @java_tool_command_name = 'class'
 end
 
-class FindInClasspath < ArtifactAction
+# TODO: revise !!!
+class FindInClasspath < Artifact
     def initialize(name, &block)
         super
-        REQUIRE @target
-        @patterns ||= $lithium_args.dup
+        REQUIRE name
+        @classpaths       = []
+        @patterns       ||= $lithium_args.dup
         @findJvmClasses ||= true
+        raise 'Patterns have not been defined' if @patterns.nil? || @patterns.length == 0
     end
 
-    def build()
-        raise 'Patterns have not been defined' if @patterns.nil? || @patterns.length == 0
-
-        classpath = @target.classpath if @target.kind_of?(JVM)
-        classpath = @target           if @target.kind_of?(JavaClasspath)
+    def build
+        classpath = @java.classpath                      unless @java.nil?
+        classpath = PATHS.new(homedir).JOIN(@classpaths) unless @classpaths.length == 0
         res       = []
 
         unless classpath.EMPTY?
             find(classpath, *(@patterns)) { | path, item |
                 path   = File.absolute_path(path)
-                r_path = FileArtifact.relative_to(path, @target.homedir)
+                r_path = FileArtifact.relative_to(path, homedir)
                 path   = r_path unless r_path.nil?
                 res.push([path, item])
             }
@@ -109,7 +110,7 @@ class FindInClasspath < ArtifactAction
 
         if @findJvmClasses
             @patterns.each { | pattern |
-                ArtifactTree.build(DetectJvmClassByName.new(pattern, owner:self.owner)) { |stdin, stdout, th|
+                ArtifactTree.new(DetectJvmClassByName.new(pattern, owner:self.owner)).build { | stdin, stdout, th |
                     prefix = 'detected:'
                     stdout.each { | line |
                         res.push(['JVM', line.chomp[prefix.length..]]) if line.start_with?(prefix)

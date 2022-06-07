@@ -27,8 +27,11 @@ class JavaCheckStyle < JavaFileRunner
         puts "Checkstyle home  : '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
 
         cp = File.join(@checkstyle_home, '*.jar')
-        DefaultClasspath('checkstyle_def_classpath') {
-            JOIN(cp)
+
+        REQUIRE {
+            DefaultClasspath('checkstyle_def_classpath') {
+                JOIN(cp)
+            }
         }
     end
 
@@ -69,14 +72,16 @@ class PMD < JavaFileRunner
         @source_list_prefix = '-d '
 
         cp = File.join(@pmd_home, 'lib', '*.jar')
-        DefaultClasspath('pmd_def_classpath') {
-            JOIN(cp)
+        REQUIRE {
+            DefaultClasspath('pmd_def_classpath') {
+                JOIN(cp)
+            }
         }
     end
 
     def classpath
         # only chackstyle classpath related JARs arer required
-        return PATHS.new(project.homedir).JOIN(@classpaths)
+        PATHS.new(project.homedir).JOIN(@classpaths)
     end
 
     def run_with_target(src)
@@ -100,8 +105,10 @@ class JsonSchemaToPojo < RunJAR
         raise "JSON Schema to POJO home path cannot be found '#{@pmd_home}'" unless File.directory?(@jsonSchemaToPojo_home)
 
         cp = File.join(@jsonSchemaToPojo_home, 'lib', '*.jar')
-        DefaultClasspath('jsonSchemaToPojo_def_classpath') {
-            JOIN(cp)
+        REQUIRE {
+            DefaultClasspath('jsonSchemaToPojo_def_classpath') {
+                JOIN(cp)
+            }
         }
     end
 

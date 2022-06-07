@@ -144,7 +144,6 @@ class MavenClasspath < InFileClasspath
             #look_up_file('pom.xml')
             PomFile(pom)
         }
-        #REQUIRE(homedir, PomFile)
         DEP_TARGET('build-classpath')
         TRANSITIVE(false)
     end

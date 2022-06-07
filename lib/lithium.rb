@@ -41,11 +41,6 @@ unless artifact_path.nil?
     artifact_mask = i ? artifact_path[i, artifact_path.length - i] : nil # store mask
     artifact_path = artifact_path[0, i] if !i.nil? && i >= 0             # cut mask from path
 
-    # if basedir has not been defined and path is not an absolute one let's try to
-    # lookup basedir by joining it with current directory (combine it to build an
-    # absolute path)
-    artifact_path = File.join(basedir, artifact_path) unless (File.absolute_path?(artifact_path) || $lithium_options.has_key?('basedir'))
-
     if File.absolute_path?(artifact_path)
         # resolve link to real path for absolute paths
         artifact_path = File.realpath(artifact_path) if File.exists?(artifact_path)
@@ -59,14 +54,15 @@ unless artifact_path.nil?
                 basedir = File.dirname(basedir)
             end
         end
-    else
-        if artifact_path == '.' || artifact_path == './'
-            artifact_path = basedir
-        elsif artifact_path.start_with?('./') || artifact_path.start_with?('../')
-            artifact_path = File.join(basedir, artifact_path)
-        end
+    elsif artifact_path == '.' || artifact_path == './'
+        artifact_path = basedir
+    elsif artifact_path.start_with?('./') || artifact_path.start_with?('../')
+        artifact_path = File.join(basedir, artifact_path)
+    elsif !artifact_path.start_with?('.env/')
+        artifact_path = File.join(basedir, artifact_path)
     end
 
+    artifact_path = Pathname.new(artifact_path).cleanpath.to_s
     artifact_path = artifact_path[0 .. -2] if artifact_path.length > 1 && artifact_path[-1] == '/'
 end
 

@@ -1,8 +1,10 @@
 -> {
     JAVA {
-        DefaultClasspath {
-            JOIN('classes')
-            JOIN('lib/*.jar')
+        REQUIRE {
+            DefaultClasspath {
+                JOIN('classes')
+                JOIN('lib/*.jar')
+            }
         }
     }
 }
