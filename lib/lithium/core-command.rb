@@ -5,13 +5,12 @@ require 'lithium/core'
 class CLEAN < Artifact
     def build
         # firstly let's create tree that resolves static dependencies (for instance set environment variables)
-        tree = ArtifactTree.new(@name)
+        tree = ArtifactTree.new(owner.artifact(@name))
         tree.art.clean
-        #Project.build(@name)
     end
 
     def what_it_does
-        "Cleanup '#{@name}', #{Project.artifact(@name).class}" 
+        "Cleanup '#{@name}', #{owner.artifact(@name).class}"
     end
 end
 

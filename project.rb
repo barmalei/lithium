@@ -2,11 +2,11 @@
     $lithium_options['v'] = 1
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
-    REQUIRE  {
-        DONE {
-            Directory('target')
-        }
-    }
+    # REQUIRE  {
+    #     DONE {
+    #         Directory('target')
+    #     }
+    # }
 
     JAVA {
         REQUIRE {

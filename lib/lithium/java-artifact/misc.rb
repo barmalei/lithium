@@ -86,59 +86,93 @@ class FindInClasspath < Artifact
     def initialize(name, &block)
         super
         REQUIRE name
-        @classpaths       = []
-        @patterns       ||= $lithium_args.dup
-        @findJvmClasses ||= true
-        raise 'Patterns have not been defined' if @patterns.nil? || @patterns.length == 0
+        @classpaths     = []
+        @cache          = {}
+        @pattern      ||= $lithium_args[0]
+        @findJvmClasses = true if @findJvmClasses.nil?
+        @cacheEnabled   = true if @cacheEnabled.nil?
+        raise 'Pattern has not been defined' if @pattern.nil?
+        @cache = _load_cache() if @cacheEnabled == true
     end
 
     def build
-        classpath = @java.classpath                      unless @java.nil?
-        classpath = PATHS.new(homedir).JOIN(@classpaths) unless @classpaths.length == 0
-        res       = []
-
-        unless classpath.EMPTY?
-            find(classpath, *(@patterns)) { | path, item |
-                path   = File.absolute_path(path)
-                r_path = FileArtifact.relative_to(path, homedir)
-                path   = r_path unless r_path.nil?
-                res.push([path, item])
-            }
+        if !@java.nil?
+            classpath = @java.classpath
+        elsif @classpaths.length > 0
+            classpath = PATHS.new(homedir).JOIN(@classpaths)
         else
-            puts_warning 'Classpath is empty'
+            raise "'#{@name}' artifact name doesn't point neither to JVM nor to classpaths artifact"
         end
 
-        if @findJvmClasses
-            @patterns.each { | pattern |
-                ArtifactTree.new(DetectJvmClassByName.new(pattern, owner:self.owner)).build { | stdin, stdout, th |
+        res = []
+        if @cacheEnabled == true && !@cache.empty? && @cache.has_key?(@pattern)
+            @cache[@pattern].each_pair { | path, items |
+                if path != 'JVM'
+                    b = !File.exists?(path) ||
+                        (File.directory?(path) && !items.detect { | item | !File.exists?(File.join(path, item)) }.nil?) ||
+                        (File.file?(path) && !classpath.INCLUDE?(path))
+
+                    if b
+                        @cache[@pattern].delete(path)
+                        res = []
+                        break
+                    end
+                end
+                items.each { | item | res.push([path, item]) }
+            }
+        end
+
+        if res.length == 0
+            unless classpath.EMPTY?
+                find(classpath, @pattern) { | path, item |
+                    path   = File.absolute_path(path)
+                    r_path = FileArtifact.relative_to(path, homedir)
+                    path   = r_path unless r_path.nil?
+                    res.push([path, item])
+                }
+            else
+                puts_warning 'Classpath is empty'
+            end
+
+            if @findJvmClasses
+                ArtifactTree.new(DetectJvmClassByName.new(*[ @pattern ], owner:self.owner)).build { | stdin, stdout, th |
                     prefix = 'detected:'
                     stdout.each { | line |
                         res.push(['JVM', line.chomp[prefix.length..]]) if line.start_with?(prefix)
                     }
                 }
-            }
+            end
         end
 
         res.each { | path, item |
             puts "    [#{path} => #{item}]"
+            if @cacheEnabled == true
+                @cache[@pattern]       = {} if @cache[@pattern].nil?
+                @cache[@pattern][path] = [] if @cache[@pattern][path].nil?
+                @cache[@pattern][path].push(item) if @cache[@pattern][path].index(item).nil?
+            end
         }
 
-        puts_warning "No item for '#{@patterns}' has been found" if res.length == 0
+        _save_cache(@cache) if @cacheEnabled == true
+        puts_warning "No item for '#{@pattern}' has been found" if res.length == 0
     end
 
-    def find(classpath, *patterns)
+    def clean
+        fn = _cache_path
+        File.delete(fn) if File.exists?(fn) && !File.directory?(fn)
+    end
+
+    def find(classpath, pattern)
         classpath.paths.each { | path |
             if File.directory?(path)
-                patterns.each { | pattern |
-                    Dir.glob(File.join(path, '**', pattern)).each  { | item |
-                        item = Pathname.new(item)
-                        item = item.relative_path_from(path).to_s if item.absolute?
-                        yield path, item.to_s
-                    }
+                Dir.glob(File.join(path, '**', pattern)).each  { | item |
+                    item = Pathname.new(item)
+                    item = item.relative_path_from(path).to_s if item.absolute?
+                    yield path, item.to_s
                 }
             elsif path.end_with?('.jar') || path.end_with?('.zip')
                 # TODO: probably "find" should be static method
-                FindInZip.new(path, owner:self.owner).find(*patterns) { | jar_path, item |
+                FindInZip.new(path, owner:self.owner).find(*[ "**/#{pattern}" ]) { | jar_path, item |
                     yield jar_path, item
                 }
             else
@@ -147,5 +181,38 @@ class FindInClasspath < Artifact
         }
     end
 
-    def what_it_does() "Looking for '#{@patterns}' in classpath" end
+    #  Cache structure:
+    #    {  "<class_name1>.class" : {
+    #           "<path>" : [  "<full_class_name1>", "<full_class_name2>", ... ]
+    #       },
+    #       "<class_name2>.class" :  { ... }
+    #       ...
+    #    }
+    def _cache_path
+        # TODO: more unique name is required, should depend on classpath
+        File.join(homedir, '.lithium', '.logs', "#{self.class.name}_cache.ser")
+    end
+
+    def _load_cache
+        if File.exists?(_cache_path)
+            File.open(_cache_path, 'r') { | f |
+                begin
+                    return Marshal.load(f)
+                rescue
+                    File.delete(path)
+                    raise
+                end
+            }
+        else
+            return {}
+        end
+    end
+
+    def _save_cache(cache)
+        File.open(_cache_path, 'w') {
+            | f | Marshal.dump(cache, f)
+        }
+    end
+
+    def what_it_does() "Looking for '#{@pattern}' in classpath" end
 end

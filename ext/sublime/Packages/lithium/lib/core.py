@@ -1,5 +1,5 @@
 
-import os, json, sublime_plugin, sublime, io, threading, re, traceback, subprocess, copy
+import os, json, sublime_plugin, sublime, io, threading, re, traceback, subprocess, copy, datetime
 
 # path to the lithium settings
 LI_SETTINGS_FILE = os.path.join(
@@ -71,17 +71,22 @@ class LiLog:
     @classmethod
     def debug(clz, msg):
         if clz.is_debug():
-            print(LiLog.format_str % ('DEBUG', msg))
+            print(clz.format('DEBUG', msg))
+            #print(LiLog.format_str % ('DEBUG', msg))
 
     @classmethod
     def warn(clz, msg):
         if clz.is_warn():
-            print(LiLog.format_str % ('WARN', msg))
+            print(clz.format('WARN', msg))
 
     @classmethod
     def info(clz, msg):
         if clz.is_info():
-            print(LiLog.format_str % ('INFO', msg))
+            print(LiLog.format('INFO', msg))
+
+    @classmethod
+    def format(clz, level, msg):
+        return datetime.datetime.now().strftime("%H:%M:%S.%f") + " " + LiLog.format_str % ('INFO', msg)
 
 # various helper methods
 class LiHelper:

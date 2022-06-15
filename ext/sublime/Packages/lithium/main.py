@@ -1,4 +1,3 @@
-
 import sublime, sublime_plugin, subprocess, os, platform, json, re, sys, webbrowser
 
 from itertools      import groupby
@@ -213,7 +212,7 @@ class LiJavaTextCommand(LiTextCommand):
 class LiSortImportsCommand(LiJavaTextCommand):
     def run(self, edit, **args):
         #  [ [Region, String:<import [static]? [package];>], ... ]
-        imports = LiJava.java_view_imports(self.view)
+        imports = LiJava.java_imports(self.view)
 
         if imports is not None:
             imports_str = ""
@@ -223,17 +222,11 @@ class LiSortImportsCommand(LiJavaTextCommand):
                 if index > 0:
                     imports_str = imports_str + "\n\n"
 
-                import_items = [ x[1] for x in group ]
+                import_items = [ "import static %s" % x[1] if x[2] else "import %s" % x[1] for x in group ]
                 # for group_item in group
                 imports_str = imports_str + ";\n".join(import_items) + ";"
 
             if len(imports_str) > 0:
-                # more gentle clean, but it preserves empty lines between imports
-                # for import_item in reversed(imports):
-                #     new_reg = self.view.line(import_item[0])
-                #     new_reg.b = new_reg.b + 1
-                #     self.view.erase(edit, new_reg)
-
                 a = imports[0][0].a
                 b = self.view.line(imports[len(imports) - 1][0]).b
                 self.view.replace(edit, sublime.Region(a, b), imports_str)
@@ -242,9 +235,8 @@ class LiSortImportsCommand(LiJavaTextCommand):
     # output:[ [ group ], [ group ] ]  where group: [ region, String ], [ region, String ] ..,
     def group_imports(self, imports): # return [ [], [], ... ] grouped by package prefix
         # add "a." prefix to key to sort java package first
-        imports = sorted(imports, key = lambda x : 'a.' + x[1] if x[1].startswith('import java.') or x[1].startswith('import javax.') else x[1])
+        imports = sorted(imports, key = lambda x : 'a.' + x[1] if x[1].startswith('java.') or x[1].startswith('javax.') else x[1])
         groups  = []
-        #for k, g in groupby(imports, lambda x : x[1][:x[1].rfind('.')] ):
         for k, g in groupby(imports, lambda x : x[1][:x[1].find('.')] ):
             groups.append(list(g))
 
@@ -301,7 +293,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
         self.region, self.word = LiHelper.sel_region(self.view)
 
         if self.region is not None:
-            OUTPUT(self).append_info("%s: completing '%s' word" % (self.__class__.__name__,self.word))
+            OUTPUT(self).append_info("%s: completing '%s' word" % (self.__class__.__name__, self.word))
 
             if self.word is not None and len(self.word.strip()) > 1:
                 # detect home folder
@@ -320,7 +312,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     self.found_items = []
                     self.edit        = edit
                     self.process     = self.exec(
-                        "FindInClasspath:\"%s\" %s.class" % (os.path.join(li_home, ".env", "JAVA"), "*/" + self.word),
+                        "FindInClasspath:\"%s\" %s.class" % (os.path.join(li_home, ".env", "JAVA"), self.word),
                         self.match_output,
                         self.error_output,
                         False
@@ -348,9 +340,12 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                 if l == 1 and self.auto_apply:
                     self.class_name_selected(0)
                 else:
-                    self.found_items.sort(),
+                    pkg_name, pkg_type = LiJava.java_detect_class_package(self.view, self.word)
+
+                    self.found_items.sort()
+                    found_items = [ e + " (*)" if pkg_name is not None and e.startswith(pkg_name + ".") else e for e in self.found_items ]
                     self.view.show_popup_menu(
-                        self.found_items,
+                        found_items,
                         self.class_name_selected)
             else:
                 OUTPUT(self).append_warn("No class has been found for '%s' word" % self.word)
@@ -360,7 +355,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
         if index >= 0:
             item    = self.found_items[index]
             syntax  = self.syntax()
-            imports = LiJava.java_view_imports(self.view, syntax)
+            imports = LiJava.java_imports(self.view, syntax)
             if imports is not None and next((x[1] for x in imports if x[1].endswith(item)), None) is not None:
                 OUTPUT(self).append_warn("%s: Import '%s' is already declared" % (self.__class__.__name__,item))
             else:
@@ -374,7 +369,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     self.view.replace(self.edit, self.region, item)
                 else:
                     # detect a place to insert the import
-                    if imports is not None:
+                    if imports is not None and len(imports) > 0:
                         for imp in imports:
                             if import_to_insert > imp[1]:
                                 index_to_insert = index_to_insert + 1
@@ -382,7 +377,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                                 break
 
                     if syntax == 'java':
-                        if imports is not None:
+                        if imports is not None and len(imports) > 0:
                             if index_to_insert >= len(imports):
                                 self.view.insert(self.edit, imports[len(imports) - 1][0].b, "\n%s;" % import_to_insert)
                             else:
@@ -390,7 +385,8 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                         elif len(scopes) == 2 and scopes.index('source.java') >= 0 and scopes.index('support.class.java') >= 0:
                             self.view.replace(self.edit, self.region, '%s;' % import_to_insert)
                         else:
-                            self.view.replace(self.edit, self.region, item)
+                            pkg_reg, pkg_name = LiJava.java_package(self.view)
+                            self.view.insert(self.edit, pkg_reg.b + 1, "\n\n%s;" % import_to_insert)
                     elif syntax == 'kotlin':
                         if imports is not None:
                             self.view.insert(self.edit, imports[0][0].a, "%s\n" % import_to_insert)
@@ -448,11 +444,12 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
             else:
                 sublime.error_message("No region has been detected to place ")
         else:
-            self.selected_symbol, self.package_name, self.class_name, const_name = LiJava.java_view_symbol(self.view)
+            self.package_name, self.package_type, self.class_name = LiJava.java_view_symbol(self.view)
 
-            if self.selected_symbol is not None and self.selected_symbol != '':
+            if self.package_name is not None:
+                self.full_class_name = self.package_name + "." + self.class_name
                 self.exec(
-                    "ShowClassMethods:%s" % self.selected_symbol,
+                    "ShowClassMethods:%s" % self.full_class_name,
                     self.match_output,
                     self.error_output,
                     False, { "std": "none" }
@@ -461,7 +458,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
                 if len(self.detected_methods) > 0:
                     self.show()
                 else:
-                    sublime.error_message("No method has been discovered for %s" % self.selected_symbol)
+                    sublime.error_message("No method has been discovered for %s" % self.full_class_name)
             else:
                 sublime.error_message("Nothing has been selected")
 
@@ -516,7 +513,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
 
             marks = [ 'x' if f is True else '-' for f in filters ]
             self.view.show_popup(
-                LiShowClassMethodsCommand.content % (self.selected_symbol, marks[0], marks[1], marks[2], "\n".join(links)),
+                LiShowClassMethodsCommand.content % (self.full_class_name, marks[0], marks[1], marks[2], "\n".join(links)),
                 max_width = 1500,
                 max_height = 700,
                 on_navigate = self.selected
@@ -532,15 +529,15 @@ class LiGotoClassCommand(LiJavaTextCommand):
             self.warn("View is not available")
             return
 
-        fullclazz, clazz, cnst, word = LiJava.java_view_symbol(view)
-        if fullclazz is None:
+        package, pkg_type, class_name = LiJava.java_view_symbol(view)
+        if class_name is None:
             self.warn("Class name cannot be detected")
-            return
-
-        sublime.active_window().run_command(
-            "show_overlay",
-            { "overlay": "goto", "show_files" : "true", "text": fullclazz.replace('.', '/') }
-        )
+        else:
+            full_class_name = package + "." +  class_name
+            sublime.active_window().run_command(
+                "show_overlay",
+                { "overlay": "goto", "show_files" : "true", "text": full_class_name.replace('.', '/') }
+            )
 
 
 class LiShowClassModuleCommand(LiJavaTextCommand):
@@ -559,20 +556,20 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
         if args.get('clazz') is not None:
             word = args.get('clazz')
         else:
-            word, package, clazz, const = LiJava.java_view_symbol(self.view)
+            package, pkg_type, class_name = LiJava.java_view_symbol(self.view)
 
-        if word is not None and word != '':
-            self.selected_symbol = word
+        if package is not None:
+            self.full_class_name = package + "." + class_name
             self.exec(
-                "ShowClassModule:%s" % word, self.match_output, self.error_output, False, { "std": "none" }
+                "ShowClassModule:%s" % self.full_class_name, self.match_output, self.error_output, False, { "std": "none" }
             )
 
             if len(self.detected_modules) > 0:
                 self.show()
             else:
-                sublime.error_message("No module has been discovered for %s" % word)
+                sublime.error_message("No module has been discovered for %s" % self.full_class_name)
         else:
-            self.selected_symbol = None
+            self.full_class_name = None
             sublime.error_message("Nothing has been selected")
 
     def exec(self, *args):
@@ -594,7 +591,7 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
     def show(self):
         items = [ '<li>%s</li>' % module for module in self.detected_modules ]
         self.view.show_popup(
-            LiShowClassModuleCommand.content % (self.selected_symbol, "\n".join(items)),
+            LiShowClassModuleCommand.content % (self.full_class_name, "\n".join(items)),
             max_width = 1200,
             max_height = 700,
             on_navigate = None
@@ -606,14 +603,16 @@ class LiShowClassInfoCommand(LiJavaTextCommand):
         if args.get('clazz') is not None:
             word = args.get('clazz')
         else:
-            word, package, clazz, const = LiJava.java_view_symbol(self.view)
+            pkg, pkg_type, class_name = LiJava.java_view_symbol(self.view)
 
-        if word is not None and word != '':
-            self.exec("ShowClassInfo:%s" % word, self.match_output, self.error_output, False, { "std": "none" })
+        if pkg is not None:
+            full_class_name = pkg + "." + class_name
+
+            self.exec("ShowClassInfo:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" })
             if len(self.matched_results) > 0:
                 LiClassInfo(json.loads(''.join(self.matched_results))).show(self.view)
             else:
-                sublime.error_message("No module has been discovered for %s" % word)
+                sublime.error_message("No module has been discovered for %s" % full_class_name)
         else:
             sublime.error_message("Class name and package cannot be fetched")
 
@@ -653,15 +652,16 @@ class LiShowClassFieldCommand(LiJavaTextCommand):
     """
 
     def run(self, edit, **args):
-        word, package, clazz, const = LiJava.java_view_symbol(self.view)
-        if word is not None and word != '':
+        pkg, pkg_type, class_name = LiJava.java_view_symbol(self.view)
+        if pkg is not None:
+            full_class_name = pkgf + "." + class_name
             self.exec(
-                "ShowClassField:%s" % word, self.match_output, self.error_output, False, { "std": "none" }
+                "ShowClassField:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" }
             )
 
             if self.outputText is not None and len(self.outputText) > 0:
                 self.outputText = "\n".join(self.outputText)
-                self.symbol     = word
+                self.symbol     = full_class_name
 
                 mt = re.search(r'\{\{\{([^{}]+)\}\}\}', self.outputText, re.MULTILINE)
                 if mt is not None:
@@ -669,7 +669,7 @@ class LiShowClassFieldCommand(LiJavaTextCommand):
                     self.detected_field = self.detected_field.replace("\n", "<br/>")
                     self.show()
             else:
-                sublime.error_message("No field value has been discovered for %s" % word)
+                sublime.error_message("No field value has been discovered for %s" % full_class_name)
         else:
             sublime.error_message("Nothing has been selected")
 

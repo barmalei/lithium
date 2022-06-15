@@ -131,7 +131,7 @@ module LogArtifactState
     #############################################################
     def logs_home_dir
         hd = homedir
-        raise 'Cannot detect log directory since project home is unknown' if !hd
+        raise 'Cannot detect log directory since project home is unknown' if hd.nil?
         log_hd = File.join(hd, '.lithium', '.logs')
         unless File.exists?(log_hd)
             puts_warning "LOG directory '#{log_hd}' cannot be found. Try to create it ..."
@@ -1412,6 +1412,7 @@ class FileArtifact < Artifact
         return art.kind_of?(Project) ? [] : FileArtifact.search(path, art.project, &block)
     end
 
+    # TODO: grep and grep_file a bit weird names
     def self.grep_file(path, pattern, match_all = false, &block)
         raise 'Pattern cannot be nil' if pattern.nil?
         pattern = Regexp.new(pattern) if pattern.kind_of?(String)

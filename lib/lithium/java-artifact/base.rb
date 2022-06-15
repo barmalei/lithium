@@ -357,15 +357,17 @@ class KOTLIN < JVM
     def initialize(name, &block)
         super
         kotlinc_path = @kotlin_home
-        unless @kotlin_home
+        if @kotlin_home.nil?
             kotlinc_path = FileArtifact.which('kotlinc')
-            kotlinc_path = File.dirname(File.dirname(kotlinc_path)) if kotlinc_path
+            kotlinc_path = File.dirname(File.dirname(kotlinc_path)) unless kotlinc_path.nil?
             @kotlin_home = kotlinc_path
         end
         raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
 
-        KotlinClasspath {
-            @kotlin_home = kotlinc_path
+        REQUIRE {
+            KotlinClasspath {
+                @kotlin_home = kotlinc_path
+            }
         }
     end
 
