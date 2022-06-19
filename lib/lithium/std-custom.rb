@@ -1,6 +1,7 @@
 require 'lithium/std-core'
 
 class LithiumStd < Std
+    # TODO: remove one of the following line
     @@signs_map = ['INF', 'WAR', 'ERR', 'EXC']
     @@signs_map = ['I', 'W', 'E', 'X']
 
@@ -27,9 +28,9 @@ class LithiumStd < Std
     end
 
     def format(msg, level)
-        level    = @@signs_map[level]
+        slevel   = @@signs_map[level]
         artclass = $current_artifact.nil? ? 'STR' : $current_artifact.class.abbr
-        "(#{level}) [#{artclass}]  #{msg}"
+        "(#{slevel}) [#{artclass}]  #{msg}"
     end
 
     def pattern_matched(msg, pattern, match)
