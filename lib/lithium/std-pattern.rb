@@ -556,8 +556,8 @@ end
 
 class KotlinCompileErrorPattern < JavaPattern
     def initialize()
-        super(2) {
-            location('kt'); any('\s+error:\s+'); group(:message, '.*$')
+        super(1) {
+            location('kt'); any('\s+'); group(:level, 'error|warning'); any(':\s+'); group(:message, '.*$')
         }
 
         COMPLETE_PATH()
