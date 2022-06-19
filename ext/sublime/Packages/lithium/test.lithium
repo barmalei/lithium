@@ -1,9 +1,9 @@
-(INF)  Z  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-(INF)  Z  :: Lithium - project management tool v2.2-beta, Sep 2012  ::
-(INF)  Z  :: http://www.gravitysoft.org                             ::
-(INF)  Z  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-(WAR)  !  Override 'compilejava' command
-(INF)  Z  TARGET: 'compile:WEB-INF/src/nl/jnc/pubsub/onetrail/view/Companies.java'
-(INF)  Z  'WEB-INF/src/nl/jnc/pubsub/onetrail/view/Companies.java', SunJavaCompiler is not expired
-(INF)  Z  There is nothing to be done!
-(INF)  Z  TARGET 'compile:WEB-INF/src/nl/jnc/pubsub/onetrail/view/Companies.java' sucessfully DONE
+(I) [STR]  19:08:09.052 Running lithium v5.0.0
+(I) [STR]  TARGET 'compile:/Users/brigadir/projects/.lithium/ext/sublime/Packages/lithium/lithium.sublime-settings' in 'projects' home
+(I) [FIL]  Build 'FileMaskContainer:lithium.sublime-settings' artifact
+(I) [OTH]  Build 'OTHERWISE:lithium.sublime-settings' artifact
+(X) [OTH]  Unsupported '**/*.sublime-settings' file type
+(X) [OTH]   from  (eval):127:in `block (3 levels) in LOAD'
+(X) [OTH]   from  [[/Users/brigadir/projects/.lithium/lib/lithium/core.rb:2356]]in `instance_exec'
+(X) [OTH]   from  [[/Users/brigadir/projects/.lithium/lib/lithium/core.rb:2356]]in `block in build'
+(I) [STR]  19:08:09.054 Building of 'compile:/Users/brigadir/projects/.lithium/ext/sublime/Packages/lithium/lithium.sublime-settings' has been done

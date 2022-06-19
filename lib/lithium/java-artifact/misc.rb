@@ -98,6 +98,12 @@ class FindInClasspath < Artifact
     def build
         if !@java.nil?
             classpath = @java.classpath
+        elsif !@kotlin.nil?
+            classpath = @kotlin.classpath
+        elsif !@scala.nil?
+            classpath = @scala.classpath
+        elsif !@groovy.nil?
+            classpath = @groovy.classpath
         elsif @classpaths.length > 0
             classpath = PATHS.new(homedir).JOIN(@classpaths)
         else

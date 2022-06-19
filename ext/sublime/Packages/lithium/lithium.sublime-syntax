@@ -1,0 +1,53 @@
+%YAML 1.2
+---
+name: 'LiOutput'
+file_extensions: [ lithium ]
+scope: source.lithium
+
+contexts:
+    main:
+        - match: (?=^\([A-Z]\))
+          push: level
+        - match: (?=^\[[A-Z]+\])
+          push: maven_level
+        - match: \b(MVN|Maven|JAVA|Java|PYTHON|Python|RUBY|Ruby|KOTLIN|Kotlin|SCALA|Scala|GROOVY|Scala|JS|JavaScript|TARGET|JUnit|Checkstyle|PMD|PHP|TypeScript|CSS|HTML)\b
+          scope: li.keywords
+        - match: \'[^\']+\'
+          scope: li.string
+        - match: \[\[
+          push: path
+        - match: '[0-9][0-9]\:[0-9][0-9]\:[0-9][0-9]\.[0-9]*'
+          scope: li.time
+
+    level:
+        - meta_scope: li.level
+        - match: (^\(I\) \[[A-Z]+\])|(^\(X\) \[[A-Z]+\])|(^\(W\) \[[A-Z]+\])|(^\(E\) \[[A-Z]+\])
+          captures:
+              1: li.info
+              2: li.exception
+              3: li.warning
+              4: li.error
+          pop: true
+
+    maven_level:
+        - match: (\[INFO\])|(\[ERROR\])|(\[WARNING\])
+          captures:
+              1: li.info
+              2: li.error
+              3: li.warning
+          pop: true
+
+    path:
+        - match: \]\]
+          pop: true
+        - match: '([^\]]+)(\:)([0-9]+)'
+          captures:
+              1: li.path.file
+              2: li.path.delim
+              3: li.path.line
+
+    string:
+        - match: "[^\\']+"
+          scope: li.string
+        - match: \'
+          pop: true

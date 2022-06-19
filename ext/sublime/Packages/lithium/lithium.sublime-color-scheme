@@ -34,43 +34,37 @@
 		{
 			"name": "Lithium exception",
 			"scope": "li.exception",
-			"foreground":  "#FF0000"
+			"foreground":  "#FF7799"
 		},
 
 		{
 			"name": "Lithium warning",
 			"scope": "li.warning",
-			"foreground":  "#ffa759"
+			"foreground":  "#FFa759"
 		},
 
 		{
 			"name": "Lithium info",
 			"scope": "li.info",
-			"foreground":  "#ffd580"
-		},
-
-		{
-			"name": "Lithium path",
-			"scope": "li.path",
-			"foreground":  "#FF0000"
+			"foreground": "#CCFF20"
 		},
 
 		{
 			"name": "Lithium path name",
-			"scope": "li.path.name",
-			"foreground":  "#FF0000"
+			"scope": "li.path.file",
+			"foreground":  "orange"
 		},
 
 		{
-			"name": "Lithium URL",
-			"scope": "li.url",
-			"foreground":  "#FF00FF"
+			"name": "Lithium path name",
+			"scope": "li.path.delim",
+			"foreground":  "white"
 		},
 
 		{
 			"name": "Lithium path line",
 			"scope": "li.path.line",
-			"foreground":  "#FF0000"
+			"foreground":  "white"
 		},
 
 		{
@@ -81,14 +75,15 @@
 
 		{
 			"name": "Lithium string",
-			"scope": "li.delim",
-			"foreground":  "#000FFF"
+			"scope": "li.time",
+			"foreground": "#5ccfe6"
 		},
 
 		{
-			"name": "Lithium target",
-			"scope": "li.target",
-			"foreground":  "#5ccfe6"
+			"name": "Lithium keywords",
+			"scope": "li.keywords",
+			"font_style": "bold",
+			"foreground": "#5ccfe6"
 		}
 	]
 }

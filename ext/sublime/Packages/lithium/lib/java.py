@@ -10,41 +10,59 @@ class LiJava:
     def java_package(clz, view, syntax = 'java'):
         if syntax == 'java':
             expand_scope = 'source.java meta.namespace.package.identifier.java'
-            regs = view.find_by_selector('source.java meta.namespace.package.identifier.java meta.path.java')
-            if regs is not None and len(regs) > 0:
-                return view.expand_to_scope(regs[0].a, expand_scope), view.substr(regs[0])
-            else:
-                regs = view.find_by_selector('source.java meta.namespace.package.identifier.java entity.name.namespace.package.java')
+            pkg_scopes   = [
+                'source.java meta.namespace.package.identifier.java meta.path.java',
+                'source.java meta.namespace.package.identifier.java entity.name.namespace.package.java'
+            ]
+
+            for pkg_scope in pkg_scopes:
+                regs = view.find_by_selector(pkg_scope)
                 if regs is not None and len(regs) > 0:
                     return view.expand_to_scope(regs[0].a, expand_scope), view.substr(regs[0])
-                else:
-                    return None, None
+            return None, None
         elif syntax == 'kotlin':
             regs = view.find_by_selector('source.Kotlin entity.name.package.kotlin')
+            if regs is not None and len(regs) > 0:
+                pkg = view.substr(regs[0])
+                ln  = len(pkg)
+                pkg = pkg.strip("\n")
+                return sublime.Region(regs[0].a, regs[0].b - ln + len(pkg)), pkg
+            else:
+                return None, None
+        elif syntax == 'scala':
+            regs = view.find_by_selector('source.scala meta.namespace.scala entity.name.namespace.header.scala')
+            if regs is not None and len(regs) > 0:
+                return regs[0], view.substr(regs[0])
+            else:
+                return None, None
+        elif syntax == 'groovy':
+            regs = view.find_by_selector('source.groovy meta.package.groovy storage.type.package.groovy')
             if regs is not None and len(regs) > 0:
                 return regs[0], view.substr(regs[0])
             else:
                 return None, None
         else:
-            raise "Syntax '%s' is not supported" % syntax
+            raise BaseException("Syntax '%s' is not supported" % syntax)
 
     # retrieve current class name and return it
+    # @return  [ class_name, ...]
     @classmethod
-    def java_classname(clz, view, syntax = 'java'):
+    def java_classnames(clz, view, syntax = 'java'):
         if syntax == 'java':
             regions = view.find_by_selector("source.java meta.class.identifier.java entity.name.class.java")
-            if regions is None or len(regions) == 0:
-                return None
-            else:
-                return view.substr(regions[0])
         elif syntax == 'kotlin':
             regions = view.find_by_selector("source.Kotlin entity.name.type.class.kotlin")
-            if regions is None or len(regions) == 0:
-                return None
-            else:
-                return view.substr(regions[0])
+        elif syntax == 'groovy':
+            regions = view.find_by_selector("source.groovy meta.definition.class.groovy entity.name.type.class.groovy")
+        elif syntax == 'scala':
+            regions = view.find_by_selector('source.scala meta.class.body.scala meta.class.identifier.scala keyword.declaration.class.scala')
         else:
-            raise "Syntax '%s' is not supported" % syntax
+            raise BaseException("Syntax '%s' is not supported" % syntax)
+
+        if regions is None or len(regions) == 0:
+            return None
+        else:
+            return [ view.substr(region) for region in regions ]
 
     # Collect JAVA imports
     # @return: [ [ region, "<package_name>", isStatic], ... ]
@@ -64,6 +82,19 @@ class LiJava:
                     is_static    = re.match(r'^\s*import\s+static\s+', view.substr(expanded_reg)) != None
                     res.append([ expanded_reg, import_pkg, is_static])
 
+                return res
+        elif syntax == 'scala':
+            regions = view.find_by_selector("source.scala meta.import.scala")
+            if regions is None or len(regions) == 0:
+                return None
+            else:
+                res = []
+                for region in regions:
+                    expanded_reg = view.substr(region)
+                    mt = re.match(r"^\s*import\s+([a-zA-Z0-9._]+)", expanded_reg)
+                    if mt is not None:
+                        import_pkg = mt.group(1)
+                        res.append([region, import_pkg, False])
                 return res
         else:
             # this code probably will be required for other JVM languages since they may
@@ -100,9 +131,9 @@ class LiJava:
                     if mt is not None:
                         static_str = mt.group(1)
                         if static_str is not None:
-                            imports.append([ line_region, "import static %s" % mt.group(2), True ])
+                            imports.append([ line_region, "%s" % mt.group(2), True ])
                         else:
-                            imports.append([ line_region, "import %s" % mt.group(2), False ])
+                            imports.append([ line_region, "%s" % mt.group(2), False ])
                     else:
                         if not line.startswith("package"):
                             break
@@ -115,8 +146,8 @@ class LiJava:
     # detect package name by class basing on imports, package
     # @return (package, type)
     @classmethod
-    def java_detect_class_package(clz, view, class_name):
-        imports = clz.java_imports(view)
+    def java_detect_class_package(clz, view, class_name, syntax = 'java'):
+        imports = clz.java_imports(view, syntax)
         if imports is not None and len(imports) > 0:
             find_package = [ x[1] for x in imports if x[1].endswith("." + class_name)]
             if len(find_package) > 0:
@@ -125,9 +156,7 @@ class LiJava:
 
         fn = os.path.basename(view.file_name())
         fn = fn[0 : fn.rfind('.java')]
-        if fn == class_name:
-            return (clz.java_package(view)[1], 'package')
-        elif os.path.exists(os.path.join(os.path.dirname(view.file_name()), class_name + '.java')):
+        if fn == class_name or os.path.exists(os.path.join(os.path.dirname(view.file_name()), class_name + '.java')):
             return (clz.java_package(view)[1], 'package')
         else:
             return None, None
@@ -139,7 +168,7 @@ class LiJava:
         symbol, region, scope = LiHelper.view_symbol(view)
 
         LiLog.info(
-            "java_view_symbol(): symbol = '%s', scopes = '%s', view_clazz = '%s', view_pkg = '%s'" % (symbol, scope, clz.java_classname(view), clz.java_package(view))
+            "java_view_symbol(): symbol = '%s', scopes = '%s', view_clazz = '%s', view_pkg = '%s'" % (symbol, scope, clz.java_classnames(view), clz.java_package(view))
         )
 
         if symbol is not None:
@@ -177,7 +206,7 @@ class LiJava:
             elif syntax == 'kotlin':
                 pass
             else:
-                raise "Syntax '%s' is not supported" % syntax
+                raise BaseException("Syntax '%s' is not supported" % syntax)
         else:
             return None, None, None
 
@@ -259,7 +288,7 @@ class LiJava:
                     elif LiHelper.has_in_scope(view, ws, const_name_scope):
                         const_name.insert(index, word)
                     elif LiHelper.has_in_scope(view, ws, 'entity.name.class.java'):
-                        pkg_name   = clz.java_package(view)[1].split('.')
+                        pkg_name   = clz.java_package(view)[1].split('.', syntax)
                         class_name = [ word ]
                     elif LiHelper.has_in_scope(view, ws, 'entity.other.inherited-class.java'):
                         class_name = [ word ]
@@ -277,8 +306,8 @@ class LiJava:
             #  Direct reference to a constant:
             #  a = CONSTANT
             if len(const_name) > 0 and len(pkg_name) == 0:
-                class_name = [ clz.java_classname(view) ]
-                pkg_name   = clz.java_package(view)[1].split('.')
+                class_name = clz.java_classnames(view, syntax)
+                pkg_name   = clz.java_package(view)[1].split('.', syntax)
             elif len(parts) > 0:
                 class_name = [ parts[len(parts) - 1] ]
             else:
@@ -287,7 +316,7 @@ class LiJava:
 
         if len(pkg_name) == 0 and len(class_name) > 0:
             cn      = None
-            imports = clz.java_imports(view)
+            imports = clz.java_imports(view, syntax)
             if imports is not None and len(imports) > 0:
                 for item in class_name:
                     cn = item if cn is None else cn + "." + item
@@ -307,7 +336,7 @@ class LiJava:
                 filename   = view.file_name()
                 class_path = os.path.join(os.path.dirname(filename), class_name[0] + ".java")
                 if os.path.isfile(class_path):
-                    pkg_name = clz.java_package(view)[1].split('.')
+                    pkg_name = clz.java_package(view, syntax)[1].split('.')
 
         LiLog.debug("%s.java_view_symbol(): pkgs = '%s', class_name = '%s', const = '%s', symb = '%s'" % (clz.__name__, pkg_name, class_name, const_name, symbol))
 
@@ -317,11 +346,11 @@ class LiJava:
 
         symbol = '' if pkg_name is None else pkg_name
         if len(symbol) > 0:
-            symbol = symbol + "." + class_name
+            symbol = "%s.%s" % (symbol, class_name)
         else:
             symbol = class_name
 
         if const_name is not None:
-            symbol = symbol + "." + const_name
+            symbol = "%s.%s" % (symbol, const_name)
 
         return symbol, pkg_name, class_name, const_name

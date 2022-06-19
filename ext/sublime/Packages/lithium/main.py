@@ -246,7 +246,7 @@ class LiRemoveUnusedImportsCommand(LiJavaTextCommand):
     re_unused_import = r"\s+([^;:,?!!%^&()|+=></-]+)\.\s+\[UnusedImports\]$"
 
     def run(self, edit, **args):
-        OUTPUT(self).append_info("%s: Remove un-used imports" % self.__class__.__name__)
+        OUTPUT(self).append_info("%s: Remove un-used imports\n" % self.__class__.__name__)
 
         self.exec(
             "UnusedJavaCheckStyle:\"%s\" " % self.view.file_name(),
@@ -256,14 +256,14 @@ class LiRemoveUnusedImportsCommand(LiJavaTextCommand):
         )
 
         if self.unused_imports is None or len(self.unused_imports) == 0:
-            OUTPUT(self).append_warn("(%s: Unused imports have not been detected" % self.__class__.__name__)
+            OUTPUT(self).append_warn("(%s: Unused imports have not been detected\n" % self.__class__.__name__)
         else:
             for imp in reversed(self.unused_imports):
                 line = imp[1]
                 region = self.view.full_line((self.view.text_point(line - 1, 0)));
                 self.view.show(region)
                 self.view.erase(edit, region)
-                OUTPUT(self).append_warn("%s: Remove unused import '%s' at line %i" % ( self.__class__.__name__, imp[0],line))
+                OUTPUT(self).append_warn("%s: Remove unused import '%s' at line %i\n" % ( self.__class__.__name__, imp[0],line))
 
     def exec(self, *args):
         self.unused_imports = []
@@ -288,17 +288,15 @@ class LiValidateImportsCommand(LiJavaTextCommand):
 
 class LiCompleteImportCommand(LiJavaTextCommand):
     def run(self, edit, **args):
-        OUTPUT(self).append_info("%s: Completing JAVA import" % self.__class__.__name__)
+        OUTPUT(self).append_info("%s: Completing JAVA import\n" % self.__class__.__name__)
 
         self.region, self.word = LiHelper.sel_region(self.view)
 
         if self.region is not None:
-            OUTPUT(self).append_info("%s: completing '%s' word" % (self.__class__.__name__, self.word))
+            OUTPUT(self).append_info("%s: completing '%s' word\n" % (self.__class__.__name__, self.word))
 
             if self.word is not None and len(self.word.strip()) > 1:
                 # detect home folder
-                li_home = self.home()
-
                 self.inline = False
                 if 'inline' in args:
                     self.inline = args['inline']
@@ -312,7 +310,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     self.found_items = []
                     self.edit        = edit
                     self.process     = self.exec(
-                        "FindInClasspath:\"%s\" %s.class" % (os.path.join(li_home, ".env", "JAVA"), self.word),
+                        "FindInClasspath:\"%s\" %s.class" % (os.path.join(".env", self.syntax().upper()), self.word),
                         self.match_output,
                         self.error_output,
                         False
@@ -340,7 +338,10 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                 if l == 1 and self.auto_apply:
                     self.class_name_selected(0)
                 else:
-                    pkg_name, pkg_type = LiJava.java_detect_class_package(self.view, self.word)
+                    pkg_name, pkg_type = LiJava.java_detect_class_package(self.view, self.word, self.syntax())
+
+                    core.LiLog.info("!!!!!!!!!!!! rp = %s syn = %s  pkg = %s, pkg_type = %s, imp = %s" % (LiJava.java_package(self.view, self.syntax()), self.syntax(), pkg_name, pkg_type, LiJava.java_imports(self.view, self.syntax())))
+                    core.LiLog.info("!!!!!!!!!!!! cname = %s " % LiJava.java_classnames(self.view, self.syntax()))
 
                     self.found_items.sort()
                     found_items = [ e + " (*)" if pkg_name is not None and e.startswith(pkg_name + ".") else e for e in self.found_items ]
@@ -348,7 +349,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                         found_items,
                         self.class_name_selected)
             else:
-                OUTPUT(self).append_warn("No class has been found for '%s' word" % self.word)
+                OUTPUT(self).append_warn("No class has been found for '%s' word\n" % self.word)
                 #sublime.message_dialog("Import '%s' is already declared" % item)
 
     def class_name_selected(self, index):
@@ -357,7 +358,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
             syntax  = self.syntax()
             imports = LiJava.java_imports(self.view, syntax)
             if imports is not None and next((x[1] for x in imports if x[1].endswith(item)), None) is not None:
-                OUTPUT(self).append_warn("%s: Import '%s' is already declared" % (self.__class__.__name__,item))
+                OUTPUT(self).append_warn("%s: Import '%s' is already declared\n" % (self.__class__.__name__,item))
             else:
                 scopes = self.view.scope_name(self.region.begin()).strip().split(" ")
                 index_to_insert  = 0
@@ -371,7 +372,8 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     # detect a place to insert the import
                     if imports is not None and len(imports) > 0:
                         for imp in imports:
-                            if import_to_insert > imp[1]:
+                            cmp_imp = "import %s" % imp[1] if imp[2] is False else "import static %s" % imp[1]
+                            if import_to_insert > cmp_imp:
                                 index_to_insert = index_to_insert + 1
                             else:
                                 break
@@ -385,7 +387,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                         elif len(scopes) == 2 and scopes.index('source.java') >= 0 and scopes.index('support.class.java') >= 0:
                             self.view.replace(self.edit, self.region, '%s;' % import_to_insert)
                         else:
-                            pkg_reg, pkg_name = LiJava.java_package(self.view)
+                            pkg_reg, pkg_name = LiJava.java_package(self.view, syntax)
                             self.view.insert(self.edit, pkg_reg.b + 1, "\n\n%s;" % import_to_insert)
                     elif syntax == 'kotlin':
                         if imports is not None:
@@ -490,7 +492,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
                 self.detected_methods.append(method)
 
     def error_output(self, process, err):
-        OUTPUT(self).append_err("Unexpected error")
+        OUTPUT(self).append_err("Unexpected error\n")
         OUTPUT(self).append_err(err)
 
     def show(self):
@@ -533,7 +535,7 @@ class LiGotoClassCommand(LiJavaTextCommand):
         if class_name is None:
             self.warn("Class name cannot be detected")
         else:
-            full_class_name = package + "." +  class_name
+            full_class_name = package + "." + class_name if package is not None else class_name
             sublime.active_window().run_command(
                 "show_overlay",
                 { "overlay": "goto", "show_files" : "true", "text": full_class_name.replace('.', '/') }
@@ -544,7 +546,7 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
     content = """
         <html>
             <body style='width:900px;'>
-                <div class='headerFilter' style='margin:0px;background-color:sandybrown;color:red;padding:6px;font-weight:bold;font-size:14px;'>
+                <div class='headerFilter' style='margin:0px;background-color:sandybrown;color:white;padding:6px;font-size:14px;'>
                     %s
                 </div>
                 <ul>%s</ul>
@@ -585,7 +587,7 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
                 self.detected_modules.append( module )
 
     def error_output(self, process, err):
-        OUTPUT(self).append_err("Unexpected error")
+        OUTPUT(self).append_err("Unexpected error\n")
         OUTPUT(self).append_err(err)
 
     def show(self):
@@ -631,10 +633,10 @@ class LiShowClassInfoCommand(LiJavaTextCommand):
                     self.matched_flags.pop(0)
                 else:
                     print(line)
-                    matched_results.append(line)
+                    self.matched_results.append(line)
 
     def error_output(self, process, err):
-        OUTPUT(self).append_err("Unexpected error")
+        OUTPUT(self).append_err("Unexpected error\n")
         OUTPUT(self).append_err(err)
 
 
@@ -682,7 +684,7 @@ class LiShowClassFieldCommand(LiJavaTextCommand):
             self.outputText.append(line)
 
     def error_output(self, process, err):
-        OUTPUT(self).append_err("Unexpected error")
+        OUTPUT(self).append_err("Unexpected error\n")
         OUTPUT(self).append_err(err)
 
     def show(self):
@@ -832,7 +834,7 @@ class LiShowLocationsCommand(LiTextCommand):
             if self.panel.select_location(i):
                 self.panel.goto_location(i)
         else:
-            self.panel.append_warn("Unknown selected item")
+            self.panel.append_warn("Unknown selected item\n")
 
 # The standard open_file doesn't recognize row and column in file name
 # but the window.open_file does it. This command is wrapper around

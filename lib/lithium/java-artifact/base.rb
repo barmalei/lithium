@@ -322,7 +322,7 @@ class GROOVY < JVM
             groovy_path = FileArtifact.which('groovy')
             @groovy_home = File.dirname(File.dirname(groovy_path)) if groovy_path
         end
-        raise "Cannot find groovy home '#{@groovy_home}'" unless File.exists?(@groovy_home)
+        raise "Groovy home '#{@groovy_home}' home is nil or invalid" if @groovy_home.nil? || !File.exists?(@groovy_home)
 
         puts "Groovy home: '#{groovy_home}'"
     end
@@ -362,13 +362,14 @@ class KOTLIN < JVM
             kotlinc_path = File.dirname(File.dirname(kotlinc_path)) unless kotlinc_path.nil?
             @kotlin_home = kotlinc_path
         end
-        raise "Kotlin home '#{@kotlin_home}' cannot be found" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
+        raise "Kotlin '#{@kotlin_home}' home is nil or invalid" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
 
         REQUIRE {
             KotlinClasspath {
                 @kotlin_home = kotlinc_path
             }
         }
+        puts "Kotlin home: '#{@kotlin_home}'"
     end
 
     def SDKMAN(version, candidate = 'kotlin')
@@ -394,7 +395,7 @@ class SCALA < JVM
             @scala_home = File.dirname(File.dirname(scala_path)) if scala_path
         end
 
-        raise "Scala home '#{@scala_home}' cannot be found" if @scala_home.nil? || !File.exist?(@scala_home)
+        raise "Scala'#{@scala_home}' home is nil or invalid" if @scala_home.nil? || !File.exist?(@scala_home)
         puts "Scala home: '#{@scala_home}'"
     end
 

@@ -67,7 +67,6 @@
             { "key": "selector", "operator": "equal", "operand": "source.lithium" }
         ]
     },
-
     {
         "keys": [ "alt+super+enter" ],
         "command": "li",
