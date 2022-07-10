@@ -41,7 +41,7 @@ require 'lithium/xml-artifact'
 #     }.TO(ValidatePythonScript, RunPythonScript)
 # }
 
-# STD recognizers
+# STD recognizer
 PATTERNS ({
     JavaFileRunner => [
        # '\s+at\s+(?<class>[a-zA-Z_$][\-0-9a-zA-Z_$.]*)\s*\((?<file>${file_pattern}\.(java|kt|scala))\:(?<line>[0-9]+)\)'
@@ -73,10 +73,10 @@ PATTERNS ({
             }
 
             MATCHED {
-                convert?(:level) { | b |
-                    if b == 'WARNING'
+                convert?(:level) { | l |
+                    if l == 'WARNING'
                         'warning'
-                    elsif b == 'ERROR'
+                    elsif l == 'ERROR'
                         'error'
                     end
                 }
@@ -84,17 +84,17 @@ PATTERNS ({
         }
     ],
 
-    [ KotlinCompiler ] => [
+    KotlinCompiler => [
         KotlinCompileErrorPattern.new()
     ],
 
-    [ ScalaCompiler ] => [
+    ScalaCompiler => [
          StdPattern.new {
-            any('--\s*\[[0-9]+\]\s+[^:]+'); colon; any('\s*'); group(:location) { file('.scala'); colon; line; colon; column; }
+            group(:message, '\-\-\s*\[E[0-9]+\]\s+[^:]+'); colon; spaces; location('scala');
         }
     ],
 
-    [ GroovyCompiler ] => [
+    GroovyCompiler => [
         GroovyCompileErrorPattern.new()
     ],
 
@@ -115,7 +115,7 @@ PATTERNS ({
         }
     ],
 
-    ValidateXML  => [
+    ValidateXML => [
         FileLocPattern.new('xml')
     ],
 
@@ -165,15 +165,14 @@ PATTERNS ({
         }
     ],
 
-    ValidateDartCode => [
+    # test.dart:8:1: Error: Variables must be declared using the keywords 'const', 'final', 'var' or a type name.
+    [ ValidateDartCode, RunDartCode ] => [
         StdPattern.new {
-            any('^\s+error\s*-\s*')
-            group(:location) {
-                file('dart'); colon; line; colon; column
-            }
+            location('dart')
+            any('\s+Error:\s*')
+            group(:message, '.*$')
         }
     ],
-    # error - test.dart:8:1 - Expected to find ';'. - expected_token
 
     [ ValidatePhpScript, RunPhpScript ] => [
         StdPattern.new {
@@ -270,7 +269,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
 
     # reg self registered artifact in lithium project if they have not been defined yet
     top_prj = prj.top
-    AutoRegisteredArtifact.artifact_classes.each { | clazz |
+    SelfRegisteredArtifact.artifact_classes.each { | clazz |
         meta = ArtifactName.new(clazz)
         top_prj.DEFINE(meta) if prj.match_meta(meta).nil?
     }

@@ -6,10 +6,8 @@ class GCE < SdkEnvironmen
     @tool_name = 'gcloud'
 
     def gcloud
-        tool_path('gcloud')
+        tool_path(tool_name())
     end
-
-    def what_it_does() "Initialize GCE environment '#{@name}'" end
 end
 
 class GoogleAppFile < ExistentFile

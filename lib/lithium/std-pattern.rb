@@ -548,8 +548,8 @@ end
 
 class JavaCompileErrorPattern < JavaPattern
     def initialize
-        super(2) {
-            location('java', 'scala'); any('\s+error:\s+'); group(:message, '.*$')
+        super(1) {
+            location('java', 'scala'); spaces(); group(:level, 'error|warning'); any(':\s+'); group(:message, '.*$')
         }
     end
 end
@@ -557,7 +557,7 @@ end
 class KotlinCompileErrorPattern < JavaPattern
     def initialize()
         super(1) {
-            location('kt'); any('\s+'); group(:level, 'error|warning'); any(':\s+'); group(:message, '.*$')
+            location('kt'); spaces(); group(:level, 'error|warning'); any(':\s+'); group(:message, '.*$')
         }
 
         COMPLETE_PATH()
@@ -582,7 +582,7 @@ class URLPattern < StdPattern
     end
 
     def path
-        group(:path, '[^ \t]*')
+        group(:path,'[^ \t]*')
     end
 
     def host

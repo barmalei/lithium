@@ -8,10 +8,8 @@ class ANT < SdkEnvironmen
     @tool_name = 'ant'
     @abbr      = 'ANT'
 
-    def what_it_does() "Initialize ANT environment '#{@name}'" end
-
     def ant
-        tool_path('ant')
+        tool_path(tool_name())
     end
 end
 

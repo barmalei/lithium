@@ -18,6 +18,7 @@
                     ,{ "caption": "Maven clean/install",  "command": "li", "args": { "command": "mvn:{file}" } }
                     ,{ "caption": "Maven compile",  "command": "li",       "args": { "command": "MavenCompiler:{file}" } }
                     ,{ "caption": "Maven test",  "command": "li",          "args": { "command": "RunMavenTest:{file}" } }
+                    ,{ "caption": "Artifact deps",  "command": "li",          "args": { "command": "ShowMavenArtifactTree:{file}/{symbol}" } }
                     ,{ "caption": "Open POM",  "command": "pom", "args" : { "command": "POM" } }
 
                     ,{ "caption": "-" }

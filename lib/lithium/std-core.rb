@@ -68,7 +68,15 @@ def puts_exception(*args)
     end
 end
 
+module StdFormater
+    def format(msg, level, parent = nil)
+        msg
+    end
+end
+
 class Std
+    include StdFormater
+
     @@std = nil  # singleton object static variable
 
     # Make std singleton object
@@ -169,17 +177,13 @@ class Std
 
         # check if an artifact has a custom formatter
         if !cur_art.nil? && cur_art.kind_of?(StdFormater)
-            self << cur_art.format(msg, level) # print formatted message
+            self << cur_art.format(msg, level, self) # print formatted message
         else
-            self << format(msg, level) # print formatted message
+            self << format(msg, level, $STDOUT) # print formatted message
         end
     end
 
     def pattern_matched(msg, pattern, match)
-        msg
-    end
-
-    def format(msg, level)
         msg
     end
 
@@ -193,8 +197,3 @@ class Std
     def time(format = "%H:%M:%S %d/%b/%Y") Time.now.strftime(format) end
 end
 
-module StdFormater
-    def format(msg, level)
-        msg
-    end
-end

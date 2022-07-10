@@ -1,9 +1,9 @@
 -> {
-    $lithium_options['v'] = 1
+    $lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
     # REQUIRE  {
-    #     DONE {
+    #     BUILT {
     #         Directory('target')
     #     }
     # }
@@ -16,13 +16,13 @@
         }
     }
 
-    JAVA('.env/JAVA2') {
-        REQUIRE {
-            DefaultClasspath {
-                JOIN('.lithium/ext/java/lithium/classes2')
-            }
-        }
-    }
+    # JAVA('.env/JAVA2') {
+    #     REQUIRE {
+    #         DefaultClasspath {
+    #             JOIN('.lithium/ext/java/lithium/classes2')
+    #         }
+    #     }
+    # }
 
     MATCH('cmd:*.java') {
         FileArtifact("test.java") {

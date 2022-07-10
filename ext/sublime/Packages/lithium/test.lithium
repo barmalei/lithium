@@ -1,9 +1,0 @@
-(I) [STR]  19:08:09.052 Running lithium v5.0.0
-(I) [STR]  TARGET 'compile:/Users/brigadir/projects/.lithium/ext/sublime/Packages/lithium/lithium.sublime-settings' in 'projects' home
-(I) [FIL]  Build 'FileMaskContainer:lithium.sublime-settings' artifact
-(I) [OTH]  Build 'OTHERWISE:lithium.sublime-settings' artifact
-(X) [OTH]  Unsupported '**/*.sublime-settings' file type
-(X) [OTH]   from  (eval):127:in `block (3 levels) in LOAD'
-(X) [OTH]   from  [[/Users/brigadir/projects/.lithium/lib/lithium/core.rb:2356]]in `instance_exec'
-(X) [OTH]   from  [[/Users/brigadir/projects/.lithium/lib/lithium/core.rb:2356]]in `block in build'
-(I) [STR]  19:08:09.054 Building of 'compile:/Users/brigadir/projects/.lithium/ext/sublime/Packages/lithium/lithium.sublime-settings' has been done

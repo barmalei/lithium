@@ -27,7 +27,7 @@ class LithiumStd < Std
         end
     end
 
-    def format(msg, level)
+    def format(msg, level, parent)
         slevel   = @@signs_map[level]
         artclass = $current_artifact.nil? ? 'STR' : $current_artifact.class.abbr
         "(#{slevel}) [#{artclass}]  #{msg}"

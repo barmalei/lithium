@@ -7,7 +7,7 @@ class GenerateJavaDoc < RunJavaTool
 
     def initialize(name, &block)
         super
-        @source_as_file = true
+        @targets_from_file = true
         @destination ||= 'apidoc'
     end
 
@@ -18,22 +18,21 @@ class GenerateJavaDoc < RunJavaTool
         return dest
     end
 
-    def run_with
+    def WITH
         @java.javadoc
     end
 
-    def run_with_options(opts)
-        opts.push('-d', destination())
-        return opts
+    def WITH_TARGETS(src)
+        super("@#{src}")
+    end
+
+    def WITH_OPTS
+        super.push('-d', destination())
     end
 
     def clean
         dest = destination()
         FileUtils.rm_r(dest) unless File.directory?(dest)
-    end
-
-    def what_it_does
-        "Generate javadoc to '#{destination()}' folder"
     end
 end
 
@@ -50,14 +49,13 @@ class LithiumJavaToolRunner < RunJavaTool
              .JOIN(File.join(base, 'lib/*.jar'))
     end
 
-    def run_with
+    def WITH
         @java.java
     end
 
-    def run_with_target(src)
+    def WITH_TARGETS(src)
         t = [ 'lithium.JavaTools', "#{self.class.java_tool_command_name}:#{@shortname}" ]
         t.concat(super(src))
-        return t
     end
 end
 
@@ -85,9 +83,7 @@ end
 class FindInClasspath < Artifact
     def initialize(name, &block)
         super
-        REQUIRE name
-        @classpaths     = []
-        @cache          = {}
+        REQUIRE (name)
         @pattern      ||= $lithium_args[0]
         @findJvmClasses = true if @findJvmClasses.nil?
         @cacheEnabled   = true if @cacheEnabled.nil?
@@ -95,28 +91,42 @@ class FindInClasspath < Artifact
         @cache = _load_cache() if @cacheEnabled == true
     end
 
-    def build
-        if !@java.nil?
-            classpath = @java.classpath
-        elsif !@kotlin.nil?
-            classpath = @kotlin.classpath
-        elsif !@scala.nil?
-            classpath = @scala.classpath
-        elsif !@groovy.nil?
-            classpath = @groovy.classpath
-        elsif @classpaths.length > 0
-            classpath = PATHS.new(homedir).JOIN(@classpaths)
-        else
-            raise "'#{@name}' artifact name doesn't point neither to JVM nor to classpaths artifact"
+    def assign_required_to(req)
+        @classpaths ||=  []
+        if req.is_a?(JVM)
+            @classpaths.push(req.classpath)
+        elsif req.is_a?(JavaClasspath)
+            @classpaths.push(req)
         end
+    end
+
+    def classpath
+        PATHS.new(homedir).JOIN(@classpaths) unless @classpaths.nil? || @classpaths.length == 0
+    end
+
+    def build
+        # if !@java.nil?
+        #     classpath = @java.classpath
+        # elsif !@kotlin.nil?
+        #     classpath = @kotlin.classpath
+        # elsif !@scala.nil?
+        #     classpath = @scala.classpath
+        # elsif !@groovy.nil?
+        #     classpath = @groovy.classpath
+        # elsif @classpaths.length > 0
+        #     classpath = PATHS.new(homedir).JOIN(@classpaths)
+        # else
+        #     raise "'#{@name}' artifact name doesn't point neither to JVM nor to classpaths artifact"
+        # end
 
         res = []
+        cp  = classpath()
         if @cacheEnabled == true && !@cache.empty? && @cache.has_key?(@pattern)
             @cache[@pattern].each_pair { | path, items |
                 if path != 'JVM'
                     b = !File.exists?(path) ||
                         (File.directory?(path) && !items.detect { | item | !File.exists?(File.join(path, item)) }.nil?) ||
-                        (File.file?(path) && !classpath.INCLUDE?(path))
+                        (File.file?(path) && !cp.INCLUDE?(path))
 
                     if b
                         @cache[@pattern].delete(path)
@@ -129,8 +139,8 @@ class FindInClasspath < Artifact
         end
 
         if res.length == 0
-            unless classpath.EMPTY?
-                find(classpath, @pattern) { | path, item |
+            unless cp.EMPTY?
+                find(cp, @pattern) { | path, item |
                     path   = File.absolute_path(path)
                     r_path = FileArtifact.relative_to(path, homedir)
                     path   = r_path unless r_path.nil?

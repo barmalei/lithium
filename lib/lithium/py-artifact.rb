@@ -7,69 +7,45 @@ class PYPATH < EnvArtifact
 
     log_attr :paths
 
-    def assign_me_to
+    def assign_me_as
        :add_pypath
-    end
-
-    def build
     end
 end
 
 class DefaultPypath < PYPATH
     def initialize(name, &block)
         super
-        JOIN('lib') if block.nil? && File.exists?(File.join(path_base_dir, 'lib'))
+        JOIN('lib') if block.nil? && File.exists?(File.join(homedir, 'lib'))
     end
 end
 
 # Python home
-class PYTHON < EnvArtifact
-    include LogArtifactState
-    include AutoRegisteredArtifact
+class PYTHON < SdkEnvironmen
+    @tool_name = 'python3'
 
-    log_attr :sdk_home, :pyname
+    log_attr :pyname
 
     def initialize(name, &block)
-        @pypaths = []
         REQUIRE(DefaultPypath)
         super
-
-        if !@sdk_home
-            if @pyname
-                python_path = FileArtifact.which(@pyname)
-            else
-                python_path = FileArtifact.which('python')
-                if python_path
-                    @pyname = 'python'
-                else
-                    python_path = FileArtifact.which('python3')
-                    @pyname= 'python3' if python_path
-                end
-            end
-            @sdk_home = File.dirname(File.dirname(python_path)) if python_path
-        else
-            @pyname ||= 'python'
-        end
-
-        raise "Python home ('#{@sdk_home}') cannot be detected" if !@sdk_home || !File.directory?(@sdk_home)
-        raise "Python ('#{python()}') cannot be found"             unless File.file?(python())
-
-        puts "Python home '#{@sdk_home}', pyname = #{@pyname}"
     end
 
     def add_pypath(pp)
+        @pypaths ||= []
         @pypaths.push(pp) if @pypaths.index(pp).nil?
     end
 
     def pypath
-        @pypaths.length == 0 ? nil : PATHS.new(project.homedir).JOIN(@pypaths)
+        @pypaths.nil? || @pypaths.length == 0 ? nil : PATHS.new(homedir).JOIN(@pypaths)
     end
 
     def python
-        File.join(@sdk_home, 'bin', @pyname)
+        tool_path(tool_name())
     end
 
-    def what_it_does() "Initialize python environment '#{@name}'" end
+    def tool_name
+        @pyname.nil? ? super : @pyname
+    end
 end
 
 #  Run python
@@ -92,7 +68,7 @@ class RunPythonScript < ExistentFile
         raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
         pp = pypath()
         ENV['PYTHONPATH'] = pp.to_s unless pp.EMPTY?
-        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, OPTS(), q_fullpath) != 0
+        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, @python.OPTS(), OPTS(), q_fullpath) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end

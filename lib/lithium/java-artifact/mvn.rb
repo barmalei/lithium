@@ -9,7 +9,7 @@ class MVN < SdkEnvironmen
     @tool_name = 'mvn'
 
     def mvn
-        tool_path('mvn')
+        tool_path(tool_name())
     end
 end
 
@@ -110,22 +110,17 @@ class PomFile < ExistentFile
 
     def initialize(name = nil, &block)
         REQUIRE MVN
-        name = homedir if name.nil?
-        fp   = fullpath(name)
-        pom  = FileArtifact.look_file_up(fp, 'pom.xml', homedir)
-        raise "POM cannot be detected by '#{fp}' path" if pom.nil?
-        super(pom, &block)
+        name = FileArtifact.look_file_up(homedir, 'pom.xml', homedir) if name.nil?
+        super
     end
 
-    def assign_me_to
+    def assign_me_as
         'pom'
     end
 
     def expired?
         false
     end
-
-    def self.abbr() 'POM' end
 end
 
 class MavenClasspath < InFileClasspath
@@ -140,9 +135,7 @@ class MavenClasspath < InFileClasspath
         super
         REQUIRE {
             MVN()
-            pom  = FileArtifact.look_file_up(homedir, 'pom.xml', homedir)
-            #look_up_file('pom.xml')
-            PomFile(pom)
+            PomFile(FileArtifact.look_file_up(homedir, 'pom.xml', homedir))
         }
         DEP_TARGET('build-classpath')
         TRANSITIVE(false)
@@ -197,7 +190,7 @@ class RunMaven < PomFile
 
     @abbr = 'RMV'
 
-    def initialize(name, &block)
+    def initialize(name = nil, &block)
         super
         @targets ||= [ 'clean', 'install' ]
     end
@@ -244,10 +237,6 @@ class MavenCompiler < RunMaven
         TARGETS('compile')
     end
 
-    def expired?
-        false
-    end
-
     def list_items
         dir = File.join(File.dirname(fullpath), 'src', '**', '*')
         FileMask.new(dir, owner:self.owner).list_items { | f, t |
@@ -257,5 +246,19 @@ class MavenCompiler < RunMaven
         super { | f, t |
             yield f, t
         }
+    end
+end
+
+
+class ShowMavenArtifactTree < RunMaven
+    def initialize(name, &block)
+        @artifact = File.basename(name)
+        super(File.dirname(name), &block)
+        TARGETS('dependency:tree')
+        OPT("-Dincludes=#{@artifact}")
+    end
+
+    def expired?
+        true
     end
 end

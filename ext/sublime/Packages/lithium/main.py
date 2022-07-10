@@ -175,6 +175,10 @@ class LiCommand(LiWindowCommand):
                 else:
                     placeholders['src_home'] = os.path.join(src_folder, 'src')
 
+            symb = LiHelper.view_symbol(active_view)[0]
+            if symb is not None:
+                 placeholders['symbol'] = symb
+
         # apply placeholders to command line
         try:
             command = command.format(**placeholders)
@@ -339,9 +343,6 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     self.class_name_selected(0)
                 else:
                     pkg_name, pkg_type = LiJava.java_detect_class_package(self.view, self.word, self.syntax())
-
-                    core.LiLog.info("!!!!!!!!!!!! rp = %s syn = %s  pkg = %s, pkg_type = %s, imp = %s" % (LiJava.java_package(self.view, self.syntax()), self.syntax(), pkg_name, pkg_type, LiJava.java_imports(self.view, self.syntax())))
-                    core.LiLog.info("!!!!!!!!!!!! cname = %s " % LiJava.java_classnames(self.view, self.syntax()))
 
                     self.found_items.sort()
                     found_items = [ e + " (*)" if pkg_name is not None and e.startswith(pkg_name + ".") else e for e in self.found_items ]

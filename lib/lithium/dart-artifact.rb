@@ -12,7 +12,7 @@ class DART < SdkEnvironmen
     end
 
     def dart
-        tool_path('dart')
+        tool_path(tool_name())
     end
 
     def version
@@ -22,8 +22,6 @@ class DART < SdkEnvironmen
     def pub
         tool_path('pub')
     end
-
-    def what_it_does() "Initialize DART environment '#{@name}'" end
 end
 
 class ValidateDartCode < FileMask
@@ -38,7 +36,7 @@ class ValidateDartCode < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation DART script '#{path}' failed" if Artifact.exec(@dart.dart, 'analyze', OPTS(), q_fullpath(path)) != 0
+        raise "Validation DART script '#{path}' failed" if Artifact.exec(@dart.dart, 'compile', 'jit-snapshot', OPTS(), q_fullpath(path)) != 0
     end
 
     def what_it_does() "Validate '#{@name}' DART code" end
@@ -80,7 +78,7 @@ class PubspecFile < ExistentFile
         super(pubspec, &block)
     end
 
-    def assign_me_to
+    def assign_me_as
         'pubspec'
     end
 end

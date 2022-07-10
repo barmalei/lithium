@@ -9,12 +9,8 @@ class GRADLE < SdkEnvironmen
     @tool_name = 'gradle'
     @abbr      = 'GRD'
 
-    def what_it_does
-        "Initialize Gradle environment '#{@name}'"
-    end
-
     def gradle
-        tool_path('gradle')
+        tool_path(tool_name())
     end
 end
 
@@ -33,7 +29,7 @@ class GradleFile < ExistentFile
         super( gradle, &block)
     end
 
-    def assign_me_to
+    def assign_me_as
         return 'gradle'
     end
 

@@ -349,6 +349,9 @@ class LiCommandBase:
     def settings(self):
         return SETTINGS
 
+    def symbol(self):
+        return LiHelper.view_symbol(self.view)[0]
+
     def home(self):
         return Lithium.detect_project_home()
 

@@ -1,21 +1,23 @@
 require 'lithium/java-artifact/base'
 
 class JavaFileRunner < RunJavaTool
-    def run_with
+    def WITH
         @java.java
     end
 
-    def self.abbr() 'JVR' end
+    def what_it_does
+        "Run '#{@name}' with '#{self.class}'"
+    end
 end
 
 class RunJavaClass < JavaFileRunner
-    def transform_source_path(path)
+    @abbr = 'RJC'
+
+    def transform_target_path(path)
         n = paths.dup
         n[/[.]class$/] = '' if n.end_with?('.class')
         n
     end
-
-    def what_it_does() "Run '#{name}' class" end
 end
 
 class RunJavaCode < JavaFileRunner
@@ -27,14 +29,14 @@ class RunJavaCode < JavaFileRunner
         REQUIRE "compile:#{name}"
     end
 
-    def transform_source_path(path)
+    def transform_target_path(path)
         JVM.grep_classname(path)
     end
-
-    def what_it_does() "Run JAVA '#{@name}' code" end
 end
 
 class RunJUnit < JavaFileRunner
+    @abbr = 'JUN'
+
     def initialize(name, &block)
         super
         @junit_home ||= File.join($lithium_code, 'ext', 'java', 'junit')
@@ -44,8 +46,6 @@ class RunJUnit < JavaFileRunner
     def classpath
         cp = super
         juv = detect_junit_version(cp) if juv.nil?
-
-        puts
 
         if juv == 5
             unless cp.INCLUDE?("**/junit-platform-console-standalone*.jar")
@@ -59,7 +59,7 @@ class RunJUnit < JavaFileRunner
         return cp
     end
 
-    def run_with_target(src)
+    def WITH_TARGETS(src)
         juv = detect_junit_version()
         if juv == 5
             return [
@@ -81,14 +81,10 @@ class RunJUnit < JavaFileRunner
         return 5 if cp.INCLUDE?('**/junit-jupiter-*5*.jar')
         return nil
     end
-
-    def abbr() 'JUN' end
-
-    def what_it_does() "Run JAVA '#{@name}' with JUnit ('#{detect_junit_version}') code" end
 end
 
 class RunJavaCodeWithJUnit < RunJUnit
-    def transform_source_path(path)
+    def transform_target_path(path)
         cn  = JVM.grep_classname(path)
         res = FileArtifact.grep(path, '@Test')
         if res.nil? || res.length == 0
@@ -104,7 +100,7 @@ class RunJavaCodeWithJUnit < RunJUnit
 end
 
 class RunJavaClassWithJUnit < RunJUnit
-    def transform_source_path(path)
+    def transform_target_path(path)
         n = paths.dup
         n[/[.]class$/] = '' if n.end_with?('.class')
         n
@@ -112,18 +108,16 @@ class RunJavaClassWithJUnit < RunJUnit
 end
 
 class RunJAR < JavaFileRunner
-    def run_with_target(src)
+    def WITH_TARGETS(src)
         t = [ '-jar' ]
         t.concat(super(src))
         return t
     end
-
-    def what_it_does
-        "Run JAR '#{@name}'"
-    end
 end
 
 class RunGroovyScript < RunJvmTool
+    @abbr = 'RGS'
+
     def initialize(name, &block)
         REQUIRE GROOVY
         super
@@ -133,16 +127,14 @@ class RunGroovyScript < RunJvmTool
         @groovy.classpath
     end
 
-    def run_with
+    def WITH
         @groovy.groovy
-    end
-
-    def what_it_does
-        "Run groovy '#{@name}' script"
     end
 end
 
 class RunKotlinCode < RunJvmTool
+    @abbr = 'RKC'
+
     def initialize(name, &block)
         REQUIRE KOTLIN
         super
@@ -153,11 +145,11 @@ class RunKotlinCode < RunJvmTool
         @kotlin.classpath
     end
 
-    def run_with
+    def WITH
         @kotlin.kotlin
     end
 
-    def transform_source_path(path)
+    def transform_target_path(path)
         pkg  = JVM.grep_package(path)
         ext  = File.extname(path)
         name = File.basename(path, ext)
@@ -166,13 +158,11 @@ class RunKotlinCode < RunJvmTool
         clname = clname + ext[1].upcase() + ext[2..ext.length - 1] unless ext.nil?
         return pkg.nil? ? clname : "#{pkg}.#{clname}"
     end
-
-    def what_it_does()
-        "Run Kotlin '#{@name}' code"
-    end
 end
 
 class RunScalaCode < RunJvmTool
+    @abbr = 'RSC'
+
     def initialize(name, &block)
         REQUIRE SCALA
         super
@@ -183,7 +173,7 @@ class RunScalaCode < RunJvmTool
         @scala.classpath
     end
 
-    def transform_source_path(path)
+    def transform_target_path(path)
         pkg = JVM.grep_package(path)
         cln = nil
         res = FileArtifact.grep_file(path, /^object[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
@@ -199,11 +189,7 @@ class RunScalaCode < RunJvmTool
         return pkg.nil? ? cln : "#{pkg}.#{cln}"
     end
 
-    def run_with
+    def WITH
         @scala.scala
-    end
-
-    def what_it_does
-        "Run Scala '#{@name}' code"
     end
 end

@@ -6,18 +6,15 @@ class RUBYPATH < EnvArtifact
 
     log_attr :paths
 
-    def assign_me_to
+    def assign_me_as
        :add_rubypath
-    end
-
-    def build
     end
 end
 
 class DefaultRubypath < RUBYPATH
     def initialize(name, &block)
         super
-        JOIN('lib') if block.nil? && File.exists?(File.join(path_base_dir, 'lib'))
+        JOIN('lib') if block.nil? && File.exists?(File.join(homedir, 'lib'))
     end
 end
 
@@ -27,24 +24,22 @@ class RUBY < SdkEnvironmen
     @abbr      = 'RUB'
 
     def initialize(name, &block)
-        @ruby_paths = []
         REQUIRE DefaultRubypath
         super
     end
 
     def add_rubypath(rp)
+        @ruby_paths ||= []
         @ruby_paths.push(rp) if @ruby_paths.index(rp).nil?
     end
 
     def rubypath
-        PATHS.new(project.homedir).JOIN(@ruby_paths)
+        @ruby_paths.nil? || @ruby_paths.length == 0 ? nil : PATHS.new(homedir).JOIN(@ruby_paths)
     end
 
     def ruby
-        tool_path('ruby')
+        tool_path(tool_name())
     end
-
-    def what_it_does() "Initialize Ruby environment '#{@name}'\n    '#{rubypath}'" end
 end
 
 # Run ruby script

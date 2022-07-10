@@ -10,11 +10,8 @@ class JavaClasspath < EnvArtifact
 
     log_attr :paths
 
-    def assign_me_to
+    def assign_me_as
         :add_classpath
-    end
-
-    def build
     end
 
     def what_it_does
@@ -27,7 +24,7 @@ class DefaultClasspath < JavaClasspath
         super
         # if a user defines its own customization block ignore classpath auto-detection
         if block.nil?
-            hd = path_base_dir
+            hd = homedir
             unless hd.nil?
                 JOIN('classes')   if File.exists?(File.join(hd, 'classes'))
                 JOIN('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
@@ -39,9 +36,9 @@ end
 class WarClasspath < JavaClasspath
     def initialize(name, &block)
         super
-        base_lib = File.join(path_base_dir, 'WEB-INF')
-        JOIN(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(base_lib, 'classes'))
-        JOIN(File.join('WEB-INF', 'lib/*.jar')) if File.exists?(File.join(base_lib, 'lib'))
+        hd = File.join(homedir, 'WEB-INF')
+        JOIN(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(hd, 'classes'))
+        JOIN(File.join('WEB-INF', 'lib/*.jar')) if File.exists?(File.join(hd, 'lib'))
     end
 end
 
@@ -49,8 +46,8 @@ class WildflyWarClasspath < WarClasspath
     attr_reader :modules_path
 
     def initialize(name, &block)
-        @modules_path = FileArtifact.look_directory_up(project.homedir, 'modules')
-        raise 'Invalid NIL WildFly module path' if modules_path.nil?
+        @modules_path = FileArtifact.look_directory_up(homedir, 'modules')
+        raise 'Invalid nil WildFly module path' if modules_path.nil?
         raise "Invalid WildFly module path '#{@modules_path}'" unless File.directory?(@modules_path)
 
         super
@@ -60,7 +57,7 @@ class WildflyWarClasspath < WarClasspath
 
     # TODO: not completed method to lookup WF modules
     def DEPLOYMENT()
-        dep_xml = File.join(project.homedir, 'WEB-INF', 'jboss-deployment-structure.xml')
+        dep_xml = File.join(homedir, 'WEB-INF', 'jboss-deployment-structure.xml')
         jars    = []
         if File.exists?(dep_xml)
             xmldoc = REXML::Document.new(File.new(dep_xml))
@@ -141,7 +138,7 @@ class InFileClasspath < FileArtifact
         load_paths() if File.exists?(fp)
     end
 
-    def assign_me_to
+    def assign_me_as
         :add_classpath
     end
 
@@ -181,20 +178,14 @@ class InFileClasspath < FileArtifact
     end
 end
 
-class JVM < EnvArtifact
-    include LogArtifactState
-
+class JVM < SdkEnvironmen
     attr_reader :classpaths # array of PATHS instances
-
-    def initialize(name, &block)
-        @classpaths = []
-        super
-    end
 
     def add_classpath(cp)
         raise "Invalid class path type: '#{cp.class}'" unless cp.kind_of?(PATHS)
         # the method can call multiple time for the same instance of the artifact
         # if there are more than 1 artifact that depends on the artifact
+        @classpaths ||= []
         @classpaths.push(cp) if @classpaths.index(cp).nil?
     end
 
@@ -206,15 +197,17 @@ class JVM < EnvArtifact
     end
 
     def classpath
-        PATHS.new(project.homedir).JOIN(@classpaths)
+        @classpaths ||= []
+        PATHS.new(homedir).JOIN(@classpaths)
     end
 
-    def what_it_does
-        "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
-    end
+    # def what_it_does
+    #     "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
+    # end
 
+    # TODO: strange implementation
     def SDKMAN(version, candidate = 'java')
-        raise "Invalid '#{candidate}' candidate"         if candidate.nil? || candidate.length < 3
+        raise "Invalid '#{candidate}' candidate"                 if candidate.nil? || candidate.length < 3
         raise "Invalid '#{version}' #{candidate} SDKMAN version" if version.nil?   || version.length   < 2
 
         sdk_home = File.expand_path("~/.sdkman/candidates/#{candidate}")
@@ -259,80 +252,58 @@ class JVM < EnvArtifact
 end
 
 class JAVA < JVM
-    include AutoRegisteredArtifact
+    include SelfRegisteredArtifact
 
-    log_attr :java_home, :jdk_home, :java_version
+    @tool_name = 'java'
+
+    log_attr :java_version
 
     def initialize(name, &block)
+        unless @sdk_home || !ENV['JAVA_HOME']
+            @sdk_home = ENV['JAVA_HOME']
+            @sdk_home.gsub('\\','/') # windows !
+            puts_warning 'Java home has not been defined by project. Use Java home specified by env. variable'
+        end
+
         super
 
-        # identify Java Home
-        unless @java_home
-            if ENV['JAVA_HOME']
-                @java_home = ENV['JAVA_HOME']
-                puts_warning 'Java home has not been defined by project. Use Java home specified by env. variable'
-            else
-                @java_home = FileArtifact.which('java')
-                @java_home = File.dirname(File.dirname(@java_home)) if @java_home
-            end
-        end
-
-        raise 'Java home cannot be identified' if @java_home.nil?
-        @java_home = @java_home.gsub('\\','/')
-
-        unless @jdk_home
-            @jdk_home = @java_home
-        else
-            raise "JDK '#{@jdk_home}' directory is invalid" unless File.directory?(@jdk_home)
-        end
-
-        @java_version = Artifact.grep_exec(File.join(@java_home, 'bin', 'java'), "-version", pattern:/version\s+\"([^\"]+)\"/)
-        raise "Java version cannot be identified for #{@java_home}" if @java_version.nil?
-        puts "Java version '#{@java_version}', home '#{@java_home}'"
+        @java_version = tool_version
+        raise "Java version cannot be identified for #{@sdk_home}" if @java_version.nil?
+        puts "Java version '#{@java_version}', home '#{@sdk_home}'"
     end
 
-    def javac()   jtool('javac')   end
-    def javadoc() jtool('javadoc') end
-    def java()    jtool('java')    end
-    def jar()     jtool('jar')     end
+    def javac()   tool_path('javac')     end
+    def javadoc() tool_path('javadoc')   end
+    def java()    tool_path(tool_name()) end
+    def jar()     tool_path('jar')       end
 
     def SDKMAN(version, candidate = 'java')
-        @java_home = super
+        @sdk_home = super
     end
 
-    protected
-
-    def jtool(tool)
-        path = File.join(@jdk_home, 'bin', tool)
+    def tool_path(pp)
+        path = super
         return path if File.exists?(path) || (File::PATH_SEPARATOR == ';' && File.exists?(path + '.exe'))
         puts_warning "'#{path}' not found. Use '#{tool}' as is"
         return tool
     end
+
+    def tool_version(version = '-version')
+        super
+    end
 end
 
 class GROOVY < JVM
-    include AutoRegisteredArtifact
+    include SelfRegisteredArtifact
 
-    log_attr :groovy_home
-
-    def initialize(name, &block)
-        super
-
-        unless @groovy_home
-            groovy_path = FileArtifact.which('groovy')
-            @groovy_home = File.dirname(File.dirname(groovy_path)) if groovy_path
-        end
-        raise "Groovy home '#{@groovy_home}' home is nil or invalid" if @groovy_home.nil? || !File.exists?(@groovy_home)
-
-        puts "Groovy home: '#{groovy_home}'"
-    end
+    @tool_name = 'groovy'
 
     def SDKMAN(version, candidate = 'groovy')
-        @groovy_home = super
+        @sdk_home = super
     end
 
-    def groovyc() File.join(@groovy_home, 'bin', 'groovyc') end
-    def groovy()  File.join(@groovy_home, 'bin', 'groovy')  end
+    def groovyc() tool_path('groovyc')  end
+    def groovy()  tool_path(tool_name())  end
 end
 
 
@@ -350,62 +321,43 @@ end
 
 # Kotlin environment
 class KOTLIN < JVM
-    include AutoRegisteredArtifact
+    include SelfRegisteredArtifact
 
-    log_attr :kotlin_home
+    @tool_name = 'kotlin'
 
     def initialize(name, &block)
         super
-        kotlinc_path = @kotlin_home
-        if @kotlin_home.nil?
-            kotlinc_path = FileArtifact.which('kotlinc')
-            kotlinc_path = File.dirname(File.dirname(kotlinc_path)) unless kotlinc_path.nil?
-            @kotlin_home = kotlinc_path
-        end
-        raise "Kotlin '#{@kotlin_home}' home is nil or invalid" if @kotlin_home.nil? || !File.exist?(@kotlin_home)
-
+        # TODO: redesign, may be replace KotlinClasspath with DefaultClasspath ?
+        hm = @sdk_home
         REQUIRE {
             KotlinClasspath {
-                @kotlin_home = kotlinc_path
+                @kotlin_home = hm
             }
         }
-        puts "Kotlin home: '#{@kotlin_home}'"
     end
 
     def SDKMAN(version, candidate = 'kotlin')
-        @kotlin_home = super
+        @sdk_home = super
     end
 
-    def kotlinc() File.join(@kotlin_home, 'bin', 'kotlinc') end
+    def kotlinc() tool_path('kotlinc') end
 
-    def kotlin() File.join(@kotlin_home, 'bin', 'kotlin') end
+    def kotlin() tool_path(tool_name()) end
 end
 
 # Scala environment
 class SCALA < JVM
-    include AutoRegisteredArtifact
+    include SelfRegisteredArtifact
 
-    log_attr :scala_home
-
-    def initialize(name, &block)
-        super
-
-        unless @scala_home
-            scala_path = FileArtifact.which('scalac')
-            @scala_home = File.dirname(File.dirname(scala_path)) if scala_path
-        end
-
-        raise "Scala'#{@scala_home}' home is nil or invalid" if @scala_home.nil? || !File.exist?(@scala_home)
-        puts "Scala home: '#{@scala_home}'"
-    end
+    @tool_name = 'scala'
 
     def SDKMAN(version, candidate = 'scala')
-        @scala_home = super
+        @sdk_home = super
     end
 
-    def scalac() File.join(@scala_home, 'bin', 'scalac') end
+    def scalac() tool_path('scalac') end
 
-    def scala() File.join(@scala_home, 'bin', 'scala') end
+    def scala() tool_path(tool_name()) end
 end
 
 class RunJvmTool < RunTool
@@ -433,10 +385,11 @@ class RunJvmTool < RunTool
         raise "#{self.class}.tool_classpath() is not implemented"
     end
 
-    def run_with_options(opts)
+    def WITH_OPTS
+        op = super
         cp = classpath
-        opts.push('-classpath', "\"#{cp}\"") unless cp.EMPTY?
-        return opts
+        op.push('-classpath', "\"#{cp}\"") unless cp.EMPTY?
+        return op
     end
 end
 

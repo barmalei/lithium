@@ -4,7 +4,7 @@ require 'lithium/java-artifact/runner'
 
 class CPP < EnvArtifact
     include LogArtifactState
-    include AutoRegisteredArtifact
+    include SelfRegisteredArtifact
 
     log_attr :destination
 
@@ -43,31 +43,25 @@ class CppRunTool < RunTool
 end
 
 class CppCompiler < CppRunTool
-    @abbr = 'CCC'
-
-    def initialize(name, &block)
-        super
-        @run_with ||= 'c++'
+    def WITH
+        'c++'
     end
 
-    def run_with_options(opts)
-        dst = destination
-        fn  = File.basename(fullpath, '.*')
-        opts.push('-o', "\"#{File.join(dst, fn)}\"")
-        return opts
+    def WITH_OPTS
+        fn = File.basename(fullpath, '.*')
+        super.push('-o', "\"#{File.join(destination(), fn)}\"")
     end
 end
 
 class CppCodeRunner < CppRunTool
     @abbr = 'RCC'
 
-    def initialize(name, &block)
-        super
-        @run_with ||= 'exec'
+    def WITH
+        'exec'
     end
 
-    def transform_source_path(path)
-        return File.join(destination, File.basename(path, '.*'))
+    def transform_target_path(path)
+        File.join(destination, File.basename(path, '.*'))
     end
 end
 

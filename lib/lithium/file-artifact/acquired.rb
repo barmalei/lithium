@@ -7,7 +7,7 @@ module FileSourcesSupport
     module FileSource
         include AssignableDependency
 
-        def assign_me_to
+        def assign_me_as
             :sources
         end
 

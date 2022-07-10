@@ -54,28 +54,22 @@ class JvmCompiler < RunJvmTool
     def list_dest_paths
         dest = destination()
         unless dest.nil?
-            list_source_paths { | path |
-                pkg = JVM.grep_package(path)
-
-                cn  = File.basename(path)
-                cn[/\.java$/] = '' if cn.end_with?('.java')
-                raise 'Class name cannot be identified' if cn.nil?
-
-                fp = File.join(dest, pkg.gsub('.', '/'), "#{cn}.class")
-                yield fp, pkg if File.exists?(fp)
-                FileArtifact.dir(File.join(dest, pkg.gsub('.', '/'), "#{cn}$*.class")) { | item |
-                    yield item, pkg
+            list_items { | path, t |
+                cn = JVM.grep_classname(path)
+                fn = "#{cn.gsub('.', '/')}.class"
+                fp = File.join(dest, fn)
+                yield fp, cn if File.exists?(fp)
+                FileArtifact.dir(File.join(dest, "#{cn.gsub('.', '/')}$*.class")) { | item |
+                    yield item, cn
                 }
             }
         end
     end
 
-    def run_with_options(opts)
-        opts = super(opts)
+    def WITH_OPTS
         dst  = destination()
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
-        opts.push('-d', "\"#{dst}\"")
-        return opts
+        super.push('-d', "\"#{dst}\"")
     end
 
     def clean
@@ -84,48 +78,44 @@ class JvmCompiler < RunJvmTool
         }
     end
 
-    def what_it_does() "Compile (#{@description})\n    from: '#{@name}'\n    to:   '#{destination()}'" end
+    def what_it_does
+        "Compile (#{self.class})\n    from: '#{@name}'\n    to:   '#{destination()}'"
+    end
 end
 
 class JavaCompiler < JvmCompiler
+    @abbr = 'JVC'
+
     def initialize(name, &block)
         REQUIRE JAVA
         super
-        @description = 'JAVA'
     end
 
-    def run_with
+    def WITH
         @java.javac
     end
 
     def tool_classpath
         @java.classpath
     end
-
-    def self.abbr() 'JVC' end
 end
 
-
 class JDTCompiler < JavaCompiler
+    @abbr = 'JDT'
+
     def initialize(name, &block)
         super
-        @description   = 'JDT'
         @jdt_home    ||= File.join($lithium_code, 'ext', 'java', 'jdt')
         raise "JDT home '#{@jdt_home}' cannot be found" unless File.file?(@jdt_home)
         @target_version ||= '1.8'
     end
 
-    def run_with
+    def WITH
         @java.java
     end
 
-    def run_with_options(opts)
-        opts.push('-jar', File.join(@jdt_home, '*.jar'), @target_version)
-        return opts
-    end
-
-    def what_it_does
-        "Compile JAVA '#{@name}' code with JDT\n        to:  '#{destination()}'"
+    def WITH_OPTS
+        super.push('-jar', File.join(@jdt_home, '*.jar'), @target_version)
     end
 end
 
@@ -137,19 +127,14 @@ class GroovyCompiler < JvmCompiler
     def initialize(name, &block)
         REQUIRE GROOVY
         super
-        @description = 'Groovy'
     end
 
     def tool_classpath
         @groovy.classpath
     end
 
-    def run_with
+    def WITH
         @groovy.groovyc
-    end
-
-    def what_it_does
-        "Compile groovy '#{@name}' code"
     end
 end
 
@@ -161,34 +146,30 @@ class KotlinCompiler < JvmCompiler
     def initialize(name, &block)
         REQUIRE KOTLIN
         super
-        @description = 'Kotlin'
     end
 
     def tool_classpath
         @kotlin.classpath
     end
 
-    def run_with
+    def WITH
         @kotlin.kotlinc
-    end
-
-    def what_it_does
-        "Compile Kotlin '#{@name}' code\n            to '#{destination()}'"
     end
 end
 
 # Scala 
 class ScalaCompiler < JvmCompiler
+    include StdFormater
+
     @abbr = 'STC'
 
     def initialize(name, &block)
         REQUIRE SCALA
         super
         OPT "-no-colors"
-        @description = 'Scala'
     end
 
-    def run_with
+    def WITH
         @scala.scalac
     end
 
@@ -196,7 +177,7 @@ class ScalaCompiler < JvmCompiler
         @scala.classpath
     end
 
-    def what_it_does
-        "Compile Scala '#{@name}' code"
+    def format(msg, level, parent)
+        parent.format(msg.gsub(/\x1b\s*\[[0-9]+m/, ""), level, $STDOUT)
     end
 end

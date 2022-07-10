@@ -17,12 +17,12 @@ end
 #  modified time that greater than zero it is compared to logged
 #  modified time. The most recent will be return as result.
 #
-#  Hook module replace "clean", "build_done", "mtime",  "expired?"
+#  Hook module replace "clean", "built", "mtime",  "expired?"
 #  artifact class methods with "original_<method_name>" methods.
 #  It used by LogArtifact to intercept the method calls with "method_missing"
 #  method.
 module HookMethods
-    @@hooked = [ :clean, :build_done, :mtime, :expired? ]
+    @@hooked = [ :clean, :built, :mtime, :expired? ]
 
     def included(clazz)
         if clazz.kind_of?(Class)
@@ -65,8 +65,8 @@ module LogArtifactState
         if meth == :clean
             original_clean()
             expire_logs()
-        elsif meth == :build_done
-            original_build_done() if self.respond_to?(:original_build_done)
+        elsif meth == :built
+            original_built()
             update_logs()
         elsif meth == :mtime
             t = logs_mtime()
@@ -370,7 +370,8 @@ end
 
 # Option support
 module OptionsSupport
-    @@NAMED_OPT = /^(\-{0,2})([^=]+)=(.*)/
+    @@NAMED_OPT = /^(\-{0,2})([^=]+)=?([^=]*)?/
+    #@@NAMED_OPT = /^(\-{0,2})([^ ]+)\s?([^- ]*)?/
 
     def OPTS(*args)
         @_options = _options()
@@ -378,7 +379,7 @@ module OptionsSupport
             @_options = []
             @_options.push(*args)
         end
-        return @_options.join(' ')
+        _options().dup
     end
 
     def OPT(opt)
@@ -605,11 +606,15 @@ class ArtifactName < String
     end
 end
 
-module AutoRegisteredArtifact
+module SelfRegisteredArtifact
     @arts_classes = []
 
     def self.included(clazz)
-        @arts_classes.push(clazz)
+        unless @arts_classes.index(clazz).nil?
+            puts_warning "Artifact '#{clazz}' has been already registered"
+        else
+            @arts_classes.push(clazz)
+        end
     end
 
     def self.artifact_classes()
@@ -621,13 +626,12 @@ end
 #  "@name" - name of artifact
 #  "@shortname"
 class Artifact
-    @abbr = 'ART'
-
-    attr_reader :name, :shortname, :owner, :createdByMeta, :done, :ignored, :expired, :caller, :requires
+    attr_reader :name, :shortname, :owner, :createdByMeta, :built, :expired, :caller, :requires
 
     # the particular class static variables
     @default_name  = nil
     @default_block = nil
+    @auto_registered_arts = []
 
     # set or get default artifact name
     def self.default_name(*args)
@@ -640,10 +644,20 @@ class Artifact
         @default_block
     end
 
+    def self.SELF_REGISTERED
+        unless @auto_registered_arts.index(self.class).nil?
+            puts_warning "Artifact '#{self.class}' has been already registered"
+        else
+            @auto_registered_arts.push(self.class)
+        end
+    end
+
     # !!! this method cares about owner and default name setup, otherwise
     # !!! owner and default name initialization depends on when an artifact
     # !!! instance call super
-    def self.new(name = nil, owner:nil, &block)
+    def self.new(name, owner:nil, &block)
+        raise "Invalid name" if name.nil?
+
         name = self.default_name if name.nil?
         unless owner.nil? || owner.kind_of?(ArtifactContainer)
             raise "Invalid owner '#{owner.class}' type for '#{name}' artifact, an artifact container class instance is expected"
@@ -721,7 +735,7 @@ class Artifact
 
     # prevent error generation for a number of optional artifact methods
     # that are called by lithium engine:
-    #  - build_done
+    #  - built
     #  - build_failed
     #  - pre_build
     #
@@ -745,7 +759,7 @@ class Artifact
                 REQUIRE(name, clazz, &block)
             end
         # TODO: revise the code
-        elsif meth.length > 2 && @caller == :done
+        elsif meth.length > 2 && @caller == :built
             name = args.length == 0 ? nil : args[0]
             clazz, is_internal = Artifact._name_to_clazz(meth)
             tree = ArtifactTree.new(clazz.new(name, owner:self.owner.is_a?(ArtifactContainer) ? self : self.owner, &block))
@@ -772,15 +786,11 @@ class Artifact
     def build
     end
 
-    def build_ignored
-        self.instance_exec(&@ignored) unless @ignored.nil?
-    end
-
-    def build_done
+    def built
         prev = @caller
         begin
-            @caller = :done
-            self.instance_exec(&@done) unless @done.nil?
+            @caller = :built
+            self.instance_exec(&@built) unless @built.nil?
         ensure
             @caller = prev
         end
@@ -845,13 +855,8 @@ class Artifact
     end
 
     # called after the artifact has been built
-    def DONE(&block)
-        @done = block
-    end
-
-    # called when artifact has not been built since it did not expired
-    def IGNORED(&block)
-        @ignored = block
+    def BUILT(&block)
+        @built = block
     end
 
     def add_reqiured(name = nil, clazz = nil, &block)
@@ -1030,9 +1035,10 @@ class ArtifactTree
             # its parent and assign it despite if the artifact has
             # been excluded from the tree
             #
-            # resolve assign_me_to  property that says to which property the instance of the
+            # resolve assign_me_as  property that says to which property the instance of the
             # dependent artifact has to be assigned
-            node.art.do_assignment(@art) if node.art.is_a?(AssignableDependency)
+            node.art.assign_me_to(@art) if node.art.is_a?(AssignableDependency)
+            @art.send(:assign_required_to, node.art) if @art.respond_to?(:assign_required_to)
 
             # most likely the expired state has to be set here, after assignable dependencies are set
             # since @art.expired? method can require the assigned deps to define its expiration state
@@ -1052,10 +1058,11 @@ class ArtifactTree
 
     def build(&block)
         unless @expired
-            @art.build_ignored()
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
         else
-            @children.each { | node | node.build() }
+            @children.each { | node |
+                node.build()
+            }
             prev_art = $current_artifact
 
             begin
@@ -1065,7 +1072,7 @@ class ArtifactTree
                 puts wid unless wid.nil?
                 @art.pre_build()
                 @art.build(&block)
-                @art.build_done()
+                @art.built()
             rescue
                 @art.build_failed()
                 level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
@@ -1229,12 +1236,12 @@ class FileArtifact < Artifact
         FileArtifact.search(path, self)
     end
 
-    def existing_dir(*args)
-        self.class.existing_dir(*args)
+    def assert_dirs(*args)
+        self.class.assert_dirs(*args)
     end
 
-    def existing_file(*args)
-        self.class.existing_file(*args)
+    def assert_files(*args)
+        self.class.assert_files(*args)
     end
 
     def self.path_start_with?(path, to)
@@ -1316,13 +1323,13 @@ class FileArtifact < Artifact
         }
     end
 
-    def self.existing_dir(*args)
+    def self.assert_dirs(*args)
         path = File.join(*args)
         raise "Expected directory '#{path}' doesn't exist or points to a file" unless File.directory?(path)
         return path
     end
 
-    def self.existing_file(*args)
+    def self.assert_files(*args)
         path = File.join(*args)
         raise "Expected file '#{path}' doesn't exist or points to a directory" unless File.file?(path)
         return path
@@ -1663,18 +1670,26 @@ class FileMask < FileArtifact
     end
 end
 
+#
+#   <WITH>  <OPTS>  <TARGETS>  <ARGS>
+#     |       |        |          |
+#     |       |        |          +--- test
+#     |       |        |   +--- [ file_list ]
+#     |       |        +---|
+#     |       |            +--- path_to_tmp_file (contains files to be processed)
+#     |       |
+#     |       +--- e.g -cp classes:lib
+#     |
+#     +--- e.g java
+#
 class RunTool < FileMask
     include LogArtifactState
     include OptionsSupport
 
-    log_attr :_options, :arguments, :list_expired
+    log_attr :_options, :arguments
 
     def initialize(name)
-        @source_file_prefix = '@'
-        @source_list_prefix = ''
-        @run_with         ||= nil
-        @list_expired       = false
-        @source_as_file     = false  # store target files into temporary file
+        @targets_from_file
         super
 
         @arguments ||= []
@@ -1687,69 +1702,25 @@ class RunTool < FileMask
     end
 
     # can be overridden to transform paths,
-    # e.g. path to JAVA file to class name/
-    def transform_source_path(path)
+    # e.g. convert path to JAVA file to a class name
+    def transform_target_path(path)
         path
     end
 
-    def list_source_paths
-        if @list_expired
-            list_expired_items { | n, t |  yield transform_source_path(n) }
-        else
-            list_items { | n, t |  yield transform_source_path(n) }
-        end
+    def WITH
+        raise 'Run tool name is not defined'
     end
 
-    # Return:
-    #   -- (Tempfile, count) if @source_as_file is true (temp file contains list of paths)
-    #   -- ([ path1, path2, .. pathN], count) if @source_as_file is false
-    #   -- nil if source cannot be built
-    def source
-        if @source_as_file
-            f = Tempfile.open('lithium')
-            c = 0
-            begin
-                list_source_paths { | path |
-                    f.puts(path)
-                    c = c + 1
-                }
-            ensure
-               f.close
-            end
-
-            if f.length == 0
-                f.unlink
-                return nil
-            else
-                return f, c
-            end
-        else
-            list = []
-            list_source_paths { | path |
-                list.push("\"#{path}\"")
-            }
-            return list, list.length
-        end
+    # @return Array
+    def WITH_OPTS
+        OPTS()
     end
 
-    def run_with
-        raise "Run tool name is not known for '#{self.class}' artifact" if @run_with.nil?
-        @run_with
-    end
-
-    # Input:
-    #   opts: Array
-    # Return:
-    #   Array
-    def run_with_options(opts)
-        opts
-    end
-
-    # Return array
-    def run_with_target(src)
+    # @param src - array of [ path1, path2, ... pathN ] or path to file
+    # @return array
+    def WITH_TARGETS(src)
         return [] if src.nil?
-        return [ "#{@source_file_prefix}\"#{src.path}\"" ] if @source_as_file
-        return [ @source_list_prefix ].concat(src)
+        return src.is_a?(String) ? [ "\"#{src}\"" ] : src
     end
 
     def run_with_output_handler
@@ -1760,18 +1731,31 @@ class RunTool < FileMask
         super
 
         begin
-            src, len = source
+            tmp, src, len = nil, [], 0
+            if @targets_from_file
+                tmp = Tempfile.open('lithium')
+                begin
+                    list_items { | path, t |
+                        tmp.puts(transform_target_path(path))
+                        len = len + 1
+                    }
+                ensure
+                   tmp.close
+                end
+                src = tmp.path
+            else
+                list_items{ | path, t |
+                    src.push("\"#{transform_target_path(path)}\"")
+                }
+                len = src.length
+            end
+
             puts_warning "Source files cannot be detected by '#{@name}'" if src.nil?
 
-            cmd = [ run_with ].concat(run_with_options(_options().dup), run_with_target(src), @arguments)
+            cmd = [ WITH() ] + WITH_OPTS() + WITH_TARGETS(src) + @arguments
 
             go_to_homedir()
-
-            if block.nil?
-                ec = Artifact.exec(*cmd)
-            else
-                ec = Artifact.exec(*cmd, &block)
-            end
+            ec = block.nil? ? Artifact.exec(*cmd) : Artifact.exec(*cmd, &block)
 
             if error_exit_code?(ec)
                 # TODO: simplify detailed level fetching
@@ -1781,15 +1765,14 @@ class RunTool < FileMask
             end
             puts "#{len} source files have been processed with '#{self.class}'"
         ensure
-            src.unlink if src.kind_of?(Tempfile)
+            tmp.unlink unless tmp.nil?
         end
     end
 end
 
 class RunShell < RunTool
-    def initialize(name)
-        @run_with = 'bash'
-        super
+    def WITH
+        'bash'
     end
 end
 
@@ -1950,7 +1933,7 @@ module ArtifactContainer
 
     def method_missing(meth, *args, &block)
         # TODO: review this code
-        if meth.length > 2 && @caller != :require && @caller != :done
+        if meth.length > 2 && @caller != :require && @caller != :built
             clazz, is_reuse = Artifact._name_to_clazz(meth)
             name = args.length == 0 ? nil : args[0]
             if is_reuse
@@ -2103,20 +2086,20 @@ end
 # that requires the AssignableDependency artifact
 module AssignableDependency
     #  an attribute name the dependency artifact has to be assigned
-    def assign_me_to
+    def assign_me_as
         self.class.name.downcase
     end
 
-    def do_assignment(target)
+    def assign_me_to(target)
         raise "Target is nil and cannot be assigned with a value provided by #{self.class}:#{self.name}" if target.nil?
 
-        assignMeTo = assign_me_to
-        raise "Nil assignable property name for #{self.class}:#{self.name}" if assignMeTo.nil?
+        assignMeAs = assign_me_as
+        raise "Nil assignable property name for #{self.class}:#{self.name}" if assignMeAs.nil?
 
-        if target.respond_to?(assignMeTo.to_sym)
-            target.send(assignMeTo.to_sym, self)
+        if target.respond_to?(assignMeAs.to_sym)
+            target.send(assignMeAs.to_sym, self)
         else
-            asn = "@#{assignMeTo}".to_sym
+            asn = "@#{assignMeAs}".to_sym
             av  = target.instance_variable_get(asn)
             if av.kind_of?(Array)
                 # check if the artifact is already in
@@ -2159,12 +2142,12 @@ module PATHS
     class CombinedPath
         include PATHS
 
-        def initialize(dir = nil)
-            @path_base_dir = dir
+        def initialize(hd = nil)
+            @homedir = hd
         end
 
-        def path_base_dir
-            @path_base_dir
+        def homedir
+            @homedir
         end
     end
 
@@ -2182,7 +2165,8 @@ module PATHS
     end
 
     def FILTER(fpath)
-        if !defined?(@paths).nil? && !@paths.nil? && @paths.length > 0
+        @paths ||= []
+        if @paths.length > 0
             @paths = @paths.filter { | path |
                 match_two_paths(fpath, path) == false
             }
@@ -2200,7 +2184,7 @@ module PATHS
 
     def match_two_paths(path, path_item)
         is_file  = false
-        bd       = path_base_dir()
+        bd       = homedir
         has_mask = FileArtifact.fmask?(path)
 
         unless has_mask
@@ -2223,18 +2207,6 @@ module PATHS
         return false
     end
 
-    def path_base_dir
-        if respond_to?(:project)
-            prj = project
-            unless prj.nil?
-                return project.homedir
-            else
-                puts_warning "Project cannot be detected for #{self.class}"
-            end
-        end
-        return nil
-    end
-
     # add path item
     def JOIN(*parts)
         @paths ||= []
@@ -2245,20 +2217,20 @@ module PATHS
             if path.kind_of?(PATHS)
                 @paths.concat(path.paths())
             elsif path.kind_of?(String)
-                hd = path_base_dir
+                hd = homedir
                 path.split(File::PATH_SEPARATOR).each { | path_item |
-                    path_item = File.join(hd, path_item) if !hd.nil? && !File.absolute_path?(path_item)
+                    path_item = File.join(hd, path_item) unless hd.nil? || File.absolute_path?(path_item)
 
                     pp, mask = FileArtifact.cut_fmask(path_item)
                     unless mask.nil?
                         @paths.concat(FileArtifact.dir(path_item))
-                        path_item = pp
+                        @paths.push(pp)
+                    else
+                        @paths.push(path_item)
                     end
-
-                    @paths.push(path_item)
                 }
             else
-                raise "Invalid path type '#{path.class}'"
+                raise "Unknown path type '#{path.class}' cannot be joined"
             end
         }
         @is_path_valid = false if parts.length > 0
@@ -2272,7 +2244,8 @@ module PATHS
         return self
     end
 
-    def validate_path
+    def paths
+        @paths ||= []
         unless path_valid?
             res   = []
             files = {}
@@ -2303,16 +2276,11 @@ module PATHS
             @paths = res
             @is_path_valid = true
         end
-    end
-
-    def paths
-        @paths ||= []
-        validate_path()
         return @paths
     end
 
     def EMPTY?
-        return paths().length == 0
+        paths().length == 0
     end
 
     def list_items
@@ -2365,7 +2333,6 @@ end
 
 class SdkEnvironmen < EnvArtifact
     include LogArtifactState
-    include AutoRegisteredArtifact
     include OptionsSupport
 
     log_attr :sdk_home
@@ -2387,12 +2354,12 @@ class SdkEnvironmen < EnvArtifact
             puts_error "SDK #{self.class} home '#{@sdk_home}' cannot be found"
             puts_error 'Configure/install SDK if it is required for a project'
         else
-            puts "SDK #{self.class} home: '#{@sdk_home}'"
+            puts "SDK #{self.class}('#{@name}') home: '#{@sdk_home}'"
         end
     end
 
     def what_it_does
-        "Initialize #{self.class} environment '#{@name}'"
+        "Initialize #{self.class} env '#{@name}', home: '#{sdk_home}'"
     end
 
     def tool_path(nm)
@@ -2401,6 +2368,12 @@ class SdkEnvironmen < EnvArtifact
 
     def tool_name
         self.class.tool_name
+    end
+
+    def tool_version(version_opt = '--version', pattern = /([0-9]+\.[0-9]+(\.[0-9]+|_[0-9]+)?)/)
+        @version = Artifact.grep_exec(tool_path(tool_name()), version_opt, pattern:pattern)
+        @version = @version[0] unless @version.nil?
+        @version
     end
 
     def self.tool_name

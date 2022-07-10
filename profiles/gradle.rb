@@ -2,7 +2,7 @@
 -> {
     REQUIRE {
         Directory('build') {
-            DONE {
+            BUILT {
                 RunGradle {
                     TARGETS('build')
                 }
@@ -11,19 +11,23 @@
     }
 
     JAVA {
-        DefaultClasspath {
-            JOIN('build/classes/java/main')
-            JOIN('build/classes/java/test')
+        REQUIRE {
+            DefaultClasspath {
+                JOIN('build/classes/java/main')
+                JOIN('build/classes/java/test')
+            }
+            GradleClasspath()
         }
-        GradleClasspath()
     }
 
     KOTLIN {
-        DefaultClasspath {
-            JOIN('build/classes/kotlin/main')
-            JOIN('build/classes/kotlin/test')
+        REQUIRE {
+            DefaultClasspath {
+                JOIN('build/classes/kotlin/main')
+                JOIN('build/classes/kotlin/test')
+            }
+            GradleClasspath()
         }
-        GradleClasspath()
     }
 
     KotlinCompiler("compile:src/main/kotlin/**/*.kt") {
@@ -43,6 +47,8 @@
     }
 
     Directory("apidoc") {
-        GenerateJavaDoc("src/main/java/**/*.java")
+        REQUIRE {
+            GenerateJavaDoc("src/main/java/**/*.java")
+        }
     }
 }

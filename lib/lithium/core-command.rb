@@ -33,8 +33,6 @@ end
 class META < Artifact
     include OptionsSupport
 
-    @abbr = 'MET'
-
     def initialize(name, &block)
         super
         OPT($lithium_options['meta.opt'])
@@ -201,8 +199,6 @@ class EXPIRED < Artifact
 end
 
 class INFO < Artifact
-    @abbr = 'INF'
-
     def self.info(art)
         art  = Project.artifact(art) unless art.kind_of?(Artifact)
 
