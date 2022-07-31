@@ -8,7 +8,7 @@ class PYPATH < EnvArtifact
     log_attr :paths
 
     def assign_me_as
-       :add_pypath
+        [ :pypaths, true ]
     end
 end
 
@@ -28,11 +28,6 @@ class PYTHON < SdkEnvironmen
     def initialize(name, &block)
         REQUIRE(DefaultPypath)
         super
-    end
-
-    def add_pypath(pp)
-        @pypaths ||= []
-        @pypaths.push(pp) if @pypaths.index(pp).nil?
     end
 
     def pypath

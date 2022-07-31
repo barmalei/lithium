@@ -53,8 +53,6 @@ end
 
 #  PMD code analyzer
 class PMD < JavaFileRunner
-    @abbr = 'PMD'
-
     def initialize(name, &block)
         super
         @pmd_home ||= File.join($lithium_code, 'ext', 'java', 'pmd')

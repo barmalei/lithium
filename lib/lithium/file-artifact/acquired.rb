@@ -8,7 +8,7 @@ module FileSourcesSupport
         include AssignableDependency
 
         def assign_me_as
-            :sources
+            [ :sources, true ]
         end
 
         def relative_from
@@ -293,4 +293,3 @@ class GeneratedTmpDirectory < GeneratedDirectory
         "Generate temporary folder '#{fullpath}' and its content"
     end
 end
-

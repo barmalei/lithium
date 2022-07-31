@@ -54,7 +54,7 @@ class LithiumJavaToolRunner < RunJavaTool
     end
 
     def WITH_TARGETS(src)
-        t = [ 'lithium.JavaTools', "#{self.class.java_tool_command_name}:#{@shortname}" ]
+        t = [ 'lithium.JavaTools', "#{self.class.java_tool_command_name}:#{File.basename(@name)}" ]
         t.concat(super(src))
     end
 end
@@ -91,34 +91,18 @@ class FindInClasspath < Artifact
         @cache = _load_cache() if @cacheEnabled == true
     end
 
-    def assign_required_to(req)
-        @classpaths ||=  []
-        if req.is_a?(JVM)
-            @classpaths.push(req.classpath)
-        elsif req.is_a?(JavaClasspath)
-            @classpaths.push(req)
-        end
+    # [name, is_array]
+    def assign_req_as(art)
+        return [ :classpaths, true ] if art.is_a?(JVM) || art.is_a?(JavaClasspath)
+        return art.assign_me_to.push(art)
     end
 
     def classpath
-        PATHS.new(homedir).JOIN(@classpaths) unless @classpaths.nil? || @classpaths.length == 0
+        @classpaths ||= []
+        PATHS.new(homedir).JOIN(@classpaths.map { | art |  art.is_a?(JVM) ? art.classpath : art } ) if @classpaths.length > 0
     end
 
     def build
-        # if !@java.nil?
-        #     classpath = @java.classpath
-        # elsif !@kotlin.nil?
-        #     classpath = @kotlin.classpath
-        # elsif !@scala.nil?
-        #     classpath = @scala.classpath
-        # elsif !@groovy.nil?
-        #     classpath = @groovy.classpath
-        # elsif @classpaths.length > 0
-        #     classpath = PATHS.new(homedir).JOIN(@classpaths)
-        # else
-        #     raise "'#{@name}' artifact name doesn't point neither to JVM nor to classpaths artifact"
-        # end
-
         res = []
         cp  = classpath()
         if @cacheEnabled == true && !@cache.empty? && @cache.has_key?(@pattern)

@@ -624,9 +624,8 @@ end
 
 # Core artifact abstraction.
 #  "@name" - name of artifact
-#  "@shortname"
 class Artifact
-    attr_reader :name, :shortname, :owner, :createdByMeta, :built, :expired, :caller, :requires
+    attr_reader :name, :owner, :createdByMeta, :built, :expired, :caller, :requires
 
     # the particular class static variables
     @default_name  = nil
@@ -678,7 +677,7 @@ class Artifact
     def initialize(name = nil, &block)
         # test if the name of the artifact is not nil or empty string
         name = ArtifactName.assert_notnil_name(name)
-        @name, @shortname = name, File.basename(name)
+        @name = name
 
         # block can be passed to artifact
         # it is expected the block setup class instance
@@ -737,7 +736,7 @@ class Artifact
     # that are called by lithium engine:
     #  - built
     #  - build_failed
-    #  - pre_build
+    #  - before_build
     #
     def method_missing(meth, *args, &block)
         # detect if there is an artifact class exits with the given name to treat it as
@@ -780,7 +779,7 @@ class Artifact
         }
     end
 
-    def pre_build
+    def before_build(is_expired)
     end
 
     def build
@@ -809,7 +808,7 @@ class Artifact
     def clean() end
 
     def what_it_does
-        "Build '#{self.class}:#{@shortname}' artifact"
+        "Build '#{self.class}:#{@name}' artifact"
     end
 
     # Overload "eq" operation of two artifact instances.
@@ -824,7 +823,7 @@ class Artifact
     end
 
     def to_s
-        @shortname
+        File.basename(@name)
     end
 
     # @param art : { String, Symbol, Class } - artifact can be one of the following type:
@@ -1026,10 +1025,11 @@ class ArtifactTree
             raise "#{@art.class}:'#{art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
             # build sub-tree to evaluate expiration
-            node.build_tree(map)
-
-            # add the new node to tree and process it only if doesn't already exist
-            @children << node if foundNode.nil?
+            if foundNode.nil?
+                node.build_tree(map)
+                # add the new node to tree and process it only if doesn't already exist
+                @children << node
+            end
 
             # we have to check if the artifact is assignable to
             # its parent and assign it despite if the artifact has
@@ -1038,7 +1038,6 @@ class ArtifactTree
             # resolve assign_me_as  property that says to which property the instance of the
             # dependent artifact has to be assigned
             node.art.assign_me_to(@art) if node.art.is_a?(AssignableDependency)
-            @art.send(:assign_required_to, node.art) if @art.respond_to?(:assign_required_to)
 
             # most likely the expired state has to be set here, after assignable dependencies are set
             # since @art.expired? method can require the assigned deps to define its expiration state
@@ -1058,19 +1057,20 @@ class ArtifactTree
 
     def build(&block)
         unless @expired
+            @art.before_build(false)
             puts_warning "'#{@art.name}' : #{@art.class} is not expired"
         else
             @children.each { | node |
                 node.build()
             }
-            prev_art = $current_artifact
 
+            prev_art = $current_artifact
             begin
                 $current_artifact = @art
                 wid = @art.what_it_does()
 
                 puts wid unless wid.nil?
-                @art.pre_build()
+                @art.before_build(true)
                 @art.build(&block)
                 @art.built()
             rescue
@@ -1078,7 +1078,7 @@ class ArtifactTree
                 level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
                 puts_exception($!, 0) if level == 0
                 puts_exception($!, 3) if level == 1
-                raise                 if level == 2
+                raise                 if level > 1
             ensure
                 $current_artifact = prev_art
             end
@@ -1091,10 +1091,6 @@ class ArtifactTree
             node.traverse(level + 1, &block)
         }
         block.call(self, level)
-    end
-
-    def what_it_does
-        "Build '#{@name}' artifact dependencies tree"
     end
 end
 
@@ -2086,33 +2082,31 @@ end
 # that requires the AssignableDependency artifact
 module AssignableDependency
     #  an attribute name the dependency artifact has to be assigned
+    #  @return [attribute_name, is_array]
     def assign_me_as
-        self.class.name.downcase
+        [ self.class.name.downcase, false ]
     end
 
     def assign_me_to(target)
         raise "Target is nil and cannot be assigned with a value provided by #{self.class}:#{self.name}" if target.nil?
+        raise "Nil assignable property name for #{self.class}:#{self.name}"                              if assign_me_as.nil?
 
-        assignMeAs = assign_me_as
-        raise "Nil assignable property name for #{self.class}:#{self.name}" if assignMeAs.nil?
+        attr_name, is_array = assign_me_as()
+        attr_name, is_array = target.assign_req_as(self) if target.respond_to?(:assign_req_as)
 
-        if target.respond_to?(assignMeAs.to_sym)
-            target.send(assignMeAs.to_sym, self)
+        new_value = self
+        attr_name = "@#{attr_name}"
+        cur_value = target.instance_variable_get(attr_name)
+        if is_array
+            cur_value = [] if cur_value.nil?
+            target.instance_variable_set(attr_name, cur_value.push(new_value)) if cur_value.index(new_value).nil?
         else
-            asn = "@#{assignMeAs}".to_sym
-            av  = target.instance_variable_get(asn)
-            if av.kind_of?(Array)
-                # check if the artifact is already in
-                found = av.detect { | art | self.object_id == art.object_id }
-
-                if found.nil?
-                    av.push(self)
-                    target.instance_variable_set(asn, av)
-                end
-            else
-                target.instance_variable_set(asn, self)
-            end
+            target.instance_variable_set(attr_name, new_value)
         end
+
+        assignable = target.instance_variable_get('@_assignable')
+        assignable ||= []
+        target.instance_variable_set('@_assignable', assignable.push([attr_name, is_array]).uniq)
     end
 end
 
@@ -2122,9 +2116,10 @@ class EnvArtifact < Artifact
 
     def self.default_name(*args)
         @default_name ||= nil
+
         if args.length > 0
-            raise "Invalid environment artifact '#{name}' name ('.env/<artifact_name>' is expected)" unless name.start_with?('.env/')
-            @default_name = validate_env_name(args[0])
+            raise "Invalid environment artifact '#{args[0]}' name ('.env/<artifact_name>' is expected)" unless args[0].start_with?('.env/')
+            @default_name = args[0]
         elsif @default_name.nil?
             @default_name = File.join('.env', self.name)
         end
@@ -2354,12 +2349,12 @@ class SdkEnvironmen < EnvArtifact
             puts_error "SDK #{self.class} home '#{@sdk_home}' cannot be found"
             puts_error 'Configure/install SDK if it is required for a project'
         else
-            puts "SDK #{self.class}('#{@name}') home: '#{@sdk_home}'"
+            puts "SDK #{self.class}('#{@name}') home: '#{File.realpath(@sdk_home)}'"
         end
     end
 
     def what_it_does
-        "Initialize #{self.class} env '#{@name}', home: '#{sdk_home}'"
+        "Initialize #{self.class} '#{@name}' environment"
     end
 
     def tool_path(nm)
@@ -2380,3 +2375,4 @@ class SdkEnvironmen < EnvArtifact
         @tool_name
     end
 end
+

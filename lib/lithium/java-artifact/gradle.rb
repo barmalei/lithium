@@ -19,8 +19,11 @@ class GradleFile < ExistentFile
     include StdFormater
     include AssignableDependency
 
+    @abbr = 'GRF'
+
     def initialize(name = nil, &block)
         REQUIRE GRADLE
+
         name = homedir if name.nil?
         fp   = fullpath(name)
         gradle  = FileArtifact.look_file_up(fp, 'build.gradle.kts', homedir)
@@ -30,10 +33,8 @@ class GradleFile < ExistentFile
     end
 
     def assign_me_as
-        return 'gradle'
+        [ :gradle, false ]
     end
-
-    def self.abbr() 'GRF' end
 end
 
 class RunGradle < GradleFile

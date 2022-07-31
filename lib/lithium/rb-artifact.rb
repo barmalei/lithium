@@ -7,7 +7,7 @@ class RUBYPATH < EnvArtifact
     log_attr :paths
 
     def assign_me_as
-       :add_rubypath
+       [ :rubypaths, true ]
     end
 end
 
@@ -23,18 +23,15 @@ class RUBY < SdkEnvironmen
     @tool_name = 'ruby'
     @abbr      = 'RUB'
 
+    self.default_name(".env/RBV")
+
     def initialize(name, &block)
         REQUIRE DefaultRubypath
         super
     end
 
-    def add_rubypath(rp)
-        @ruby_paths ||= []
-        @ruby_paths.push(rp) if @ruby_paths.index(rp).nil?
-    end
-
     def rubypath
-        @ruby_paths.nil? || @ruby_paths.length == 0 ? nil : PATHS.new(homedir).JOIN(@ruby_paths)
+        @rubypaths.nil? || @rubypaths.length == 0 ? nil : PATHS.new(homedir).JOIN(@rubypaths)
     end
 
     def ruby

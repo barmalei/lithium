@@ -56,3 +56,28 @@ class DeployGoogleApp < GoogleAppFile
         "Deploy google app '#{name}'"
     end
 end
+
+
+# TODO: it is not completed
+class DeployGoogleQueue < RunTool
+    @abbr = 'DGQ'
+
+    def initialize(name, &block)
+        REQUIRE GCE
+        super
+    end
+
+    def WITH
+        @gce.gcloud
+    end
+
+    def WITH_OPTS(opts)
+        opts.push('deploy')
+    end
+
+    def what_it_does
+        "Deploy google queue '#{name}'"
+    end
+end
+
+

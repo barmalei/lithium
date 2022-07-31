@@ -115,7 +115,7 @@ class PomFile < ExistentFile
     end
 
     def assign_me_as
-        'pom'
+        [ :pom, false ]
     end
 
     def expired?

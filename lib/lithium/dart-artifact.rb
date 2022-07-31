@@ -79,7 +79,7 @@ class PubspecFile < ExistentFile
     end
 
     def assign_me_as
-        'pubspec'
+        [ :pubspec, false ]
     end
 end
 

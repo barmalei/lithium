@@ -11,7 +11,7 @@ class JavaClasspath < EnvArtifact
     log_attr :paths
 
     def assign_me_as
-        :add_classpath
+        [ :classpaths, true ]
     end
 
     def what_it_does
@@ -139,7 +139,7 @@ class InFileClasspath < FileArtifact
     end
 
     def assign_me_as
-        :add_classpath
+        [ :classpaths, true ]
     end
 
     def build()
@@ -180,14 +180,6 @@ end
 
 class JVM < SdkEnvironmen
     attr_reader :classpaths # array of PATHS instances
-
-    def add_classpath(cp)
-        raise "Invalid class path type: '#{cp.class}'" unless cp.kind_of?(PATHS)
-        # the method can call multiple time for the same instance of the artifact
-        # if there are more than 1 artifact that depends on the artifact
-        @classpaths ||= []
-        @classpaths.push(cp) if @classpaths.index(cp).nil?
-    end
 
     def list_classpaths
         return 'None' if @classpaths.length == 0
@@ -266,10 +258,6 @@ class JAVA < JVM
         end
 
         super
-
-        @java_version = tool_version
-        raise "Java version cannot be identified for #{@sdk_home}" if @java_version.nil?
-        puts "Java version '#{@java_version}', home '#{@sdk_home}'"
     end
 
     def javac()   tool_path('javac')     end
@@ -363,13 +351,10 @@ end
 class RunJvmTool < RunTool
     attr_reader :classpaths
 
-    # the method is called when required classpath is specified
-    # (classpath classes are auto assignable artifact that has
-    # to be assigned by add_classpath method)
-    def add_classpath(cp)
-        @classpaths ||= []
-        @classpaths.push(cp)
-    end
+    # def assign_req_as(art)
+    #     @jvm_classpath = JVM.classpath if art.is_a?(JVM)
+    #     return art.assign_me_to.push(art)
+    # end
 
     def classpath
         cp = tool_classpath()
@@ -403,3 +388,4 @@ class RunJavaTool < RunJvmTool
         @java.classpath
     end
 end
+

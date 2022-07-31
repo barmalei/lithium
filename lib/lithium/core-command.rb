@@ -102,7 +102,7 @@ end
 
 class REQUIRE < Artifact
     def build
-        puts "Artifact '#{@shortname}:' dependencies list {"
+        puts "Artifact '#{@name}:' dependencies list {"
         art = Project.artifact(@name)
         art.each_required { | art |
             aname = art.kind_of?(Artifact) ? ArtifactName.new(art.name, art.class) : name
@@ -128,7 +128,7 @@ class TREE < Artifact
     def show_tree(root) puts tree2string(nil, root) end
 
     def tree2string(parent, root, shift=0)
-        pshift, name = shift, root.art.shortname
+        pshift, name = shift, File.basename(root.art.name)
 
         e = (root.expired ? '*' : '') +
             (@show_id ? " ##{root.art.object_id}" : '') +
@@ -169,7 +169,7 @@ class EXPIRED < Artifact
     def build
         a = Project.artifact(@name)
 
-        name = "Artifact '#{a.class}:#{a.shortname}'"
+        name = "Artifact '#{a.class}:#{a.name}'"
         if a.kind_of?(LogArtifactState)
             if a.original_expired?
                 puts "#{name} is expired: 'expire?' => true"
