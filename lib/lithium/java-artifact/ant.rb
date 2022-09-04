@@ -6,7 +6,6 @@ require 'lithium/java-artifact/base'
 #
 class ANT < SdkEnvironmen
     @tool_name = 'ant'
-    @abbr      = 'ANT'
 
     def ant
         tool_path(tool_name())
@@ -26,13 +25,16 @@ class RunANT < ExistentFile
         super(ant_build, &block)
     end
 
-    def build()
+    def build
+        super
         fp = fullpath()
         chdir(File.dirname(fp)) {
             raise 'ANT error' if 0 != Artifact.exec(@ant.ant, '-buildfile', "\"#{fp}\"", OPTS())
         }
     end
 
-    def what_it_does() "Run ANT '#{fullpath()}'" end
+    def what_it_does
+        "Run ANT '#{fullpath()}'"
+    end
 end
 

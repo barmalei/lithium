@@ -110,7 +110,7 @@ class GradleClasspath < InFileClasspath
 
     log_attr :excludeGroupIds, :excludeTransitive
 
-    default_name(".lithium/li_gradle_class_path")
+    default_name(".lithium/gradle_classpath")
 
     def initialize(name, &block)
         super

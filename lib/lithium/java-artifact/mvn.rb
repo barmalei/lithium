@@ -62,6 +62,7 @@ module MavenDependencyPlugin
     end
 end
 
+# TODO: re-work or throw out
 class MavenRepoArtifact < FileArtifact
     include StdFormater
     include MavenDependencyPlugin
@@ -105,7 +106,6 @@ end
 
 class PomFile < ExistentFile
     include LogArtifactState
-    include StdFormater
     include AssignableDependency
 
     def initialize(name = nil, &block)
@@ -129,14 +129,12 @@ class MavenClasspath < InFileClasspath
 
     log_attr :excludeGroupIds, :excludeTransitive
 
-    default_name(".lithium/li_maven_class_path")
+    default_name(".lithium/mvn_classpath")
 
     def initialize(name, &block)
         super
-        REQUIRE {
-            MVN()
-            PomFile(FileArtifact.look_file_up(homedir, 'pom.xml', homedir))
-        }
+        REQUIRE MVN
+        REQUIRE 'pom.xml'
         DEP_TARGET('build-classpath')
         TRANSITIVE(false)
     end
@@ -164,10 +162,8 @@ class MavenDependenciesDir < Directory
 
     def initialize(name, &block)
         super
-        REQUIRE { 
-            MVN()
-            PomFile(@name)
-        }
+        REQUIRE MVN
+        REQUIRE 'pom.xml'
         DEP_TARGET('copy-dependencies')
     end
 
@@ -187,6 +183,7 @@ end
 
 class RunMaven < PomFile
     include OptionsSupport
+    include StdFormater
 
     @abbr = 'RMV'
 

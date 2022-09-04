@@ -2,7 +2,7 @@ require 'lithium/java-artifact/runner'
 
 
 class BuildVaadinSass < JavaFileRunner
-    @abbr = 'BAS'
+    @abbr = 'BVS'
 
     def initialize(name, &block)
         super

@@ -94,7 +94,7 @@ class FindInClasspath < Artifact
     # [name, is_array]
     def assign_req_as(art)
         return [ :classpaths, true ] if art.is_a?(JVM) || art.is_a?(JavaClasspath)
-        return art.assign_me_to.push
+        return nil
     end
 
     def classpath

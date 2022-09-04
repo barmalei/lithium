@@ -12,6 +12,7 @@ class RunPhpScript < ExistentFile
     end
 
     def build
+        super
         raise 'Run PHP failed' if Artifact.exec('php', OPTS(), q_fullpath) != 0
     end
 

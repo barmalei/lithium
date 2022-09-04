@@ -153,6 +153,7 @@ class RunNodejs < ExistentFile
     end
 
     def build
+        super
         raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), q_fullpath) != 0
     end
 

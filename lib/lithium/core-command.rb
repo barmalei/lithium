@@ -195,7 +195,9 @@ class EXPIRED < Artifact
         puts "#{name} is not expired"
     end
 
-    def what_it_does() "Explain expiration state of '#{@name}' artifact" end
+    def what_it_does
+        "Explain expiration state of '#{@name}' artifact"
+    end
 end
 
 class INFO < Artifact
@@ -232,8 +234,6 @@ class INFO < Artifact
     end
 
     def what_it_does() "Inspect artifact '#{@name}'" end
-
-    protected
 
     def self.format_val(val)
         return 'nil' if val.nil?

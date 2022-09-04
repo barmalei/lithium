@@ -55,7 +55,7 @@ class RunDartCode < ExistentFile
     end
 
     def build
-        raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
+        super
         raise "Run #{self.class.name} failed" if Artifact.exec(@dart.dart, OPTS(), q_fullpath) != 0
     end
 
@@ -103,8 +103,8 @@ class RunDartPub < PubspecFile
     end
 
     def build
+        super
         path = fullpath
-        raise "Target pub artifact cannot be found '#{path}'" unless File.exists?(path)
         chdir(File.dirname(path)) {
             if Artifact.exec(*command()).exitstatus != 0
                 raise "Pub [#{@targets.join(',')}] running failed"

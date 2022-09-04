@@ -119,7 +119,7 @@ class ArchiveFile < GeneratedFile
             tmp.sources(*@sources)
             ArtifactTree.new(tmp).build
 
-            list = tmp.list_items_to_array()
+            list = tmp.list_items_as_array()
 
             # save current directory to restore it later before temporary directory will be removed
             chdir(tmp.fullpath) {

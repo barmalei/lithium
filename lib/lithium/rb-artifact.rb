@@ -21,7 +21,6 @@ end
 # Ruby environment
 class RUBY < SdkEnvironmen
     @tool_name = 'ruby'
-    @abbr      = 'RUB'
 
     self.default_name(".env/RBV")
 
@@ -70,6 +69,7 @@ class RunRubyScript < ExistentFile
     end
 
     def build
+        super
         raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, OPTS(), cmd_rubypath, q_fullpath) != 0
     end
 

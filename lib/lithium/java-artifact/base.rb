@@ -122,12 +122,12 @@ class WildflyWarClasspath < WarClasspath
     end
 end
 
-class InFileClasspath < FileArtifact
+class InFileClasspath < ExistentFile
     include AssignableDependency
     include LogArtifactState
     include PATHS
 
-    default_name(".li_classpath")
+    default_name(".lithium/classpath")
 
     log_attr :exclude
 
@@ -135,17 +135,15 @@ class InFileClasspath < FileArtifact
         super
         fp = fullpath
         @exclude ||= []
-        load_paths() if File.exists?(fp)
+        load_paths() if exists?
     end
 
     def assign_me_as
         [ :classpaths, true ]
     end
 
-    def build()
+    def build
         super
-        fp = fullpath
-        raise "Classpath file/directory '#{fp}' doesn't exist" unless File.exists?(fp)
         load_paths()
     end
 
@@ -153,7 +151,7 @@ class InFileClasspath < FileArtifact
         CLEAR().JOIN(read_classpath_file(fullpath))
         if @exclude.length > 0
             @exclude.each { | exc_path |
-                FILTER(exc_path )
+                FILTER(exc_path)
             }
         end
     end
@@ -166,10 +164,6 @@ class InFileClasspath < FileArtifact
             lines.push(line)
         }
         return lines
-    end
-
-    def expired?
-        false
     end
 
     def EXCLUDE(*path)
@@ -351,23 +345,20 @@ end
 class RunJvmTool < RunTool
     attr_reader :classpaths
 
-    # def assign_req_as(art)
-    #     @jvm_classpath = JVM.classpath if art.is_a?(JVM)
-    #     return art.assign_me_to.push(art)
-    # end
+    def assign_req_as(art)
+        @jvm_classpath = art.classpath if art.is_a?(JVM)
+        return nil
+    end
 
     def classpath
-        cp = tool_classpath()
-        cp.JOIN(@classpaths) if @classpaths
-        return cp
+        cp = []
+        cp = cp.append(@jvm_classpath) if @jvm_classpath
+        cp = cp.append(@classpaths)    if @classpaths
+        PATHS.new(homedir).JOIN(cp)
     end
 
     def error_exit_code?(ec)
         ec != 0
-    end
-
-    def tool_classpath
-        raise "#{self.class}.tool_classpath() is not implemented"
     end
 
     def WITH_OPTS
@@ -382,10 +373,6 @@ class RunJavaTool < RunJvmTool
     def initialize(name, &block)
         REQUIRE JAVA
         super
-    end
-
-    def tool_classpath
-        @java.classpath
     end
 end
 

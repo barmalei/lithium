@@ -16,6 +16,7 @@
         }
     }
 
+
     # JAVA('.env/JAVA2') {
     #     REQUIRE {
     #         DefaultClasspath {
@@ -86,10 +87,10 @@
         DeployGoogleApp  ('**/appengine-*.xml')
         DeployGoogleApp  ('**/app*.yaml')
 
-        REQUIRE {
-            Directory(".lithium") {
-            }
-        }
+        # REQUIRE {
+        #     Directory(".lithium") {
+        #     }
+        # }
     }
 
     MATCH("test:*") {

@@ -123,10 +123,6 @@ class RunGroovyScript < RunJvmTool
         super
     end
 
-    def tool_classpath
-        @groovy.classpath
-    end
-
     def WITH
         @groovy.groovy
     end
@@ -139,10 +135,6 @@ class RunKotlinCode < RunJvmTool
         REQUIRE KOTLIN
         super
         REQUIRE "compile:#{name}"
-    end
-
-    def tool_classpath
-        @kotlin.classpath
     end
 
     def WITH
@@ -167,10 +159,6 @@ class RunScalaCode < RunJvmTool
         REQUIRE SCALA
         super
         REQUIRE "compile:#{name}"
-    end
-
-    def tool_classpath
-        @scala.classpath
     end
 
     def transform_target_path(path)

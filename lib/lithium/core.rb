@@ -56,7 +56,7 @@ end
 
 # The module has to be included in an artifact to track its update date. It is possible
 # to control either an artifact items state that has to be returned by implementing
-# "list_items()" method or an attribute state that has to be declared via log_attr method
+# "list_items" method or an attribute state that has to be declared via log_attr method
 module LogArtifactState
     extend HookMethods
 
@@ -69,7 +69,7 @@ module LogArtifactState
             original_built()
             update_logs()
         elsif meth == :mtime
-            t = logs_mtime()
+            t = detect_logs_mtime()
             return original_mtime() if t < 0
             tt = original_mtime()
             return t > tt ? t : tt
@@ -154,26 +154,26 @@ module LogArtifactState
         return unless can_artifact_be_tracked?
 
         p1 = items_log_path()
-        File.delete(p1) if is_items_log_enabled? && File.exists?(p1)
+        File.delete(p1) if items_log_enabled? && File.exists?(p1)
 
         p2 = attrs_log_path()
-        File.delete(p2) if is_attrs_log_enabled? && File.exists?(p2)
+        File.delete(p2) if attrs_log_enabled? && File.exists?(p2)
     end
 
-    def logs_mtime
+    def detect_logs_mtime
         return -1 unless can_artifact_be_tracked?
 
         p1 = items_log_path()
         p2 = attrs_log_path()
-        t1 = File.exists?(p1) && is_items_log_enabled? ? File.mtime(p1).to_i : -1
-        t2 = File.exists?(p2) && is_attrs_log_enabled? ? File.mtime(p2).to_i : -1
+        t1 = File.exists?(p1) && items_log_enabled? ? File.mtime(p1).to_i : -1
+        t2 = File.exists?(p2) && attrs_log_enabled? ? File.mtime(p2).to_i : -1
         return t1 > t2 ? t1 : t2
     end
 
     def logs_expired?
         return false unless can_artifact_be_tracked?
 
-        if is_items_log_enabled?
+        if items_log_enabled?
             # if there is no items but the items are expected consider it as expired case
             return true if self.class.method_defined?(:list_items) && !File.exists?(items_log_path())
 
@@ -183,7 +183,7 @@ module LogArtifactState
             }
         end
 
-        if is_attrs_log_enabled?
+        if attrs_log_enabled?
             list_expired_attrs { |a, ov|
                 return true
             }
@@ -196,13 +196,13 @@ module LogArtifactState
         return unless can_artifact_be_tracked?
 
         t = Time.now
-        if is_items_log_enabled?
+        if items_log_enabled?
             update_items_log()
             path = items_log_path()
             File.utime(t, t, path) if File.exists?(path)
         end
 
-        if is_attrs_log_enabled?
+        if attrs_log_enabled?
             update_attrs_log()
             path = attrs_log_path()
             File.utime(t, t, path) if File.exists?(path)
@@ -237,9 +237,8 @@ module LogArtifactState
         e = load_items_log()
 
         list_items { |n, t|
-            raise "Duplicated listed item '#{n}'" if e[n] == -2
+            # raise "Duplicated listed item '#{n}'" if e[n] == -2
             block.call(n, e[n] ? e[n] : -1) if t == -1 || e[n].nil? || e[n].to_i == -1 || e[n].to_i < t
-
             e[n] = -2 unless e[n].nil? # mark as passed the given item
         }
 
@@ -253,7 +252,7 @@ module LogArtifactState
         return unless self.class.method_defined?(:list_items)
 
         d, e, r = false, load_items_log(), {}
-        list_items() { |n, t|
+        list_items { |n, t|
             d = true if !d && (e[n].nil? || e[n] != t)  # detect expired item
             r[n] = t  # map to refresh items log
         }
@@ -271,7 +270,7 @@ module LogArtifactState
         end
     end
 
-    def is_items_log_enabled?
+    def items_log_enabled?
         true
     end
 
@@ -359,7 +358,7 @@ module LogArtifactState
         end
     end
 
-    def is_attrs_log_enabled?
+    def attrs_log_enabled?
         true
     end
 
@@ -884,7 +883,7 @@ class Artifact
         end
     end
 
-    def self.abbr()
+    def self.abbr
         return @abbr unless @abbr.nil?
         return "%3s" % self.name[0..2].upcase
     end
@@ -1058,7 +1057,7 @@ class ArtifactTree
     def build(&block)
         unless @expired
             @art.before_build(false)
-            puts_warning "'#{@art.name}' : #{@art.class} is not expired"
+            puts_warning "#{@art.class}:'#{@art.name}' is not expired"
         else
             @children.each { | node |
                 node.build()
@@ -1102,12 +1101,16 @@ class FileArtifact < Artifact
 
     def initialize(name, &block)
         path = Pathname.new(name).cleanpath
-        @is_absolute  = path.absolute?
+        @is_absolute = path.absolute?
         super(path.to_s, &block)
     end
 
     def absolute?
         @is_absolute
+    end
+
+    def exists?
+        File.exists?(fullpath)
     end
 
     def homedir
@@ -1200,9 +1203,12 @@ class FileArtifact < Artifact
         return FileArtifact.path_start_with?(path.to_s, home.to_s)
     end
 
+    # !!!!
+    # since the method can be caught with logger it should not be called anywhere
+    # the method should just provide mtime value that is it
+    # !!!!
     def mtime
-        f = fullpath()
-        return File.exists?(f) ? File.mtime(f).to_i : -1
+        exists? ? File.mtime(fullpath).to_i : -1
     end
 
     def puts_items
@@ -1211,18 +1217,14 @@ class FileArtifact < Artifact
         }
     end
 
-    def list_items(rel = nil)
+    def list_items
         fp = fullpath
-        if File.exists?(fp)
-            yield fp, File.mtime(fp).to_i
-        else
-            yield fp, -1
-        end
+        yield fp, exists? ? File.mtime(fp).to_i : -1
     end
 
-    def list_items_to_array(rel = nil)
+    def list_items_as_array
         list = []
-        list_items(rel) { | path, m |
+        list_items { | path, m |
             list << path
         }
         return list
@@ -1230,14 +1232,6 @@ class FileArtifact < Artifact
 
     def search(path)
         FileArtifact.search(path, self)
-    end
-
-    def assert_dirs(*args)
-        self.class.assert_dirs(*args)
-    end
-
-    def assert_files(*args)
-        self.class.assert_files(*args)
     end
 
     def self.path_start_with?(path, to)
@@ -1319,14 +1313,16 @@ class FileArtifact < Artifact
         }
     end
 
-    def self.assert_dirs(*args)
+    def self.assert_dir(*args)
         path = File.join(*args)
-        raise "Expected directory '#{path}' doesn't exist or points to a file" unless File.directory?(path)
+        raise "Expected directory '#{path}' points to a file" if File.file?(path)
+        raise "Expected directory '#{path}' doesn't exist" unless File.directory?(path)
         return path
     end
 
-    def self.assert_files(*args)
+    def self.assert_file(*args)
         path = File.join(*args)
+        raise "Expected file '#{path}' points to a directory" if File.directory?(path)
         raise "Expected file '#{path}' doesn't exist or points to a directory" unless File.file?(path)
         return path
     end
@@ -1538,82 +1534,46 @@ end
 
 # Permanent file shortcut
 class ExistentFile < FileArtifact
-    def initialize(name)
-        super
-        assert_existence()
+    def exists?
+        File.file?(fullpath)
+    end
+
+    def expired?
+        !exists?
     end
 
     def build
-        assert_existence()
-    end
-
-    def mtime
-        assert_existence()
-        return super()
-    end
-
-    def list_items(rel = nil)
-        assert_existence()
+        FileArtifact.assert_file(fullpath)
         super
-    end
-
-    def assert_existence
-        fp = fullpath()
-        raise "File '#{fp}' doesn't exist" unless File.exists?(fp)
     end
 end
 
 # Directory artifact
 class Directory < FileArtifact
     def expired?
-        !File.directory?(fullpath)
+        !exists?
+    end
+
+    def exists?
+        File.directory?(fullpath)
     end
 
     def build
-        super
         fp = fullpath
         raise "File '#{fp}' is not a directory" if File.file?(fp)
+        super
     end
 
     def mkdir
-        FileUtils.mkdir_p(fullpath) unless File.exists?(fullpath)
-    end
-
-    # return itself as a single item
-    def list_items
-        go_to_homedir()
-        Dir[@name].each { | path |
-            mt = File.mtime(path).to_i
-            yield path, mt
-        }
+        fp = fullpath
+        FileUtils.mkdir_p(fp) unless exists?(fp)
     end
 end
 
-# Directory content artifact
-class DirectoryContent < Directory
-    include LogArtifactState
-
+class ExistentDirectory < Directory
     def build()
+        FileArtifact.assert_dir(fullpath)
         super
-        fp = fullpath
-        raise "File '#{fp}' is not a directory" if File.file?(fp)
-    end
-
-    # return itself as a single item
-    def list_items
-        go_to_homedir()
-        Dir[File.join(@name, '*')].each { | path |
-            mt = File.mtime(path).to_i
-            yield path, mt
-        }
-    end
-end
-
-class ExistentDirectory < FileArtifact
-    def build()
-        super
-        fp = fullpath
-        raise "File '#{fp}' is not a directory or doesn't exist" unless File.directory?(fp)
     end
 end
 
@@ -1644,24 +1604,18 @@ class FileMask < FileArtifact
 
     # List items basing on the mask returns items relatively to the
     # passed path
-    def list_items(rel = nil)
-        go_to_homedir
+    def list_items
+        go_to_homedir {
+            Dir[@name].each { | path |
+                next if @regexp_filter && !(path =~ @regexp_filter)
 
-        Dir[@name].each { | path |
-            next if @regexp_filter && !(path =~ @regexp_filter)
+                if @ignore_files || @ignore_dirs
+                    b = File.directory?(path)
+                    next if (@ignore_files && !b) || (@ignore_dirs && b)
+                end
 
-            if @ignore_files || @ignore_dirs
-                b = File.directory?(path)
-                next if (@ignore_files && !b) || (@ignore_dirs && b)
-            end
-
-            mt = File.mtime(path).to_i
-            unless rel.nil?
-                path = FileArtifact.relative_to(rel)
-                "Relative path '#{rel}' cannot be applied to '#{path}'" if path.nil?
-            end
-
-            yield path, mt
+                yield path, File.mtime(path).to_i
+            }
         }
     end
 end
@@ -2091,8 +2045,8 @@ module AssignableDependency
         raise "Target is nil and cannot be assigned with a value provided by #{self.class}:#{self.name}" if target.nil?
         raise "Nil assignable property name for #{self.class}:#{self.name}"                              if assign_me_as.nil?
 
-        attr_name, is_array = assign_me_as()
         attr_name, is_array = target.assign_req_as(self) if target.respond_to?(:assign_req_as)
+        attr_name, is_array = assign_me_as()             if attr_name.nil?
 
         new_value = self
         attr_name = "@#{attr_name}"
@@ -2203,6 +2157,7 @@ module PATHS
     end
 
     # add path item
+    # @param parts - array, string or PATHS
     def JOIN(*parts)
         @paths ||= []
 
@@ -2376,3 +2331,8 @@ class SdkEnvironmen < EnvArtifact
     end
 end
 
+# READY {
+#     a = PomFile.new('/Users/brigadir/projects/current/rituals-loader/pom.xml')
+#     a.list_items()
+#     a.puts_items()
+# }

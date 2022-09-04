@@ -28,6 +28,7 @@ end
 
 class RunHtml < ExistentFile
     def build
+        super
         `open #{fullpath()}`
     end
 end

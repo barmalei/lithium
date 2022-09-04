@@ -60,7 +60,7 @@ class RunPythonScript < ExistentFile
     end
 
     def build
-        raise "File '#{fullpath()}' cannot be found" unless File.exists?(fullpath())
+        super
         pp = pypath()
         ENV['PYTHONPATH'] = pp.to_s unless pp.EMPTY?
         raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, @python.OPTS(), OPTS(), q_fullpath) != 0
@@ -88,7 +88,8 @@ class ValidatePythonScript < ExistentFile
         super
     end
 
-    def build()
+    def build
+        super
 script = "
 import py_compile, sys\n
 

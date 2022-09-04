@@ -4,6 +4,7 @@ require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
 
+
 class JavaCheckStyle < JavaFileRunner
     @abbr = 'CHS'
 
@@ -11,18 +12,10 @@ class JavaCheckStyle < JavaFileRunner
         super
 
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
+        @checkstyle_home       ||= FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'checkstyle')
+        @checkstyle_config     ||= FileArtifact.assert_file(@checkstyle_home, "crystalloids_checks.xml")
 
-        unless @checkstyle_home
-            @checkstyle_home = assert_dirs($lithium_code, 'ext', 'java', 'checkstyle')
-        end
-
-        unless @checkstyle_config
-            @checkstyle_config = assert_files(@checkstyle_home, "crystalloids_checks.xml")
-        end
-
-        unless File.exists?(@checkstyle_config)
-            raise "Checkstyle config '#{@checkstyle_config}' cannot be found"
-        end
+        raise "Checkstyle config '#{@checkstyle_config}' cannot be found" unless File.file?(@checkstyle_config)
 
         puts "Checkstyle home: '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
 
@@ -39,7 +32,7 @@ class JavaCheckStyle < JavaFileRunner
     end
 
     def classpath
-        # only chackstyle classpath related JARs arer required
+        # only checkstyle classpath related JARs are required
         PATHS.new(homedir).JOIN(@classpaths)
     end
 end

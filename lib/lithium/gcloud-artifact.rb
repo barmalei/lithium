@@ -45,6 +45,7 @@ class DeployGoogleApp < GoogleAppFile
     end
 
     def build
+        super
         Artifact.execInTerm(homedir, command())
     end
 

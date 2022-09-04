@@ -94,7 +94,7 @@ class MetaFile < ExistentFile
     attr_accessor :validate_items
     log_attr :base
 
-    def list_items(rel = nil)
+    def list_items
         fp = fullpath
         unless File.exists?(fp)
             puts "Meta file '#{fp}'' doesn't exist"
@@ -108,7 +108,7 @@ class MetaFile < ExistentFile
                 next if item.length == 0 || item[0,1]=='#'  # skip comment and empty strings
 
                 files = FileMask.new(item, owner:self.owner)
-                files.list_items(rel) { | path, m |
+                files.list_items { | path, m |
                     yield path, m
                 }
             }
@@ -251,7 +251,7 @@ class GeneratedDirectory < Directory
         FileUtils.touch(fp)
     end
 
-    def list_items(rel = nil)
+    def list_items
         fp = fullpath
         list_sources_items { | source, from, mtime, as |
             as_fp = File.join(fp, as) unless File.absolute_path?(as)

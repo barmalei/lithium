@@ -2,6 +2,9 @@ require 'fileutils'
 
 require 'lithium/java-artifact/base'
 
+
+#class Destination
+
 #  Java 
 class JvmCompiler < RunJvmTool
     log_attr :destination, :create_destination
@@ -31,7 +34,6 @@ class JvmCompiler < RunJvmTool
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
             end
-
             return @destination
         else
             pp = project
@@ -94,10 +96,6 @@ class JavaCompiler < JvmCompiler
     def WITH
         @java.javac
     end
-
-    def tool_classpath
-        @java.classpath
-    end
 end
 
 class JDTCompiler < JavaCompiler
@@ -129,10 +127,6 @@ class GroovyCompiler < JvmCompiler
         super
     end
 
-    def tool_classpath
-        @groovy.classpath
-    end
-
     def WITH
         @groovy.groovyc
     end
@@ -146,10 +140,6 @@ class KotlinCompiler < JvmCompiler
     def initialize(name, &block)
         REQUIRE KOTLIN
         super
-    end
-
-    def tool_classpath
-        @kotlin.classpath
     end
 
     def WITH
@@ -171,10 +161,6 @@ class ScalaCompiler < JvmCompiler
 
     def WITH
         @scala.scalac
-    end
-
-    def tool_classpath
-        @scala.classpath
     end
 
     def format(msg, level, parent)

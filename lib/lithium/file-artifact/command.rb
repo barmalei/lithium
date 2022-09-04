@@ -157,6 +157,7 @@ end
 
 class RunInTerminal < ExistentFile
     def build
+        super
         Artifact.execInTerm(homedir, command)
     end
 
