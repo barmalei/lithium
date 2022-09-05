@@ -17,7 +17,6 @@ $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
 $lithium_args     ||= []
 
 # modify ruby modules lookup path
-$: << File.join($lithium_code, 'lib')
 
 artifact            = ARGV[ $lithium_options.length ]
 artifact_path       = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/]
