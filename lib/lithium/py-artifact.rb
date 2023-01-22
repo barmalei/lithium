@@ -1,18 +1,7 @@
 require 'lithium/core'
 require 'lithium/file-artifact/command'
 
-class PYPATH < EnvArtifact
-    include LogArtifactState
-    include PATHS
-
-    log_attr :paths
-
-    def assign_me_as
-        [ :pypaths, true ]
-    end
-end
-
-class DefaultPypath < PYPATH
+class DefaultPythonPath < EnvironmentPath
     def initialize(name, &block)
         super
         JOIN('lib') if block.nil? && File.exists?(File.join(homedir, 'lib'))
@@ -26,16 +15,16 @@ class PYTHON < SdkEnvironmen
     log_attr :pyname
 
     def initialize(name, &block)
-        REQUIRE(DefaultPypath)
+        REQUIRE DefaultPythonPath
         super
     end
 
     def pypath
-        @pypaths.nil? || @pypaths.length == 0 ? nil : PATHS.new(homedir).JOIN(@pypaths)
+        @paths.nil? || @paths.length == 0 ? nil : PATHS.new(homedir).JOIN(@paths)
     end
 
     def python
-        tool_path(tool_name())
+        tool_path(tool_name)
     end
 
     def tool_name

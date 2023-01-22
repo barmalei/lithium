@@ -210,7 +210,7 @@ class ArchiveFileContent < FileArtifact
         return unless File.exists?(fullpath)
 
         base  = vs_home()
-        mtime =  File.mtime(fullpath).to_i
+        mtime = File.mtime(fullpath).to_i
         if !File.directory?(@vs_directory) || File.mtime(@vs_directory) < File.mtime(fullpath())
             lszip(fullpath()) { | path |
                 yield File.join(base, path), mtime

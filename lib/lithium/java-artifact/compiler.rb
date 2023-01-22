@@ -3,15 +3,22 @@ require 'fileutils'
 require 'lithium/java-artifact/base'
 
 
-#class Destination
+class JvmDestinationDir < ExistentDirectory
+    include AssignableDependency[:destination]
+
+    def build
+        unless exists?
+            puts_warning "Create destination '#{fullpath}' folder"
+            FileUtils.mkdir_p(fullpath)
+        end
+        super
+    end
+end
 
 #  Java 
 class JvmCompiler < RunJvmTool
-    log_attr :destination, :create_destination
-
     def initialize(name, &block)
-        @create_destination = false
-        @destination        = nil
+        DESTINATION('classes')
         super
     end
 
@@ -20,41 +27,17 @@ class JvmCompiler < RunJvmTool
     end
 
     def classpath
-        dst = destination()
+        #dst = destination()
+        dst = @destination.fullpath
         raise 'Destination cannot be detected' if dst.nil?
         cp  = super
         cp.JOIN(dst) unless cp.INCLUDE?(dst)
         return cp
     end
 
-    def destination
-        unless @destination.nil?
-            @destination = File.join(homedir, @destination) unless File.absolute_path?(@destination)
-            if !File.exists?(@destination) && @create_destination
-                puts_warning "Create destination '#{@destination}' folder"
-                FileUtils.mkdir_p(@destination)
-            end
-            return @destination
-        else
-            pp = project
-            while not pp.nil?
-                hd = pp.homedir
-                [ File.join(hd, 'classes'), File.join(hd, 'WEB-INF', 'classes') ].each { | path |
-                    if File.directory?(path)
-                        return path
-                    else
-                        puts_warning("Evaluated destination '#{path}' doesn't exist")
-                    end
-                }
-
-                pp = pp.project
-            end
-            return nil
-        end
-    end
-
     def list_dest_paths
-        dest = destination()
+        #dest = destination()
+        dst = @destination.fullpath
         unless dest.nil?
             list_items { | path, t |
                 cn = JVM.grep_classname(path)
@@ -69,7 +52,8 @@ class JvmCompiler < RunJvmTool
     end
 
     def WITH_OPTS
-        dst  = destination()
+        #dst  = destination()
+        dst = @destination.fullpath
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exists?(dst)
         super.push('-d', "\"#{dst}\"")
     end
@@ -80,8 +64,12 @@ class JvmCompiler < RunJvmTool
         }
     end
 
+    def DESTINATION(path)
+        REQUIRE(path, JvmDestinationDir)
+    end
+
     def what_it_does
-        "Compile (#{self.class})\n    from: '#{@name}'\n    to:   '#{destination()}'"
+        "Compile (#{self.class})\n    from: '#{@name}'\n    to:   '#{@destination.fullpath}'"
     end
 end
 
@@ -166,4 +154,8 @@ class ScalaCompiler < JvmCompiler
     def format(msg, level, parent)
         parent.format(msg.gsub(/\x1b\s*\[[0-9]+m/, ""), level, $STDOUT)
     end
+end
+
+
+def a!
 end

@@ -116,23 +116,22 @@ end
 
 class TREE < Artifact
     def initialize(name)
-        @show_id, @show_owner, @show_mtime = true, true, true
+        @show_id, @show_owner, @show_mtime, @show_expired_by_kid = true, true, true, false
         super
     end
 
     def build
-        #show_tree(ArtifactTree.new(@name))
         show_tree(ArtifactTree.new(Project.current.artifact(@name)))
     end
 
     def show_tree(root) puts tree2string(nil, root) end
 
-    def tree2string(parent, root, shift=0)
+    def tree2string(parent, root, shift = 0)
         pshift, name = shift, File.basename(root.art.name)
 
         e = (root.expired ? '*' : '') +
             (@show_id ? " ##{root.art.object_id}" : '') +
-            (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
+            (@show_expired_by_kid  && root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
             (@show_mtime ? " #{root.art.mtime}ms" : '') +
             (@show_owner ? ":<#{root.art.owner.class}:#{root.art.owner}>" : '')
 

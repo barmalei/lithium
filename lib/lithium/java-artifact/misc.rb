@@ -83,7 +83,7 @@ end
 class FindInClasspath < Artifact
     def initialize(name, &block)
         super
-        REQUIRE (name)
+        REQUIRE(name)
         @pattern      ||= $lithium_args[0]
         @findJvmClasses = true if @findJvmClasses.nil?
         @cacheEnabled   = true if @cacheEnabled.nil?
@@ -135,7 +135,7 @@ class FindInClasspath < Artifact
             end
 
             if @findJvmClasses
-                ArtifactTree.new(DetectJvmClassByName.new(*[ @pattern ], owner:self.owner)).build { | stdin, stdout, th |
+                ArtifactTree.new(DetectJvmClassByName.new(@pattern, owner:self.owner)).build { | stdin, stdout, th |
                     prefix = 'detected:'
                     stdout.each { | line |
                         res.push(['JVM', line.chomp[prefix.length..]]) if line.start_with?(prefix)
@@ -214,5 +214,8 @@ class FindInClasspath < Artifact
         }
     end
 
-    def what_it_does() "Looking for '#{@pattern}' in classpath" end
+    def what_it_does
+        "Looking for '#{@pattern}' in classpath"
+    end
 end
+

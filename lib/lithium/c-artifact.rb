@@ -65,7 +65,6 @@ class CppCodeRunner < CppRunTool
     end
 end
 
-
 class RunMakefile < RunTool
     @abbr = 'RMF'
 

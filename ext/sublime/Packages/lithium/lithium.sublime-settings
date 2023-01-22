@@ -11,7 +11,7 @@
     "output_panel": {
         "name"         : "lithium",
         "font_size"    : 11,
-        "syntax"       : "Packages/Lithium/lithium.sublime-syntax"
+        "syntax"       : "Packages/lithium/lithium.sublime-syntax"
     },
 
     "location": {

@@ -7,12 +7,9 @@ require 'tempfile'
 class JavaClasspath < EnvArtifact
     include LogArtifactState
     include PATHS
+    include AssignableDependency[:classpaths, true]
 
     log_attr :paths
-
-    def assign_me_as
-        [ :classpaths, true ]
-    end
 
     def what_it_does
         "Build '#{name}' class path "
@@ -123,7 +120,7 @@ class WildflyWarClasspath < WarClasspath
 end
 
 class InFileClasspath < ExistentFile
-    include AssignableDependency
+    include AssignableDependency[ :classpaths, true ]
     include LogArtifactState
     include PATHS
 
@@ -138,13 +135,13 @@ class InFileClasspath < ExistentFile
         load_paths() if exists?
     end
 
-    def assign_me_as
-        [ :classpaths, true ]
-    end
-
     def build
         super
         load_paths()
+    end
+
+    def expired?
+        !File.file?(fullpath)
     end
 
     def load_paths

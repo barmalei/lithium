@@ -17,7 +17,7 @@ end
 class GradleFile < ExistentFile
     include LogArtifactState
     include StdFormater
-    include AssignableDependency
+    include AssignableDependency[:gradle]
 
     @abbr = 'GRF'
 
@@ -30,10 +30,6 @@ class GradleFile < ExistentFile
         gradle  = FileArtifact.look_file_up(fp, 'build.gradle', homedir) if  gradle.nil?
         raise "Gradle build file cannot be detected by '#{fp}' path" if  gradle.nil?
         super( gradle, &block)
-    end
-
-    def assign_me_as
-        [ :gradle, false ]
     end
 end
 

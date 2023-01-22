@@ -5,10 +5,9 @@ require 'lithium/core'
 
 module FileSourcesSupport
     module FileSource
-        include AssignableDependency
-
-        def assign_me_as
-            [ :sources, true ]
+        # make class that include the module assignable
+        def self.included(o)
+            o.include(AssignableDependency[:sources, true])
         end
 
         def relative_from
@@ -23,12 +22,6 @@ module FileSourcesSupport
         end
     end
 
-    def BASE(path)
-        @sources ||= []
-        @sources.each { | src |  src.BASE(path) unless src.relative_from.nil? }
-        return self
-    end
-
     def sources(*src)
         @sources ||= []
 
@@ -41,6 +34,15 @@ module FileSourcesSupport
         return self
     end
 
+    def FILTER_OUT(f)
+        @filter_out = f
+    end
+
+    def filter_out?(p)
+        @filter_out ||= nil
+        @filter_out.nil? || @filter_out.match?(p)
+    end
+
     # yield files from all registered sources:
     #   (source, source_path, mtime, dest)
     # @from  an absolute path to file that has to be used as a part of generation
@@ -49,13 +51,15 @@ module FileSourcesSupport
     def list_sources_items
         @sources.each { | source |
             source.list_items { | path, mtime |
-                from = fullpath(path)
-                raise "File '#{from}' cannot be found" unless File.exists?(from)
+                unless filter_out?(path)
+                    from = fullpath(path)
+                    raise "File '#{from}' cannot be found" unless File.exists?(from)
 
-                dest = destination(source, path, mtime)
-                raise "Absolute path '#{dest}' cannot be used as a relative destination" if File.absolute_path?(dest)
+                    dest = destination(source, path, mtime)
+                    raise "Absolute path '#{dest}' cannot be used as a relative destination" if File.absolute_path?(dest)
 
-                yield source, from, mtime, dest
+                    yield source, from, mtime, dest
+                end
             }
         }
     end

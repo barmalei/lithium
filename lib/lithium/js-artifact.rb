@@ -23,6 +23,9 @@ class JS < EnvArtifact
 
         @npm ||= FileArtifact.which('npm')
         raise 'Node JS npm cannot be detected' if @npm.nil?
+
+        @tsc ||= FileArtifact.which('tsc')
+        raise 'Node JS tsc cannot be detected' if @tsc.nil?
     end
 
     def nodejs
@@ -31,6 +34,10 @@ class JS < EnvArtifact
 
     def npm
         @npm
+    end
+
+    def tsc
+        @tsc
     end
 
     def module_home(name)
@@ -99,6 +106,27 @@ class InstallNodeJsPackage < NodeJsPackageFile
         "Run NPM '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}'"
     end
 end
+
+# build with tsconfig.json
+class BuildWithTsConf < ExistentFile
+    include OptionsSupport
+    @abbr = 'BTS'
+
+    def initialize(name, &block)
+        REQUIRE JS
+        super
+    end
+
+    def build
+        homedir()
+        raise "Running of '#{@name}' type script config failed" if Artifact.exec(@js.tsc, OPTS(), '-p', q_fullpath) != 0
+    end
+
+    def what_it_does
+        "Build typescript with '#{@name}' config and '#{OPTS()}' options"
+    end
+end
+
 
 # nodejs module
 class NodejsModule < FileArtifact
@@ -308,11 +336,11 @@ class TypeScriptCompiler < FileMask
 
     def build
         go_to_homedir
-        raise "Compilation of '#{@name}' has failed" if Artifact.exec('tsc', OPTS(), q_fullpath) != 0
+        raise "Compilation of '#{@name}' has failed" if Artifact.exec(@js.tsc, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does
-        "Compile typescript'#{@name}'"
+        "Compile typescript '#{@name}'"
     end
 end
 
