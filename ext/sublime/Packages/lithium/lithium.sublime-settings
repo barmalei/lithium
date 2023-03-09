@@ -1,6 +1,6 @@
 {
     "lithium" : {
-        "command" : "ruby /Users/brigadir/projects/.lithium/lib/lithium.rb",
+        "command" : "ruby --enable-yjit /Users/brigadir/projects/.lithium/lib/lithium.rb",
         "opts"    : {
             "verbosity": "2",
             "std"      : "SublimeStd",
@@ -11,7 +11,7 @@
     "output_panel": {
         "name"         : "lithium",
         "font_size"    : 11,
-        "syntax"       : "Packages/Lithium/lithium.sublime-syntax"
+        "syntax"       : "Packages/lithium/lithium.sublime-syntax"
     },
 
     "location": {

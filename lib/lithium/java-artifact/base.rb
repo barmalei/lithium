@@ -7,12 +7,9 @@ require 'tempfile'
 class JavaClasspath < EnvArtifact
     include LogArtifactState
     include PATHS
+    include AssignableDependency[:classpaths, true]
 
     log_attr :paths
-
-    def assign_me_as
-        [ :classpaths, true ]
-    end
 
     def what_it_does
         "Build '#{name}' class path "
@@ -26,8 +23,8 @@ class DefaultClasspath < JavaClasspath
         if block.nil?
             hd = homedir
             unless hd.nil?
-                JOIN('classes')   if File.exists?(File.join(hd, 'classes'))
-                JOIN('lib/*.jar') if File.exists?(File.join(hd, 'lib'))
+                JOIN('classes')   if File.exist?(File.join(hd, 'classes'))
+                JOIN('lib/*.jar') if File.exist?(File.join(hd, 'lib'))
             end
         end
     end
@@ -37,8 +34,8 @@ class WarClasspath < JavaClasspath
     def initialize(name, &block)
         super
         hd = File.join(homedir, 'WEB-INF')
-        JOIN(File.join('WEB-INF', 'classes'))   if File.exists?(File.join(hd, 'classes'))
-        JOIN(File.join('WEB-INF', 'lib/*.jar')) if File.exists?(File.join(hd, 'lib'))
+        JOIN(File.join('WEB-INF', 'classes'))   if File.exist?(File.join(hd, 'classes'))
+        JOIN(File.join('WEB-INF', 'lib/*.jar')) if File.exist?(File.join(hd, 'lib'))
     end
 end
 
@@ -59,7 +56,7 @@ class WildflyWarClasspath < WarClasspath
     def DEPLOYMENT()
         dep_xml = File.join(homedir, 'WEB-INF', 'jboss-deployment-structure.xml')
         jars    = []
-        if File.exists?(dep_xml)
+        if File.exist?(dep_xml)
             xmldoc = REXML::Document.new(File.new(dep_xml))
             xmldoc.elements.each('jboss-deployment-structure/deployment/dependencies/module') { | el |
                 if el.attributes['export'] == 'true'
@@ -102,7 +99,7 @@ class WildflyWarClasspath < WarClasspath
         raise "Modules root path '#{root}' is invalid"      unless File.directory?(root)
 
         path = File.join(root, path)
-        raise "WildFly module path '#{path}' is invalid" unless File.exists?(path)
+        raise "WildFly module path '#{path}' is invalid" unless File.exist?(path)
         path = File.join(path, '**', '*.jar')
 
         libs = []
@@ -123,7 +120,7 @@ class WildflyWarClasspath < WarClasspath
 end
 
 class InFileClasspath < ExistentFile
-    include AssignableDependency
+    include AssignableDependency[ :classpaths, true ]
     include LogArtifactState
     include PATHS
 
@@ -138,13 +135,13 @@ class InFileClasspath < ExistentFile
         load_paths() if exists?
     end
 
-    def assign_me_as
-        [ :classpaths, true ]
-    end
-
     def build
         super
         load_paths()
+    end
+
+    def expired?
+        !File.file?(fullpath)
     end
 
     def load_paths
@@ -265,7 +262,7 @@ class JAVA < JVM
 
     def tool_path(pp)
         path = super
-        return path if File.exists?(path) || (File::PATH_SEPARATOR == ';' && File.exists?(path + '.exe'))
+        return path if File.exist?(path) || (File::PATH_SEPARATOR == ';' && File.exist?(path + '.exe'))
         puts_warning "'#{path}' not found. Use '#{tool}' as is"
         return tool
     end

@@ -2,12 +2,6 @@
     $lithium_options['v'] = 2
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
 
-    # REQUIRE  {
-    #     BUILT {
-    #         Directory('target')
-    #     }
-    # }
-
     JAVA {
         REQUIRE {
             DefaultClasspath {
@@ -15,24 +9,6 @@
             }
         }
     }
-
-
-    # JAVA('.env/JAVA2') {
-    #     REQUIRE {
-    #         DefaultClasspath {
-    #             JOIN('.lithium/ext/java/lithium/classes2')
-    #         }
-    #     }
-    # }
-
-    MATCH('cmd:*.java') {
-        FileArtifact("test.java") {
-            REQUIRE JAVA
-        }
-    }
-
-    REMOVE('cmd:*.java')
-
 
     Touch('touch:*')
 
@@ -84,6 +60,7 @@
         RunDartCode      ('**/*.dart')
         RunDartPub       ('**/pubspec.yaml')
         InstallNodeJsPackage('**/package.json')
+        BuildWithTsConf  ('**/tsconfig.json')
         DeployGoogleApp  ('**/appengine-*.xml')
         DeployGoogleApp  ('**/app*.yaml')
 
@@ -124,10 +101,10 @@
         RunDartPubBuild     ('**/pubspec.yaml')
         ValidateDartCode    ('**/*.dart')
 
-        OTHERWISE { | path |
-            raise "Unsupported '#{path}' file type"
-            #Project.build("compile:#{path}")
-        }
+        # OTHERWISE { | path |
+        #     raise "Unsupported '#{path}' file type"
+        #     #Project.build("compile:#{path}")
+        # }
     }
 
     MATCH('check:*') {

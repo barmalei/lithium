@@ -14,7 +14,7 @@ class GenerateJavaDoc < RunJavaTool
     def destination
         dest = fullpath(@destination)
         return dest if File.directory?(dest)
-        raise "Invalid destination directory '#{dest}'" if File.exists?(dest)
+        raise "Invalid destination directory '#{dest}'" if File.exist?(dest)
         return dest
     end
 
@@ -83,7 +83,7 @@ end
 class FindInClasspath < Artifact
     def initialize(name, &block)
         super
-        REQUIRE (name)
+        REQUIRE(name)
         @pattern      ||= $lithium_args[0]
         @findJvmClasses = true if @findJvmClasses.nil?
         @cacheEnabled   = true if @cacheEnabled.nil?
@@ -108,8 +108,8 @@ class FindInClasspath < Artifact
         if @cacheEnabled == true && !@cache.empty? && @cache.has_key?(@pattern)
             @cache[@pattern].each_pair { | path, items |
                 if path != 'JVM'
-                    b = !File.exists?(path) ||
-                        (File.directory?(path) && !items.detect { | item | !File.exists?(File.join(path, item)) }.nil?) ||
+                    b = !File.exist?(path) ||
+                        (File.directory?(path) && !items.detect { | item | !File.exist?(File.join(path, item)) }.nil?) ||
                         (File.file?(path) && !cp.INCLUDE?(path))
 
                     if b
@@ -135,7 +135,7 @@ class FindInClasspath < Artifact
             end
 
             if @findJvmClasses
-                ArtifactTree.new(DetectJvmClassByName.new(*[ @pattern ], owner:self.owner)).build { | stdin, stdout, th |
+                ArtifactTree.new(DetectJvmClassByName.new(@pattern, owner:self.owner)).build { | stdin, stdout, th |
                     prefix = 'detected:'
                     stdout.each { | line |
                         res.push(['JVM', line.chomp[prefix.length..]]) if line.start_with?(prefix)
@@ -159,7 +159,7 @@ class FindInClasspath < Artifact
 
     def clean
         fn = _cache_path
-        File.delete(fn) if File.exists?(fn) && !File.directory?(fn)
+        File.delete(fn) if File.exist?(fn) && !File.directory?(fn)
     end
 
     def find(classpath, pattern)
@@ -176,7 +176,7 @@ class FindInClasspath < Artifact
                     yield jar_path, item
                 }
             else
-                puts_warning "File '#{path}' doesn't exist" unless File.exists?(path)
+                puts_warning "File '#{path}' doesn't exist" unless File.exist?(path)
             end
         }
     end
@@ -194,7 +194,7 @@ class FindInClasspath < Artifact
     end
 
     def _load_cache
-        if File.exists?(_cache_path)
+        if File.exist?(_cache_path)
             File.open(_cache_path, 'r') { | f |
                 begin
                     return Marshal.load(f)
@@ -214,5 +214,8 @@ class FindInClasspath < Artifact
         }
     end
 
-    def what_it_does() "Looking for '#{@pattern}' in classpath" end
+    def what_it_does
+        "Looking for '#{@pattern}' in classpath"
+    end
 end
+

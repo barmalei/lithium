@@ -17,7 +17,7 @@ class CPP < EnvArtifact
     def destination
         unless @destination.nil?
             @destination = File.join(homedir, @destination) unless File.absolute_path?(@destination)
-            if !File.exists?(@destination) && @create_destination
+            if !File.exist?(@destination) && @create_destination
                 puts_warning "Create destination '#{@destination}' folder"
                 FileUtils.mkdir_p(@destination)
             end
@@ -64,7 +64,6 @@ class CppCodeRunner < CppRunTool
         File.join(destination, File.basename(path, '.*'))
     end
 end
-
 
 class RunMakefile < RunTool
     @abbr = 'RMF'

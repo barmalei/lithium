@@ -8,7 +8,7 @@ class Touch < FileArtifact
         super
 
         path = fullpath()
-        if File.exists?(path)
+        if File.exist?(path)
             File.utime(File.atime(path), Time.now(), path)
         else
             puts_warning "File '#{path}' cannot be found to be touched"
@@ -35,11 +35,11 @@ class CopyOfFile < FileArtifact
 
     def expired?
         src = validate_source()
-        return !File.exists?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
+        return !File.exist?(fullpath) || File.mtime(fullpath).to_i < File.mtime(src).to_i
     end
 
     def clean
-        if File.exists?(fullpath)
+        if File.exist?(fullpath)
             File.delete(fullpath)
         else
             puts_warning "File '#{fullpath}' doesn't exist"
@@ -69,7 +69,7 @@ class RmFile < ExistentFile
         path = fullpath
         if File.directory?(path)
             FileUtils.remove_dir(path)
-        elsif File.exists?(path)
+        elsif File.exist?(path)
             File.delete(path)
         else
             puts_warning "File '#{path}' doesn't exist"
@@ -77,7 +77,7 @@ class RmFile < ExistentFile
     end
 
     def expired?
-        File.exists?(fullpath)
+        File.exist?(fullpath)
     end
 end
 

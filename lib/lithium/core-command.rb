@@ -116,23 +116,22 @@ end
 
 class TREE < Artifact
     def initialize(name)
-        @show_id, @show_owner, @show_mtime = true, true, true
+        @show_id, @show_owner, @show_mtime, @show_expired_by_kid = true, true, true, false
         super
     end
 
     def build
-        #show_tree(ArtifactTree.new(@name))
         show_tree(ArtifactTree.new(Project.current.artifact(@name)))
     end
 
     def show_tree(root) puts tree2string(nil, root) end
 
-    def tree2string(parent, root, shift=0)
+    def tree2string(parent, root, shift = 0)
         pshift, name = shift, File.basename(root.art.name)
 
         e = (root.expired ? '*' : '') +
             (@show_id ? " ##{root.art.object_id}" : '') +
-            (root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
+            (@show_expired_by_kid  && root.expired_by_kid ? "*[#{root.expired_by_kid}]" : '') +
             (@show_mtime ? " #{root.art.mtime}ms" : '') +
             (@show_owner ? ":<#{root.art.owner.class}:#{root.art.owner}>" : '')
 
@@ -250,7 +249,7 @@ class INIT < ExistentFile
         raise "File '#{path}' is not a directory or doesn't exist" unless File.directory?(path)
         lp = File.expand_path(File.join(path, ".lithium"))
 
-        if File.exists?(lp)
+        if File.exist?(lp)
             raise "'.lithium' as a file already exits in '#{lp}'" if File.file?(lp)
             puts_warning "Project '#{lp}' already has lithium stuff initialized"
         else
@@ -258,7 +257,7 @@ class INIT < ExistentFile
         end
 
         prj_file = File.join(lp, 'project.rb')
-        unless File.exists?(prj_file)
+        unless File.exist?(prj_file)
             puts "Creating project config file -> '#{prj_file}'"
             File.open(prj_file, 'w') { | f |
                 f.puts("-> {\n}")
@@ -318,7 +317,7 @@ eval \"$vc\"
     end
 
     def build
-        if File.exists?(@script_path)
+        if File.exist?(@script_path)
             puts_warning "File '#{@script_path}' already exists"
             File.open(@script_path, 'r') { | f |
                 l = f.readlines()

@@ -133,7 +133,7 @@ module LogArtifactState
         hd = homedir
         raise 'Cannot detect log directory since project home is unknown' if hd.nil?
         log_hd = File.join(hd, '.lithium', '.logs')
-        unless File.exists?(log_hd)
+        unless File.exist?(log_hd)
             puts_warning "LOG directory '#{log_hd}' cannot be found. Try to create it ..."
             Dir.mkdir(log_hd)
         end
@@ -154,10 +154,10 @@ module LogArtifactState
         return unless can_artifact_be_tracked?
 
         p1 = items_log_path()
-        File.delete(p1) if items_log_enabled? && File.exists?(p1)
+        File.delete(p1) if items_log_enabled? && File.exist?(p1)
 
         p2 = attrs_log_path()
-        File.delete(p2) if attrs_log_enabled? && File.exists?(p2)
+        File.delete(p2) if attrs_log_enabled? && File.exist?(p2)
     end
 
     def detect_logs_mtime
@@ -165,8 +165,8 @@ module LogArtifactState
 
         p1 = items_log_path()
         p2 = attrs_log_path()
-        t1 = File.exists?(p1) && items_log_enabled? ? File.mtime(p1).to_i : -1
-        t2 = File.exists?(p2) && attrs_log_enabled? ? File.mtime(p2).to_i : -1
+        t1 = File.exist?(p1) && items_log_enabled? ? File.mtime(p1).to_i : -1
+        t2 = File.exist?(p2) && attrs_log_enabled? ? File.mtime(p2).to_i : -1
         return t1 > t2 ? t1 : t2
     end
 
@@ -175,7 +175,7 @@ module LogArtifactState
 
         if items_log_enabled?
             # if there is no items but the items are expected consider it as expired case
-            return true if self.class.method_defined?(:list_items) && !File.exists?(items_log_path())
+            #return true if self.class.method_defined?(:list_items) && !File.exist?(items_log_path())
 
             # check items expiration
             list_expired_items { |n, t|
@@ -199,13 +199,13 @@ module LogArtifactState
         if items_log_enabled?
             update_items_log()
             path = items_log_path()
-            File.utime(t, t, path) if File.exists?(path)
+            File.utime(t, t, path) if File.exist?(path)
         end
 
         if attrs_log_enabled?
             update_attrs_log()
             path = attrs_log_path()
-            File.utime(t, t, path) if File.exists?(path)
+            File.utime(t, t, path) if File.exist?(path)
         end
     end
 
@@ -215,10 +215,8 @@ module LogArtifactState
 
     # return map where key is an item path and value is integer modified time
     def load_items_log
-        return unless self.class.method_defined?(:list_items)
-
         p, e = items_log_path(), {}
-        if File.exists?(p)
+        if File.exist?(p)
             File.open(p, 'r') { |f|
                 f.each { |i|
                     i = i.strip()
@@ -260,7 +258,7 @@ module LogArtifactState
         # save log if necessary
         path = items_log_path()
         if r.length == 0    # no items means no log
-            File.delete(path) if File.exists?(path)
+            File.delete(path) if File.exist?(path)
         elsif d || r.length != e.length
             File.open(path, 'w') { |f|
                 r.each_pair { |name, time|
@@ -291,14 +289,16 @@ module LogArtifactState
         if self.class.has_log_attrs()
             data = {}
             begin
-                self.class.each_log_attrs { |a| data[a] = self.send(a) }
-                File.open(path, 'w') { |f| Marshal.dump(data, f) }
+                self.class.each_log_attrs { | a |
+                    aa = "@#{a}"
+                    data[a] = self.send(a) }
+                File.open(path, 'w') { | f | Marshal.dump(data, f) }
             rescue
                 File.delete(path)
                 raise
             end
         else
-            File.delete(path) if File.exists?(path)
+            File.delete(path) if File.exist?(path)
         end
     end
 
@@ -326,7 +326,7 @@ module LogArtifactState
         if self.class.has_log_attrs()
             path = attrs_log_path()
 
-            if File.exists?(path)
+            if File.exist?(path)
                 File.open(path, 'r') { | f |
                     d = nil
                     begin
@@ -337,7 +337,6 @@ module LogArtifactState
                     end
 
                     raise "Incorrect serialized object type '#{d.class}' (Hash is expected)" if !d.kind_of?(Hash)
-
                     attrs.each { | a |
                         if !d.key?(a)
                             block.call(a, nil)
@@ -453,10 +452,6 @@ class ArtifactName < String
         else
             super(name, clazz, &block)
         end
-    end
-
-    def self.from_class(clazz)
-
     end
 
     # Construct artifact name.
@@ -629,6 +624,7 @@ class Artifact
     # the particular class static variables
     @default_name  = nil
     @default_block = nil
+
     @auto_registered_arts = []
 
     # set or get default artifact name
@@ -750,7 +746,7 @@ class Artifact
                 raise "Block was not defined for updating '#{clazz}:#{name}' requirement" if block.nil?
                 @requires ||= []
                 art_name = ArtifactName.new(name, clazz)
-                idx      = @requires.index { | a | a.is_a?(ArtifactName) && art_name.to_s == a.to_s }
+                idx      = @requires.index { | a | art_name.to_s == a.to_s }
                 raise "Required '#{clazz}' artifact cannot be detected" if idx.nil?
                 @requires[idx].combine_block(block)
             else
@@ -770,9 +766,18 @@ class Artifact
     def each_required
         @requires ||= []
         req = @requires
+        req = req.reverse.uniq { | artname |
+            # test if required is assignable artifact and if another assignable for the same (not array)
+            # property has been already defined remove it from required
+            if !artname.clazz.nil? && artname.clazz < AssignableDependency && !artname.clazz.assign_as_array?
+                "@#{artname.clazz.assign_with_name}"
+            elsif artname.clazz.nil?
+                artname.to_s
+            else
+                "#{artname.clazz.name}:#{artname.to_s}"
+            end
+        }.reverse
 
-        # artifacts have to be unique by its names
-        req = req.reverse.uniq { | name | name.is_a?(Artifact) ? name.name : name.to_s }.reverse
         req.each { | dep |
             yield dep
         }
@@ -844,12 +849,11 @@ class Artifact
     end
 
     def DISMISS(name, clazz = nil)
-        raise 'Passed dismiss artifact name is nil' if name.nil?
         @requires ||= []
         ln = @requires.length
-        name = ArtifactName.new(name, clazz).to_s
-        @requires.delete_if { | req | req.is_a?(ArtifactName) && req.to_s == name }
-        raise "'#{name}' DEPENDENCY cannot be found and dismissed" if ln == @requires.length
+        artname = ArtifactName.new(name, clazz)
+        @requires.delete_if { | req | req.to_s == artname.to_s && req.clazz == artname.clazz }
+        raise "'#{artname}' DEPENDENCY cannot be found and dismissed" if ln == @requires.length
     end
 
     # called after the artifact has been built
@@ -860,15 +864,15 @@ class Artifact
     def add_reqiured(name = nil, clazz = nil, &block)
         @requires ||= []
         if name.is_a?(Artifact)
-            raise "Artifact instance '#{name}' cannot be used as an requirements"
+            raise "Artifact instance '#{name}' cannot be used as a required artifact"
         else
             art_name = ArtifactName.new(name, clazz, &block)
-            i = @requires.index { | req | req.is_a?(ArtifactName) && req.to_s == art_name.to_s && req.clazz == art_name.clazz }
+            i = @requires.index { | req | req.to_s == art_name.to_s && req.clazz == art_name.clazz }
             if i.nil?
                 @requires.push(art_name)
             else
                 puts_warning "Artifact '#{art_name}' requirement has been already defined"
-                @requires[i] =  art_name
+                @requires[i] = art_name
             end
         end
     end
@@ -994,7 +998,7 @@ class ArtifactTree
             @art = own.artifact(art, &block)
         end
 
-        @children, @parent, @expired, @expired_by_kid = [], parent, nil, nil
+        @children, @parent, @expired, @expired_by_kid = [], parent, false, nil
 
         # If parent is nil then the given tree node is considered as root node.
         # The root node initiate building tree
@@ -1003,13 +1007,13 @@ class ArtifactTree
 
     # build tree starting from the root artifact (identified by @name)
     def build_tree(map = [])
-        bt = @art.mtime
+        bt, @children = @art.mtime, []
 
         @art.each_required { | name |
             foundNode, node = nil, ArtifactTree.new(name, self)
 
             # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
-            if name.is_a?(ArtifactName) && name.block.nil?
+            if name.block.nil?
                 # optimize tree to exclude dependencies that are already in the tree
                 foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
                 # save in list if a new artifact has been detected
@@ -1036,7 +1040,7 @@ class ArtifactTree
             #
             # resolve assign_me_as  property that says to which property the instance of the
             # dependent artifact has to be assigned
-            node.art.assign_me_to(@art) if node.art.is_a?(AssignableDependency)
+            node.art.assign_me_to(@art) if node.art.class < AssignableDependency
 
             # most likely the expired state has to be set here, after assignable dependencies are set
             # since @art.expired? method can require the assigned deps to define its expiration state
@@ -1048,9 +1052,9 @@ class ArtifactTree
             end
         }
 
-        # check if expired attribute has not been set (if there ware no deps
+        # check if expired attribute has not been set (if there were no deps
         # that expired the given art)
-        @expired = @art.expired? if @expired.nil?
+        @expired = @art.expired? if @expired != true
         return self
     end
 
@@ -1110,7 +1114,7 @@ class FileArtifact < Artifact
     end
 
     def exists?
-        File.exists?(fullpath)
+        File.exist?(fullpath)
     end
 
     def homedir
@@ -1159,7 +1163,6 @@ class FileArtifact < Artifact
     end
 
     def fullpath(path = @name)
-        # TODO: have no idea if the commented code will have a side effect !
         return path if path.start_with?('.env/')
 
         if path == '.' || path == './'
@@ -1185,10 +1188,6 @@ class FileArtifact < Artifact
     # test if the given path is in a context of the given file artifact
     def match(path)
         raise 'Invalid empty or nil path' if path.nil? || path.length == 0
-
-        # current directory always match
-        # TODO: most likely the commented code below is incorrect
-        #return true if path == '.'
 
         pp = path.dup
         path, mask = FileArtifact.cut_fmask(path)
@@ -1259,9 +1258,7 @@ class FileArtifact < Artifact
     end
 
     def self.cut_fmask(path)
-        mi = path.index(/[\[\]\?\*\{\}]/) # test if the path contains mask
-
-        # cut mask part if it has been detected in the path
+        mi = path.index(/[^\[\]\?\*\{\}\/]*[\[\]\?\*\{\}]/) # test if the path contains mask
         mask = nil
         unless mi.nil?
             path = path.dup
@@ -1270,6 +1267,7 @@ class FileArtifact < Artifact
             path = nil if path.length == 0
         end
 
+        path = path[..-2] if !path.nil? && path[-1] == '/'
         return path, mask
     end
 
@@ -1293,7 +1291,7 @@ class FileArtifact < Artifact
         self.testdir(dest)
         raise "Source '#{src}' file is a directory or doesn't exist" unless File.file?(src)
         raise "Destination '#{dest}' cannot be file" if File.file?(dest)
-        FileUtils.mkdir_p(dest) unless File.exists?(dest)
+        FileUtils.mkdir_p(dest) unless File.exist?(dest)
         FileUtils.cp(src, dest)
     end
 
@@ -1344,12 +1342,12 @@ class FileArtifact < Artifact
         top_path  = File.expand_path(top_path) unless top_path.nil?
         prev_path = nil
 
-        #raise "Path '#{path}' doesn't exist" unless File.exists?(path)
+        #raise "Path '#{path}' doesn't exist" unless File.exist?(path)
         #raise "Path '#{path}' has to be a directory" unless File.directory?(path)
 
         while path && prev_path != path && (top_path.nil? || prev_path != top_path)
             marker = File.join(path, fname)
-            return marker if File.exists?(marker) && (block.nil? || block.call(marker))
+            return marker if File.exist?(marker) && (block.nil? || block.call(marker))
             prev_path = path
             path      = File.dirname(path)
             break if path == '.'  # dirname can return "." if there is no available top directory
@@ -1363,7 +1361,7 @@ class FileArtifact < Artifact
 
     # search the given path
     def self.search(path, art = $current_artifact, &block)
-        if File.exists?(path)
+        if File.exist?(path)
             return [ File.expand_path(path) ] if block.nil?
             return block.call(path)
         end
@@ -1382,14 +1380,14 @@ class FileArtifact < Artifact
         else
             hd  = $current_artifact.homedir
             hfp = File.join(hd, path)
-            if File.exists?(hfp)
+            if File.exist?(hfp)
                 return  [ hfp ] if block.nil?
                 return block.call(hfp)
             end
         end
 
         fp = File.dirname(fp) unless File.directory?(fp)
-        if File.exists?(fp)
+        if File.exist?(fp)
             path = Pathname.new(path).cleanpath.to_s
             if @search_cache[fp] && @search_cache[fp][path]
                 return [] if block.nil?
@@ -1458,7 +1456,7 @@ class FileArtifact < Artifact
         pattern = Regexp.new(pattern) if pattern.kind_of?(String)
 
         pp, mask = FileArtifact.cut_fmask(path)
-        raise "File '#{path}' cannot be found" if !File.exists?(path) && mask.nil?
+        raise "File '#{path}' cannot be found" if !File.exist?(path) && mask.nil?
 
         list = []
         if File.directory?(path) || mask
@@ -1478,7 +1476,7 @@ class FileArtifact < Artifact
 
         pp, mask = FileArtifact.cut_fmask(path)
         raise "Path '#{path}' points to file" if File.file?(path)
-        raise "Path '#{path}' doesn't exist"  if !File.exists?(path) && mask.nil?
+        raise "Path '#{path}' doesn't exist"  if !File.exist?(path) && mask.nil?
 
         list = []
         Dir[path].each { | item |
@@ -1520,14 +1518,14 @@ class FileArtifact < Artifact
 
     def self.exists?(path, ignore_dirs = true)
         pp, mask = FileArtifact.cut_fmask(path)
-        raise "File '#{path}' cannot be found" if !File.exists?(path) && mask.nil?
+        raise "File '#{path}' cannot be found" if !File.exist?(path) && mask.nil?
 
         if File.directory?(path) || mask
             FileArtifact.dir(path, ignore_dirs) { | item |
                 return true
             }
         else
-            return File.exists?(path)
+            return File.exist?(path)
         end
     end
 end
@@ -1536,10 +1534,6 @@ end
 class ExistentFile < FileArtifact
     def exists?
         File.file?(fullpath)
-    end
-
-    def expired?
-        !exists?
     end
 
     def build
@@ -1565,8 +1559,7 @@ class Directory < FileArtifact
     end
 
     def mkdir
-        fp = fullpath
-        FileUtils.mkdir_p(fp) unless exists?(fp)
+        FileUtils.mkdir_p(fullpath) unless exists?
     end
 end
 
@@ -1804,8 +1797,9 @@ module ArtifactContainer
     # instantiate the given artifact by its meta
     def _artifact_by_meta(artname, meta, &block)
         raise "Invalid '#{artname.class}' parameter type, ArtifactName instance is expected" unless artname.kind_of?(ArtifactName)
-        clazz = meta.clazz
+        raise "'#{meta}' definition does not define class for '#{artname}' artifact"         if     meta.clazz.nil?
 
+        clazz = meta.clazz
         art = clazz.new(artname.suffix, owner:self,
             &(block.nil? && clazz.default_block.nil? ? meta.block : Proc.new {
                 self.instance_exec &clazz.default_block unless clazz.default_block.nil?
@@ -1826,8 +1820,8 @@ module ArtifactContainer
 
     # Find appropriate for the given artifact name a registered meta
     # @param name: { String, Symbol, Class, ArtifactName } artifact name
-    # @param recursive: { boolean } flag that says if meta has to be search over
-    # the all parent hierarchy starting from "from" container
+    # @param recursive: { boolean } flag that indicates if searching a meta
+    # should be done in parent hierarchy as well
     #
     # @return (ArtifactName, ArtifactContainer)
     def match_meta(name, recursive = false)
@@ -1912,14 +1906,16 @@ module ArtifactContainer
     end
 
     # TODO: the method doesn't work for predefined artifacts
-    # TODO: the method doesn't match the passed name against meta, instead meta is matched against the name.
-    # That means  name = "cmd:*" doesn't match meta = "cme:*.java".
-    def REMOVE(name)
-        artname = ArtifactName.new(name)
-        meta, meta_ow = match_meta(name, true)
-        raise "Cannot find '#{artname}' definition in containers hierarchy" if meta.nil?
-        raise "Artifact '#{artname}' definition cannot be detected in an owner container" if meta_ow._meta.delete(meta).nil?
-        meta_ow._meta.sort!
+    def REMOVE(name, clazz = nil)
+        name = File.join(homedir, name) if name.start_with?('./') || name.start_with?('../')
+        own = self
+        while !own.nil?
+            artname = ArtifactName.new(name, clazz)
+            artname = ArtifactName.relative_to(artname, own.homedir)
+            own._meta.delete_if { | m | artname.match(m) }
+            own._meta.sort!
+            own = own.owner
+        end
     end
 
     # define a default block that will be applied to all instances of the given class
@@ -2035,32 +2031,72 @@ end
 # an artifact has to include the module to be assigned to an attribute of an artifact
 # that requires the AssignableDependency artifact
 module AssignableDependency
-    #  an attribute name the dependency artifact has to be assigned
-    #  @return [attribute_name, is_array]
-    def assign_me_as
-        [ self.class.name.downcase, false ]
+    def self.included(o)
+        raise "Class '#{o.name}' already includes '#{self.name}' module"  if o.class == Class && o.superclass < AssignableDependency
+        o.include(IncludePart)
+        o.extend(ExtendPart)
+        o.set_assign_me_as([nil, false])
     end
 
-    def assign_me_to(target)
-        raise "Target is nil and cannot be assigned with a value provided by #{self.class}:#{self.name}" if target.nil?
-        raise "Nil assignable property name for #{self.class}:#{self.name}"                              if assign_me_as.nil?
+    # use the method to parametrize module inclusion with an attribute name and is_array parameters
+    #    include  AssignableDependency[:name, true]
+    def self.[](nm = nil, is_array = false)
+        Module.new {
+            @assign_me_as = [ nm, is_array ]
+            def self.included(o)
+                o.include(AssignableDependency) unless o < AssignableDependency
+                name, is_array = @assign_me_as
+                unless name.nil?
+                    raise "Invalid attribute name argument type '#{name.class}'"           unless name.kind_of?(String) || name.kind_of?(Symbol)
+                    raise "Invalid attribute array flag argument type '#{is_array.class}'" unless is_array == true || is_array == false
+                end
+                o.set_assign_me_as(@assign_me_as)
+            end
+        }
+    end
 
-        attr_name, is_array = target.assign_req_as(self) if target.respond_to?(:assign_req_as)
-        attr_name, is_array = assign_me_as()             if attr_name.nil?
-
-        new_value = self
-        attr_name = "@#{attr_name}"
-        cur_value = target.instance_variable_get(attr_name)
-        if is_array
-            cur_value = [] if cur_value.nil?
-            target.instance_variable_set(attr_name, cur_value.push(new_value)) if cur_value.index(new_value).nil?
-        else
-            target.instance_variable_set(attr_name, new_value)
+    module ExtendPart
+        def set_assign_me_as(assign_me_as)
+            @assign_me_as = assign_me_as.dup
         end
 
-        assignable = target.instance_variable_get('@_assignable')
-        assignable ||= []
-        target.instance_variable_set('@_assignable', assignable.push([attr_name, is_array]).uniq)
+        def get_assign_me_as
+            return self.superclass.get_assign_me_as unless defined?(@assign_me_as) || self.superclass.nil? || !self.superclass.respond_to?('get_assign_me_as')
+            return @assign_me_as
+        end
+
+        def assign_with_name
+            nm = get_assign_me_as
+            nm.nil? || nm[0].nil? ? self.name.downcase : nm[0]
+        end
+
+        def assign_as_array?
+            nm = get_assign_me_as
+            nm.nil? ? false : nm[1]
+        end
+    end
+
+    module IncludePart
+        def assign_me_to(target)
+            clazz = self.class
+            raise "Target is nil and cannot be assigned with a value provided by #{self.class}:#{self.name}" if target.nil?
+            raise "Nil assignable property name for #{self.class}:#{self.name}"                              if clazz.assign_with_name.nil?
+
+            # TODO: would be nice to avoid assign_req_as logic
+            attr_name, is_array = target.assign_req_as(self)                               if target.respond_to?(:assign_req_as)
+            attr_name, is_array = self.class.assign_with_name, self.class.assign_as_array? if attr_name.nil?
+
+            new_value = self
+            attr_name = "@#{attr_name}"
+            cur_value = target.instance_variable_get(attr_name)
+            if is_array
+                cur_value = [] if cur_value.nil?
+                target.instance_variable_set(attr_name, cur_value.push(new_value)) if cur_value.index(new_value).nil?
+            else
+                raise "Other artifact has been already assigned to '#{attr_name}' attribute of #{target.class}:#{target.name} artifact" unless cur_value.nil? || cur_value == new_value
+                target.instance_variable_set(attr_name, new_value)
+            end
+        end
     end
 end
 
@@ -2202,7 +2238,7 @@ module PATHS
             @paths ||= []
 
             @paths.each { | path |
-                puts_warning "File '#{path}' doesn't exists (#{@paths.length})" unless File.exists?(path)
+                puts_warning "File '#{path}' doesn't exists (#{@paths.length})" unless File.exist?(path)
 
                 path = path[0..-2] if path[-1] == '/'
                 key = path
@@ -2238,6 +2274,15 @@ module PATHS
         @paths.each {  | p |
             yield p, 1
         }
+    end
+
+    # TODO: copy paste from  FileArtifact
+    def list_items_as_array
+        list = []
+        list_items { | path, m |
+            list << path
+        }
+        return list
     end
 
     def to_s(*args)
@@ -2331,8 +2376,12 @@ class SdkEnvironmen < EnvArtifact
     end
 end
 
-# READY {
-#     a = PomFile.new('/Users/brigadir/projects/current/rituals-loader/pom.xml')
-#     a.list_items()
-#     a.puts_items()
-# }
+class EnvironmentPath < EnvArtifact
+    include LogArtifactState
+    include PATHS
+    include AssignableDependency[:paths, true]
+
+    log_attr :paths
+end
+
+

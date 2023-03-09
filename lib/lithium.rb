@@ -43,7 +43,7 @@ unless artifact_path.nil?
 
     if File.absolute_path?(artifact_path)
         # resolve link to real path for absolute paths
-        artifact_path = File.realpath(artifact_path) if File.exists?(artifact_path)
+        artifact_path = File.realpath(artifact_path) if File.exist?(artifact_path)
         unless $lithium_options.has_key?('basedir')
             basedir = artifact_path
             while !File.directory?(basedir) do

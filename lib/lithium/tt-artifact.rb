@@ -26,7 +26,7 @@ class CompileTTGrammar < ExistentFile
         oname[ext] = '.rb' if ext
 
         opath = File.join(@output_dir, oname)
-        File.delete(opath) if File.exists?(opath)
+        File.delete(opath) if File.exist?(opath)
 
         raise "Grammar '#{path}' compilation failed" if Artifact.exec(@ruby.ruby, cmd_rubypath, @tt, q_fullpath(path), '-o', "\"#{opath}\"") != 0
     end

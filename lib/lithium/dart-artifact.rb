@@ -65,7 +65,7 @@ end
 class PubspecFile < ExistentFile
     include LogArtifactState
     #include StdFormater
-    include AssignableDependency
+    include AssignableDependency[:pubspec]
 
     @abbr = 'PSP'
 
@@ -76,10 +76,6 @@ class PubspecFile < ExistentFile
         pubspec  = FileArtifact.look_file_up(fp, 'pubspec.yaml', homedir)
         raise "Pubspec cannot be detected by '#{fp}' path" if pubspec.nil?
         super(pubspec, &block)
-    end
-
-    def assign_me_as
-        [ :pubspec, false ]
     end
 end
 

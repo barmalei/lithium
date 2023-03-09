@@ -9,6 +9,10 @@ class MVN < SdkEnvironmen
     @tool_name = 'mvn'
 
     def mvn
+        # TODO: workaround to configure Maven JVM
+        jv = Project.artifact(JAVA)
+        ENV['JAVA_HOME'] = jv.sdk_home unless jv.nil?
+
         tool_path(tool_name())
     end
 end
@@ -44,7 +48,6 @@ module MavenDependencyPlugin
 
     def MVN_CMD
         raise 'Maven dependency target was not defined' if @depTarget.nil?
-
         cmd = [ @mvn.mvn, "dependency:#{@depTarget}" ]
         cmd.push("-DexcludeTransitive=#{@excludeTransitive}")       unless @excludeTransitive.nil?
         cmd.push("-DexcludeGroupIds=#{@excludeGroupIds.join(',')}") unless @excludeGroupIds.nil? || @excludeGroupIds.length == 0
@@ -62,60 +65,14 @@ module MavenDependencyPlugin
     end
 end
 
-# TODO: re-work or throw out
-class MavenRepoArtifact < FileArtifact
-    include StdFormater
-    include MavenDependencyPlugin
-
-    def initialize(name, &block)
-        REQUIRE MVN
-
-        r = /\[([^\[\/\]]+)\/([^\[\/\]]+)\/([^\[\/\]]+)\]$/
-        m = r.match(name)
-        raise "Invalid artifact name '#{name}'" if m.nil?
-
-        @group, @id, @ver = m[1], m[2], m[3]
-        name[r] = ''
-        super
-
-        DEP_TARGET('copy')
-    end
-
-    def expired?
-        !File.exists?(File.join(fullpath, "#{@id}-#{@ver}.jar"))
-    end
-
-    def clean
-        path = File.join(fullpath, "#{@id}-#{@ver}.jar")
-        File.delete(path) if File.file?(path)
-    end
-
-    def build
-        chdir(File.dirname(@pom.fullpath)) {
-            cmd = MVN_CMD()
-            cmd.push("-Dartifact=#{@group}:#{@id}:#{@ver}")
-            cmd.push("-DoutputDirectory=\"#{fullpath}\"")
-            raise "Artifact '#{@group}:#{@id}:#{@ver}' cannot be copied" if 0 != Artifact.exec(*cmd)
-        }
-    end
-
-    def what_it_does
-        "Fetch '#{@group}:#{@id}:#{@ver}' maven artifact\n   to '#{@name}'"
-    end
-end
-
 class PomFile < ExistentFile
     include LogArtifactState
-    include AssignableDependency
+    include AssignableDependency[:pom]
 
     def initialize(name = nil, &block)
         REQUIRE MVN
         name = FileArtifact.look_file_up(homedir, 'pom.xml', homedir) if name.nil?
         super
-    end
-
-    def assign_me_as
-        [ :pom, false ]
     end
 
     def expired?
@@ -142,6 +99,7 @@ class MavenClasspath < InFileClasspath
     def build
         chdir(File.dirname(@pom.fullpath)) {
             cmd = MVN_CMD()
+            cmd.push(@mvn.OPTS())
             cmd.push("-Dmdep.outputFile=\"#{fullpath}\"")
             raise "Maven classpath '#{@name}' cannot be generated" if Artifact.exec(*cmd).exitstatus != 0
         }
@@ -199,7 +157,7 @@ class RunMaven < PomFile
 
     def build
         path = fullpath
-        raise "Target mvn artifact cannot be found '#{path}'" unless File.exists?(path)
+        raise "Target mvn artifact cannot be found '#{path}'" unless File.exist?(path)
         chdir(File.dirname(path)) {
             if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
                 raise "Maven [#{@targets.join(',')}] running failed"
@@ -246,6 +204,69 @@ class MavenCompiler < RunMaven
     end
 end
 
+class MavenDependency < RunMaven
+    def initialize(name)
+        TARGETS('dependency:build-classpath')
+    end
+
+    def TRANSITIVE(flag)
+        self['DexcludeTransitive', flag]
+    end
+
+    def EXCLUDE_GROUP(*args)
+        self['DexcludeTransitive', flag]
+
+        @excludeGroupIds = []
+        @excludeGroupIds.concat(args)
+    end
+
+    def GROUPS_IN(*args)
+        @includeGroupIds = []
+        @includeGroupIds.concat(args)
+    end
+
+    def SCOPES_OUT(*args)
+        @excludeScopes = []
+        @excludeScopes.concat(args)
+    end
+
+    def SCOPES_IN(*args)
+        @includeScopes = []
+        @includeScopes.concat(args)
+    end
+
+    def DEP_TARGET(target)
+        @depTarget = target
+    end
+
+    def MVN_CMD
+        raise 'Maven dependency target was not defined' if @depTarget.nil?
+
+        cmd = [ @mvn.mvn, "dependency:#{@depTarget}" ]
+        cmd.push("-DexcludeTransitive=#{@excludeTransitive}")       unless @excludeTransitive.nil?
+        cmd.push("-DexcludeGroupIds=#{@excludeGroupIds.join(',')}") unless @excludeGroupIds.nil? || @excludeGroupIds.length == 0
+        cmd.push("-DincludeGroupIds=#{@includeGroupIds.join(',')}") unless @includeGroupIds.nil? || @includeGroupIds.length == 0
+
+        unless @includeScopes.nil? || @includeScopes.length == 0
+            cmd.concat(@includeScopes.map { | e |  "-DincludeScope=#{e}" })
+        end
+
+        unless @excludeScopes.nil? || @excludeScopes.length == 0
+            cmd.concat(@excludeScopes.map { | e |  "-DexcludeScope=#{e}" })
+        end
+
+        return cmd
+    end
+end
+
+
+class BuildMavenClasspath < RunMaven
+    def initialize(name)
+        super
+        OPT('-DexcludeTransitive=false')
+        TARGETS('dependency:build-classpath')
+    end
+end
 
 class ShowMavenArtifactTree < RunMaven
     def initialize(name, &block)

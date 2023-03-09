@@ -1,20 +1,9 @@
 require 'lithium/file-artifact/command'
 
-class RUBYPATH < EnvArtifact
-    include LogArtifactState
-    include PATHS
-
-    log_attr :paths
-
-    def assign_me_as
-       [ :rubypaths, true ]
-    end
-end
-
-class DefaultRubypath < RUBYPATH
+class DefaultRubypath < EnvironmentPath
     def initialize(name, &block)
         super
-        JOIN('lib') if block.nil? && File.exists?(File.join(homedir, 'lib'))
+        JOIN('lib') if block.nil? && File.exist?(File.join(homedir, 'lib'))
     end
 end
 
@@ -30,11 +19,11 @@ class RUBY < SdkEnvironmen
     end
 
     def rubypath
-        @rubypaths.nil? || @rubypaths.length == 0 ? nil : PATHS.new(homedir).JOIN(@rubypaths)
+        @paths.nil? || @paths.length == 0 ? nil : PATHS.new(homedir).JOIN(@paths)
     end
 
     def ruby
-        tool_path(tool_name())
+        tool_path(tool_name)
     end
 end
 

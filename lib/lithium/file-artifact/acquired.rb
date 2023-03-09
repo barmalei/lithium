@@ -5,10 +5,9 @@ require 'lithium/core'
 
 module FileSourcesSupport
     module FileSource
-        include AssignableDependency
-
-        def assign_me_as
-            [ :sources, true ]
+        # make class that include the module assignable
+        def self.included(o)
+            o.include(AssignableDependency[:sources, true])
         end
 
         def relative_from
@@ -23,12 +22,6 @@ module FileSourcesSupport
         end
     end
 
-    def BASE(path)
-        @sources ||= []
-        @sources.each { | src |  src.BASE(path) unless src.relative_from.nil? }
-        return self
-    end
-
     def sources(*src)
         @sources ||= []
 
@@ -41,6 +34,15 @@ module FileSourcesSupport
         return self
     end
 
+    def FILTER_OUT(f)
+        @filter_out = f
+    end
+
+    def filter_out?(p)
+        @filter_out ||= nil
+        @filter_out.nil? || @filter_out.match?(p)
+    end
+
     # yield files from all registered sources:
     #   (source, source_path, mtime, dest)
     # @from  an absolute path to file that has to be used as a part of generation
@@ -49,13 +51,15 @@ module FileSourcesSupport
     def list_sources_items
         @sources.each { | source |
             source.list_items { | path, mtime |
-                from = fullpath(path)
-                raise "File '#{from}' cannot be found" unless File.exists?(from)
+                unless filter_out?(path)
+                    from = fullpath(path)
+                    raise "File '#{from}' cannot be found" unless File.exist?(from)
 
-                dest = destination(source, path, mtime)
-                raise "Absolute path '#{dest}' cannot be used as a relative destination" if File.absolute_path?(dest)
+                    dest = destination(source, path, mtime)
+                    raise "Absolute path '#{dest}' cannot be used as a relative destination" if File.absolute_path?(dest)
 
-                yield source, from, mtime, dest
+                    yield source, from, mtime, dest
+                end
             }
         }
     end
@@ -96,7 +100,7 @@ class MetaFile < ExistentFile
 
     def list_items
         fp = fullpath
-        unless File.exists?(fp)
+        unless File.exist?(fp)
             puts "Meta file '#{fp}'' doesn't exist"
         else
             raise "Meta file '#{fp}' is directory" if File.directory?(fp)
@@ -117,7 +121,7 @@ class MetaFile < ExistentFile
 
     def expired?
         log_path = items_log_path()
-        !File.exists?(log_path) || File.mtime(fullpath).to_i > File.mtime(log_path).to_i
+        !File.exist?(log_path) || File.mtime(fullpath).to_i > File.mtime(log_path).to_i
     end
 
     def build
@@ -135,7 +139,7 @@ class GeneratedFile < FileArtifact
     include FileSourcesSupport
 
     def expired?
-        !File.exists?(fullpath)
+        !File.exist?(fullpath)
     end
 
     def clean
@@ -175,14 +179,14 @@ class GeneratedDirectory < Directory
                 dest = File.join(fp, as)
                 if File.directory?(from)
                     raise "Invalid '#{dest}' destination directory" if File.file?(dest)
-                    if File.exists?(dest)
+                    if File.exist?(dest)
                         puts "Remove '#{dest}' destination directory(s)"
                         FileUtils.rm_r(dest)
                     end
                 else
                     raise "Invalid destination file '#{dest}'" if File.directory?(dest)
 
-                    if File.exists?(dest)
+                    if File.exist?(dest)
                         puts "Remove file:         '#{dest}'"
                         FileUtils.rm(dest)
                     end
@@ -217,7 +221,7 @@ class GeneratedDirectory < Directory
         clean() if @full_copy == true
 
         raise "Directory path '#{fp}' point to existing file" if File.file?(fp)
-        unless File.exists?(fp)
+        unless File.exist?(fp)
             puts "Create target directory '#{fp}'"
             FileUtils.mkdir_p(fp)
         end
@@ -226,7 +230,7 @@ class GeneratedDirectory < Directory
             dest = File.join(fp, as)
             if File.directory?(from)
                 raise "Invalid destination directory '#{dest}'" if File.file?(dest)
-                unless File.exists?(dest)
+                unless File.exist?(dest)
                     puts "Creating '#{dest}' destination directory"
                     FileUtils.mkdir_p(dest)
                 end
@@ -237,8 +241,8 @@ class GeneratedDirectory < Directory
                     FileUtils.mkdir_p(dest_up)
                 end
 
-                unless File.exists?(dest) && File.mtime(dest).to_i > mtime
-                    if File.exists?(dest)
+                unless File.exist?(dest) && File.mtime(dest).to_i > mtime
+                    if File.exist?(dest)
                         puts "Updating '#{from}'\n    with '#{dest}'"
                     else
                         puts "Copying '#{from}'\n     to '#{dest}'"
@@ -255,7 +259,7 @@ class GeneratedDirectory < Directory
         fp = fullpath
         list_sources_items { | source, from, mtime, as |
             as_fp = File.join(fp, as) unless File.absolute_path?(as)
-            yield as, File.exists?(as_fp) ? File.mtime(as_fp).to_i : -1
+            yield as, File.exist?(as_fp) ? File.mtime(as_fp).to_i : -1
         }
     end
 
@@ -265,7 +269,7 @@ class GeneratedDirectory < Directory
 
         list_sources_items { | source, from, mtime, as |
             path = File.join(fp, as)
-            return true unless File.exists?(path)
+            return true unless File.exist?(path)
             return true if mtime > 0 && mtime > File.mtime(path).to_i
         }
         return false

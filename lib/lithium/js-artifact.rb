@@ -23,6 +23,9 @@ class JS < EnvArtifact
 
         @npm ||= FileArtifact.which('npm')
         raise 'Node JS npm cannot be detected' if @npm.nil?
+
+        @tsc ||= FileArtifact.which('tsc')
+        raise 'Node JS tsc cannot be detected' if @tsc.nil?
     end
 
     def nodejs
@@ -33,11 +36,15 @@ class JS < EnvArtifact
         @npm
     end
 
+    def tsc
+        @tsc
+    end
+
     def module_home(name)
         raise 'Name of module cannot be empty' if name.nil? || name.length == 0
         module_home = File.join(homedir, $NODEJS_MODULES_DIR, name)
-        module_home = File.join(owner.homedir, $NODEJS_MODULES_DIR, name) unless File.exists?(module_home) || owner.nil?
-        module_home = File.join($lithium_code, $NODEJS_MODULES_DIR, name) unless File.exists?(module_home)
+        module_home = File.join(owner.homedir, $NODEJS_MODULES_DIR, name) unless File.exist?(module_home) || owner.nil?
+        module_home = File.join($lithium_code, $NODEJS_MODULES_DIR, name) unless File.exist?(module_home)
         return module_home
     end
 
@@ -82,7 +89,7 @@ class InstallNodeJsPackage < NodeJsPackageFile
 
     def build
         path = fullpath
-        raise "Target package JSON artifact cannot be found '#{path}'" unless File.exists?(path)
+        raise "Target package JSON artifact cannot be found '#{path}'" unless File.exist?(path)
         target_dir = File.dirname(path)
         chdir(target_dir) {
             if Artifact.exec(*command()).exitstatus != 0
@@ -99,6 +106,27 @@ class InstallNodeJsPackage < NodeJsPackageFile
         "Run NPM '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}'"
     end
 end
+
+# build with tsconfig.json
+class BuildWithTsConf < ExistentFile
+    include OptionsSupport
+    @abbr = 'BTS'
+
+    def initialize(name, &block)
+        REQUIRE JS
+        super
+    end
+
+    def build
+        homedir()
+        raise "Running of '#{@name}' type script config failed" if Artifact.exec(@js.tsc, OPTS(), '-p', q_fullpath) != 0
+    end
+
+    def what_it_does
+        "Build typescript with '#{@name}' config and '#{OPTS()}' options"
+    end
+end
+
 
 # nodejs module
 class NodejsModule < FileArtifact
@@ -125,14 +153,14 @@ class NodejsModule < FileArtifact
     end
 
     def clean
-        if File.exists?(fullpath)
+        if File.exist?(fullpath)
             project.go_to_homedir
             raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0
         end
     end
 
     def expired?
-        !File.exists?(fullpath)
+        !File.exist?(fullpath)
     end
 
     def what_it_does
@@ -231,7 +259,7 @@ class CombinedJSFile < GeneratedFile
     end
 
     def clean
-       File.delete(fullpath()) if File.exists?(fullpath())
+       File.delete(fullpath()) if File.exist?(fullpath())
     end
 
     def what_it_does() "Combine JavaScript files into '#{@name}'" end
@@ -251,7 +279,7 @@ class JavaScriptDoc < FileArtifact
     end
 
     def expired?
-       !File.exists?(fullpath)
+       !File.exist?(fullpath)
     end
 
     def clean
@@ -278,7 +306,7 @@ class JavaScriptDoc < FileArtifact
 
         istmp = false
         i = fullpath(@input)
-        raise "Invalid input path '#{i}'" unless File.exists?(i)
+        raise "Invalid input path '#{i}'" unless File.exist?(i)
         unless File.directory?(i)
             tmp = Dir.mktmpdir()
             FileUtils.cp(i, tmp.to_s)
@@ -308,11 +336,11 @@ class TypeScriptCompiler < FileMask
 
     def build
         go_to_homedir
-        raise "Compilation of '#{@name}' has failed" if Artifact.exec('tsc', OPTS(), q_fullpath) != 0
+        raise "Compilation of '#{@name}' has failed" if Artifact.exec(@js.tsc, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does
-        "Compile typescript'#{@name}'"
+        "Compile typescript '#{@name}'"
     end
 end
 

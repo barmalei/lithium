@@ -20,7 +20,7 @@ class Properties
     end
 
     def self.fromFile(path)
-        raise "File '#{path}' doesn't exist" unless File.exists?(path)
+        raise "File '#{path}' doesn't exist" unless File.exist?(path)
         raise "Path '#{path}' points to a directory" if File.directory?(path)
         return fromStr(IO.read(path))
     end

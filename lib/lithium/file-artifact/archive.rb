@@ -203,14 +203,14 @@ class ArchiveFileContent < FileArtifact
     end
 
     def clean
-        FileUtils.rm_r(@vs_directory) if File.exists?(@vs_directory)
+        FileUtils.rm_r(@vs_directory) if File.exist?(@vs_directory)
     end
 
     def list_items
-        return unless File.exists?(fullpath)
+        return unless File.exist?(fullpath)
 
         base  = vs_home()
-        mtime =  File.mtime(fullpath).to_i
+        mtime = File.mtime(fullpath).to_i
         if !File.directory?(@vs_directory) || File.mtime(@vs_directory) < File.mtime(fullpath())
             lszip(fullpath()) { | path |
                 yield File.join(base, path), mtime

@@ -19,7 +19,7 @@ class RemoteFile < FileArtifact
     end
 
     def expired?
-        !File.exists?(fullpath) || File.size(fullpath) == 0
+        !File.exist?(fullpath) || File.size(fullpath) == 0
     end
 
     def what_it_does()
