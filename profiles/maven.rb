@@ -1,5 +1,6 @@
 
 -> {
+
     REQUIRE {
         Directory('target') {
             BUILT {
@@ -25,7 +26,10 @@
     MavenClasspath()
 
     JavaCompiler("compile:src/main/java/**/*.java") {
-        @destination = 'target/classes'
+        DESTINATION('target/classes')
+        # REQUIRE {
+        #     JvmDestinationDir('target/classes')
+        # }
     }
 
 #     MATCH("src/test/**/*.java") {
@@ -45,7 +49,7 @@
 #     }
 
     JavaCompiler("compile:src/test/java/**/*.java") {
-        @destination = 'target/test-classes'
+        DESTINATION('target/test-classes')
     }
 
     Directory("apidoc") {

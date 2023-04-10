@@ -3,14 +3,14 @@ require 'pathname'
 # !==================================================================
 #  "basedir" is starting folder to lookup lithium project definition
 #
-#   1) passing an absolute path of the artifact looks for a "basedir"
+    #   1) passing an absolute path of the artifact looks for a "basedir"
 #      (and as a result an owner project) basing on the absolute path
 #   2) passing an absolute path of the artifact looks for a "basedir"
 #      ans "basedir" as an option makes possible to build an external
 #      artifact in a context of the given project
 # !==================================================================
-$lithium_version    = '5.2.0'
-$lithium_date       = 'Sep 2022'
+$lithium_version    = '5.2.1'
+$lithium_date       = 'Apr 2023'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
@@ -19,9 +19,9 @@ $lithium_args     ||= []
 # modify ruby modules lookup path
 $: << File.join($lithium_code, 'lib')
 
-artifact            = ARGV[ $lithium_options.length ]
-artifact_path       = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/]
-artifact_prefix     = artifact.nil? ? nil : (artifact_path.nil? ? artifact : artifact.chomp(artifact_path))
+artifact        = ARGV[ $lithium_options.length ]
+artifact_path   = artifact.nil? ? nil : artifact[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/]
+artifact_prefix = artifact.nil? ? nil : (artifact_path.nil? ? artifact : artifact.chomp(artifact_path))
 
 if $lithium_options.has_key?('basedir')
     bd = $lithium_options['basedir']
