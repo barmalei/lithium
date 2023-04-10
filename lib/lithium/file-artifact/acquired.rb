@@ -54,10 +54,8 @@ module FileSourcesSupport
                 unless filter_out?(path)
                     from = fullpath(path)
                     raise "File '#{from}' cannot be found" unless File.exist?(from)
-
                     dest = destination(source, path, mtime)
                     raise "Absolute path '#{dest}' cannot be used as a relative destination" if File.absolute_path?(dest)
-
                     yield source, from, mtime, dest
                 end
             }

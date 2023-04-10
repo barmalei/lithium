@@ -176,7 +176,6 @@ module LogArtifactState
         if items_log_enabled?
             # if there is no items but the items are expected consider it as expired case
             #return true if self.class.method_defined?(:list_items) && !File.exist?(items_log_path())
-
             # check items expiration
             list_expired_items { |n, t|
                 return true
