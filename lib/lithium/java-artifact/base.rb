@@ -235,8 +235,6 @@ class JVM < SdkEnvironmen
 end
 
 class JAVA < JVM
-    include SelfRegisteredArtifact
-
     @tool_name = 'java'
 
     log_attr :java_version
@@ -273,8 +271,6 @@ class JAVA < JVM
 end
 
 class GROOVY < JVM
-    include SelfRegisteredArtifact
-
     @tool_name = 'groovy'
 
     def SDKMAN(version, candidate = 'groovy')
@@ -300,8 +296,6 @@ end
 
 # Kotlin environment
 class KOTLIN < JVM
-    include SelfRegisteredArtifact
-
     @tool_name = 'kotlin'
 
     def initialize(name, &block)
@@ -326,8 +320,6 @@ end
 
 # Scala environment
 class SCALA < JVM
-    include SelfRegisteredArtifact
-
     @tool_name = 'scala'
 
     def SDKMAN(version, candidate = 'scala')

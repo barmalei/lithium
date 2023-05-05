@@ -599,22 +599,6 @@ class ArtifactName < String
     end
 end
 
-module SelfRegisteredArtifact
-    @arts_classes = []
-
-    def self.included(clazz)
-        unless @arts_classes.index(clazz).nil?
-            puts_warning "Artifact '#{clazz}' has been already registered"
-        else
-            @arts_classes.push(clazz)
-        end
-    end
-
-    def self.artifact_classes()
-        @arts_classes
-    end
-end
-
 # Core artifact abstraction.
 #  "@name" - name of artifact
 class Artifact

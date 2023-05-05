@@ -10,7 +10,6 @@ $NODEJS_MODULES_DIR = 'node_modules'
 
 # node js  environment
 class JS < EnvArtifact
-    include SelfRegisteredArtifact
     include LogArtifactState
 
     log_attr :nodejs, :npm

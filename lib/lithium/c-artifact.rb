@@ -4,7 +4,6 @@ require 'lithium/java-artifact/runner'
 
 class CPP < EnvArtifact
     include LogArtifactState
-    include SelfRegisteredArtifact
 
     log_attr :destination
 

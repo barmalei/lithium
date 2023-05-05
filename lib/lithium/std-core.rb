@@ -196,4 +196,3 @@ class Std
 
     def time(format = "%H:%M:%S %d/%b/%Y") Time.now.strftime(format) end
 end
-

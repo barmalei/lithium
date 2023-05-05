@@ -81,6 +81,11 @@ class JavaCompiler < JvmCompiler
         super
     end
 
+    def build
+        super
+
+    end
+
     def WITH
         @java.javac
     end
