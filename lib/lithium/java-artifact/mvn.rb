@@ -5,15 +5,36 @@ require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
 require 'lithium/std-core'
 
-class MVN < SdkEnvironmen
+class MVN < JVM
     @tool_name = 'mvn'
 
     def mvn
-        # TODO: workaround to configure Maven JVM
+        # TODO: workaround to configure Maven JVM. It is expected JAVA set 
+        # JAVA_HOME variable that is required by maven 
+        # 
+        # making JAVA as dependecy brings to cyclic dep problem
+        # !
         jv = Project.artifact(JAVA)
-        ENV['JAVA_HOME'] = jv.sdk_home unless jv.nil?
+        # ENV['JAVA_HOME'] = jv.sdk_home unless jv.nil?
 
         tool_path(tool_name())
+    end
+
+    def SDKMAN(*args)
+        candidate = 'maven'
+        version   = nil
+        if args.length == 2
+            candidate = args[0]
+            version   = args[1]
+        elsif args.length == 1
+            version = args[0]
+        elsif args.length == 0  
+            version = nil
+        else
+            raise "Invalid number of arguments"
+        end
+
+        super(candidate, version)
     end
 end
 

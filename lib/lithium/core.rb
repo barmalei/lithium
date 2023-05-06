@@ -361,7 +361,7 @@ module LogArtifactState
     end
 
     def attrs_log_path
-        items_log_path() + ".ser"
+        items_log_path() + ".liser"
     end
 end
 
@@ -2329,11 +2329,19 @@ class SdkEnvironmen < EnvArtifact
         end
 
         if @sdk_home.nil? || !File.exist?(@sdk_home)
+            undefined_sdk_home()  
+        end
+
+        if @sdk_home.nil? || !File.exist?(@sdk_home)
             puts_error "SDK #{self.class} home '#{@sdk_home}' cannot be found"
             puts_error 'Configure/install SDK if it is required for a project'
         else
             puts "SDK #{self.class}('#{@name}') home: '#{File.realpath(@sdk_home)}'"
         end
+    end
+
+    def undefined_sdk_home
+        nil
     end
 
     def what_it_does

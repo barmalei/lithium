@@ -184,22 +184,52 @@ class JVM < SdkEnvironmen
         PATHS.new(homedir).JOIN(@classpaths)
     end
 
-    # def what_it_does
-    #     "Init #{self.class.name} environment '#{@name}', CP = [ #{list_classpaths} ]"
-    # end
+    def undefined_sdk_home
+        SDKMAN()
+    end
 
-    # TODO: strange implementation
-    def SDKMAN(version, candidate = 'java')
+    def SDKMAN(*args)
+        candidate = tool_name
+        if args.length == 2
+            candidate = args[0]
+            version   = args[1]
+        elsif args.length == 1
+            version = args[0]
+        elsif args.length == 0  
+            version = nil
+        else
+            raise "Invalid number of arguments"
+        end
+
         raise "Invalid '#{candidate}' candidate"                 if candidate.nil? || candidate.length < 3
-        raise "Invalid '#{version}' #{candidate} SDKMAN version" if version.nil?   || version.length   < 2
+        raise "Invalid '#{version}' #{candidate} SDKMAN version" if !version.nil?  && version.length   < 2
 
         sdk_home = File.expand_path("~/.sdkman/candidates/#{candidate}")
         raise "Invalid '#{sdk_home}' SDKMAN #{candidate} candidates folder" unless File.directory?(sdk_home)
 
-        candidates = Dir.glob(File.join(sdk_home, "*#{version}*")).filter { | path | File.directory?(path) }
-        raise "SDKMAN '#{version}' #{candidate} version cannot be detected" if candidates.length == 0
+        if version.nil?
+            path = File.join(sdk_home, 'current')
+            if File.directory?(path)
+                @sdk_home = File.expand_path(path)
+            else
+                candidates = Dir.glob(File.join(sdk_home, '*')).filter { | path | 
+                    File.directory?(path) 
+                }
 
-        return File.join(candidates[0])
+                if candidates.length > 0
+                    @sdk_home = File.join(candidates[0])
+                else
+                    raise "SDKMAN '#{candidate}' version cannot be detected"            
+                end                 
+            end
+        else
+            candidates = Dir.glob(File.join(sdk_home, "*#{version}*")).filter { | path | File.directory?(path) }
+            if candidates.length == 0
+                raise "SDKMAN '#{version}' #{candidate} version cannot be detected" 
+            else
+                @sdk_home = File.join(candidates[0])
+            end
+        end
     end
 
     def self.grep_package(path, pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
@@ -247,6 +277,10 @@ class JAVA < JVM
         end
 
         super
+
+        # Java home variable has to be initialized
+        # JAVA_HOME can be required by other JVM based langs like kotlin, groovy etc
+        ENV['JAVA_HOME'] = @sdk_home if !ENV['JAVA_HOME']
     end
 
     def javac()   tool_path('javac')     end
@@ -254,7 +288,7 @@ class JAVA < JVM
     def java()    tool_path(tool_name()) end
     def jar()     tool_path('jar')       end
 
-    def SDKMAN(version, candidate = 'java')
+    def SDKMAN(*args)
         @sdk_home = super
     end
 
@@ -272,10 +306,6 @@ end
 
 class GROOVY < JVM
     @tool_name = 'groovy'
-
-    def SDKMAN(version, candidate = 'groovy')
-        @sdk_home = super
-    end
 
     def groovyc() tool_path('groovyc')  end
     def groovy()  tool_path(tool_name())  end
@@ -309,10 +339,6 @@ class KOTLIN < JVM
         }
     end
 
-    def SDKMAN(version, candidate = 'kotlin')
-        @sdk_home = super
-    end
-
     def kotlinc() tool_path('kotlinc') end
 
     def kotlin() tool_path(tool_name()) end
@@ -321,10 +347,6 @@ end
 # Scala environment
 class SCALA < JVM
     @tool_name = 'scala'
-
-    def SDKMAN(version, candidate = 'scala')
-        @sdk_home = super
-    end
 
     def scalac() tool_path('scalac') end
 

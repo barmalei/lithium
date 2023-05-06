@@ -190,7 +190,7 @@ class FindInClasspath < Artifact
     #    }
     def _cache_path
         # TODO: more unique name is required, should depend on classpath
-        File.join(homedir, '.lithium', '.logs', "#{self.class.name}_cache.ser")
+        File.join(homedir, '.lithium', '.logs', "#{self.class.name}_cache.liser")
     end
 
     def _load_cache
