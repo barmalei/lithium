@@ -1,19 +1,7 @@
 [
     {
        "class": "sidebar_label",
-       // "font.face2": "PragmataPro Mono Liga",
-       // "font.face2": "Monaco",
-       // "font.face2": "Menlo",
-       // "font.face2": "Andale Mono",
-       // "font.face2": "Consolas",
-       // "font.face2": "Lucida Console",
-       // "font.face2": "PT Mono",
        "font.size": "14px",
-       // "fg2": "sandybrown",
-       // "fg2": "lightsalmon",
-       // "fg2": "darksalmon",
-       // "fg2": "peru",
-       // "fg2": "moccasin",
        "fg": "darkturquoise"
     },
 
@@ -27,14 +15,8 @@
                 ]
             }
         ],
-       // "fg2": "red"
-       // "fg": "sandybrown",
-       // "fg": "lightsalmon",
-        //"fg": "darksalmon",
-       // "fg": "peru",
         "fg": "moccasin"
     },
-
 
     {
         "class": "tab_label",
@@ -45,20 +27,152 @@
     },
 
     {
-        "class": "mini_quick_panel_row",
+        "class": "tab_label",
+        "parents": [
+            {
+                "class": "tab_control",
+                "attributes": [
+                    "selected",
+                    "highlighted"
+                ]
+            }
+        ],
+        "fg": "#FFB454"
+    },
+
+    // color close tab button
+    {
+        "class": "tab_close_button",
+        "settings": [
+            "show_tab_close_buttons"
+        ],
+        "layer0.tint": "#FF6666"
+    },
+
+    // color for selected close tab button
+    {
+        "class": "tab_close_button",
+        "parents": [
+            {
+                "class": "tab_control",
+                "attributes" : [
+                    "selected"
+                ]
+            }
+        ],
+        "layer0.tint": "#FFCC66"
+    },
+
+    // color for selected dirty point
+    {
+        "class": "tab_close_button",
+        "parents": [
+            {
+                "class": "tab_control",
+                "attributes" : [
+                    "selected", "dirty"
+                ]
+            }
+        ],
+        "layer1.tint": "red"
+    },
+
+    // color for not-selected dirty point
+    {
+        "class": "tab_close_button",
+        "parents": [
+            {
+                "class": "tab_control",
+                "attributes" : [
+                    "dirty"
+                ]
+            }
+        ],
+        "layer1.tint": "red"
+    },
+
+    // color for small labels of quick panel
+    {
+        "class": "quick_panel_path_label",
+        "fg": "#FFCC66",
+        "selected_fg": "#FFCC66",
+    },
+
+    // quick panel label label
+    {
+        "class": "quick_panel_label",
+        "fg": "#5CCFE6",
+        "match_fg": "red",
+        "selected_fg": "#5CCFE6"
+    },
+
+    // quick panel selector background
+    {
+        "class": "quick_panel_row",
         "attributes": [
             "selected"
         ],
-        "layer0.tint": "darkslategray"
+        "layer0.opacity": 0.2,
+        "layer0.tint": "#80BFFF"
     },
 
+    // status bar text color
+    {
+        "class": "label_control",
+        "parents": [{
+            "class": "status_bar"
+        }],
+        "color": "#FFAD66",
+        "color":  "darkturquoise",
+        "color":  "#FFDFB3",
+        "color":  "#95E6CB",
+        "font.bold": false
+    },
+
+    // button label text color
+    {
+        "class": "label_control",
+        "parents": [{
+            "class": "button_control"
+        }],
+        "color": "#FFAD66",
+        "font.bold": true,
+    },
 
     {
-        "class": "quick_panel_label",
-        "fg": "darkturquoise",
-        "match_fg": "#ffcc66",
-        "selected_fg": "#cbccc6",
-        "selected_match_fg": "#ffcc66"
-    }
+        "class": "label_control",
+        "parents": [
+            {
+                "class": "button_control",
+                "attributes": [
+                    "hover"
+                ]
+            }
+        ],
+        "color": "#1A1F29"
+    },
 
+    // tool tip background
+    {
+        "class": "tool_tip_control",
+        "layer0.tint": "#FFD173"
+    },
+
+    // tool tip label
+    {
+        "class": "tool_tip_label_control",
+        "color": "#242936",
+        "font.size": 11,
+        "font.bold": true
+    },
+
+    // status bar background
+    {
+        "class": "status_bar",
+        "settings": [
+            "ui_separator"
+        ],
+        "layer0.tint": "#1C212B",
+        "layer0.opacity": 0.9
+    }
 ]

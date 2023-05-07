@@ -1,0 +1,92 @@
+{
+	"caret_style": "phase",
+	"color_scheme2": "Packages/User/Color Highlighter/themes/iPlastic.tmTheme",
+	"draw_minimap_border": true,
+
+	"draw_white_space": [],
+
+	"auto_hide_status_bar": false,
+
+	"bold_folder_labels": true,
+
+	"enable_tab_scrolling": false,
+	"font_size": 12,
+	"highlight_line": true,
+	"ignored_packages":
+	[
+		"JavaScript",
+		"SublimeLinter-xmllint",
+		"Vintage",
+	],
+
+	"index_exclude_patterns":
+	[
+		"*.log",
+		"*.exe",
+		"*.md",
+		"*.xml",
+		"*.json",
+		"*.htm",
+		"*.html",
+		"*.gif",
+		"*.jpg",
+		"*.png",
+		"*.tiff",
+		"*.db",
+		"*.sh",
+		"*.jar",
+		"*.zip",
+		"*.tar",
+		"*.class",
+		"*.pyc",
+		"*.pdf",
+		".lithium/.logs/**",
+	],
+
+	"folder_exclude_patterns": [
+		".svn",
+		".git",
+		".hg",
+		"CVS",
+		".Trash",
+		".Trash-*",
+		"target/generated-sources/**",
+		"target/generated-test-sources/**",
+		"target/surfire-reports/**",
+		"target/maven-status/**",
+		".lithium/.logs/**",
+		"target/maven-archiver/**"
+	],
+
+	"binary_file_patterns": [
+		"*.jpg",
+		"*.jpeg",
+		"*.png",
+		"*.gif",
+		"*.ttf",
+		"*.tga",
+		"*.dds",
+		"*.ico",
+		"*.eot",
+		"*.pdf",
+		"*.swf",
+		"*.jar",
+		"*.zip"
+	],
+
+	"shift_tab_unindent": false,
+
+	"overlay_scroll_bars": "enabled",
+	"show_tab_close_buttons": true,
+	"translate_tabs_to_spaces": true,
+	"trim_trailing_white_space_on_save": true,
+	
+
+	"theme": "ayu-mirage.sublime-theme",
+	"ui_separator": true,
+	"ui_native_titlebar":true,
+	"color_scheme": "Packages/ayu/ayu-mirage.sublime-color-scheme",
+	"auto_complete": true,
+	"spell_check": true,
+	"update_check": true,
+}

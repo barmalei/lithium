@@ -3,7 +3,7 @@
    "globals": {
         "guide": "#707a8c4d",
         "highlight": "#ffcc6666",
-        "gutter_foreground": "slategrey",
+        "gutter_foreground": "slategrey"
    },
    "rules": [
         {
