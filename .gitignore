@@ -1,6 +1,6 @@
 .logs
 classes
-ext/java/checkstyle
+ext/java/checkstyle/*.jar
 ext/java/pmd
 ext/java/junit
 ext/java/jdt
