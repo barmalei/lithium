@@ -130,7 +130,6 @@ class InFileClasspath < ExistentFile
 
     def initialize(name, &block)
         super
-        fp = fullpath
         @exclude ||= []
         load_paths() if exists?
     end
@@ -354,7 +353,15 @@ class SCALA < JVM
 end
 
 class RunJvmTool < RunTool
+    #  [  name, class, block ]
+    @JAVA = nil
+
     attr_reader :classpaths
+
+    def initialize(name, &block)
+        require_java()
+        super
+    end
 
     def assign_req_as(art)
         @jvm_classpath = art.classpath if art.is_a?(JVM)
@@ -372,18 +379,25 @@ class RunJvmTool < RunTool
         ec != 0
     end
 
+    def require_java
+        java_args  = self.class.JAVA
+        java_block = java_args[2]
+        REQUIRE java_args[0], java_args[1], &java_block
+    end
+
     def WITH_OPTS
         op = super
         cp = classpath
         op.push('-classpath', "\"#{cp}\"") unless cp.EMPTY?
         return op
     end
-end
 
-class RunJavaTool < RunJvmTool
-    def initialize(name, &block)
-        REQUIRE JAVA
-        super
+    def self.JAVA(name = nil, &block)
+        if name.nil? && block.nil?
+            return @JAVA.nil? ? [ JAVA.default_name(), JAVA, block ] : @JAVA
+        else
+            @JAVA = [ name.nil? ? ".env/#{self.name}/JAVA" : name, JAVA, block ]
+        end
     end
 end
 

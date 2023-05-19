@@ -2,7 +2,7 @@ require 'lithium/core'
 
 class Properties
     def self.parse(str)
-        res = str.gsub!(/(^\s*[!\#].*$)|(^\s+)|(\s+$)|(\\\s*$[\n\r]+)|(^\s*[\n\r]\s*$)/, '')
+        str = str.gsub!(/(^\s*[!\#].*$)|(^\s+)|(\s+$)|(\\\s*$[\n\r]+)|(^\s*[\n\r]\s*$)/, '')
         unless str.nil?
             str.each_line { | line |
                 m = /([^=]+)=(.*)/.match(line)

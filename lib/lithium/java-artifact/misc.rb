@@ -2,7 +2,7 @@ require 'lithium/core'
 require 'lithium/java-artifact/base'
 require 'lithium/file-artifact/archive'
 
-class GenerateJavaDoc < RunJavaTool
+class GenerateJavaDoc < RunJvmTool
     @abbr = 'JDC'
 
     def initialize(name, &block)
@@ -36,7 +36,7 @@ class GenerateJavaDoc < RunJavaTool
     end
 end
 
-class LithiumJavaToolRunner < RunJavaTool
+class LithiumJavaToolRunner < RunJvmTool
     @java_tool_command_name = 'Unknown java tool command'
 
     def self.java_tool_command_name
@@ -44,7 +44,7 @@ class LithiumJavaToolRunner < RunJavaTool
     end
 
     def classpath
-        base = File.join($lithium_code, 'ext', 'java', 'lithium')
+        base = FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'lithium')
         super.JOIN(File.join(base, 'classes'))
              .JOIN(File.join(base, 'lib/*.jar'))
     end

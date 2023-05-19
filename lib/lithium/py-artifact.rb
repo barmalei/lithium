@@ -58,6 +58,7 @@ class RunPythonScript < ExistentFile
     def what_it_does() "Run '#{@name}' script" end
 end
 
+# TODO: rename it
 class ValidatePythonCode < FileMask
     include OptionsSupport
 

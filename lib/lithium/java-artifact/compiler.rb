@@ -1,7 +1,5 @@
 require 'fileutils'
-
 require 'lithium/java-artifact/base'
-
 
 class JvmDestinationDir < ExistentDirectory
     include AssignableDependency[:destination]
@@ -37,7 +35,7 @@ class JvmCompiler < RunJvmTool
 
     def list_dest_paths
         #dest = destination()
-        dst = @destination.fullpath
+        dest = @destination.fullpath
         unless dest.nil?
             list_items { | path, t |
                 cn = JVM.grep_classname(path)
@@ -81,9 +79,8 @@ class JavaCompiler < JvmCompiler
         super
     end
 
-    def build
-        super
-
+    def LINT(*args)
+        OPT("-Xlint:#{args.join(',')}")
     end
 
     def WITH
@@ -161,6 +158,3 @@ class ScalaCompiler < JvmCompiler
     end
 end
 
-
-def a!
-end

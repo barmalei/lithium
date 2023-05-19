@@ -1,28 +1,7 @@
 -> {
-    $lithium_options['v'] = 2
+    VERBOSE()
+
     $lithium_options['app_server_root'] = File.join($lithium_code, '..', 'tomcat', 'webapps')
-
-    #JVM.SDKMAN
-
-    JAVA {
-        # REQUIRE {
-        #     DefaultClasspath {
-        #         JOIN('.lithium/ext/java/lithium/classes')
-        #     }
-        # }
-    }
-
-    KOTLIN {
-        REQUIRE JAVA
-    }
-
-    GROOVY {
-        REQUIRE JAVA
-    }
-
-    SCALA {
-        REQUIRE JAVA
-    }
 
     Touch('touch:*')
 
@@ -130,7 +109,7 @@
         # }
     }
 
-    PMD('pmd:**/*.java')
+    PMD('pmd:**/*.*')
     #MavenJarFile('mavenjar:**/*.jar')
 
     GREP('grep:')

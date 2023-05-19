@@ -51,7 +51,7 @@ PATTERNS ({
     JavaCompiler => [
         # Std::RegexpRecognizer.new('\:\s+(?<status>error)\:\s+(?<statusMsg>.*)').classifier('compile'),
         StdPattern.new() {
-            location('java', 'scala'); spaces(); group(:level, 'error'); colon(); spaces(); group(:message, '.*$')
+            location('java', 'scala'); spaces(); group(:level, 'error|warning'); colon(); spaces(); group(:message, '.*$')
         }
     ],
 
@@ -74,11 +74,7 @@ PATTERNS ({
 
             MATCHED {
                 convert?(:level) { | l |
-                    if l == 'WARNING'
-                        'warning'
-                    elsif l == 'ERROR'
-                        'error'
-                    end
+                    return l.downcase() if ['WARNING', 'ERROR'].include?(l)
                 }
             }
         }
@@ -148,10 +144,6 @@ PATTERNS ({
         StdPattern.new() {
             location('java'); spaces(); group(:message, '.*$')
         }
-
-        # StdPattern.new {
-        #     brackets { identifier(:level) }; spaces; location('java')
-        # }
     ],
 
     JavaScriptHint => [
@@ -266,9 +258,6 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
 
     # load projects hierarchy artifacts
     prjs_stack.each { | prj_home | prj = Project.new(prj_home, owner:prj) }
-
-    # reg self registered artifact in lithium project if they have not been defined yet
-    top_prj = prj.top
 
     # print header
     dt = DateTime.now.strftime("%H:%M:%S.%L")

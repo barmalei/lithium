@@ -35,7 +35,7 @@ class META < Artifact
 
     def initialize(name, &block)
         super
-        OPT($lithium_options['meta.opt'])
+        OPTS($lithium_options)
     end
 
     def build
@@ -115,19 +115,28 @@ class REQUIRE < Artifact
 end
 
 class TREE < Artifact
+    include OptionsSupport
+
     def initialize(name)
-        @show_id, @show_owner, @show_mtime, @show_expired_by_kid = true, true, true, false
+        @show_expired_by_kid = true
         super
+        OPTS($lithium_options)
+        @show_owner = !OPT?('hide_owner')
+        @show_id    = !OPT?('hide_id')
+        @show_mtime = !OPT?('hide_mtime')
+        @show_fn    =  OPT?('show_fn')
     end
 
     def build
-        show_tree(ArtifactTree.new(Project.current.artifact(@name)))
+        ArtifactTree.full_tree() if OPT?('full')
+        tree = ArtifactTree.new(Project.current.artifact(@name))
+        show_tree(tree)
     end
 
     def show_tree(root) puts tree2string(nil, root) end
 
     def tree2string(parent, root, shift = 0)
-        pshift, name = shift, File.basename(root.art.name)
+        pshift, name = shift, @show_fn ? root.art.name : File.basename(root.art.name)
 
         e = (root.expired ? '*' : '') +
             (@show_id ? " ##{root.art.object_id}" : '') +
@@ -335,5 +344,7 @@ eval \"$vc\"
         }
     end
 
-    def what_it_does() "Install Lithium '#{@script_path}' script" end
+    def what_it_does
+        "Install Lithium '#{@script_path}' script"
+    end
 end

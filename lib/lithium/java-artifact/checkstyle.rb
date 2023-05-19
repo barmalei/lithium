@@ -3,6 +3,7 @@ require 'fileutils'
 require 'lithium/file-artifact/command'
 require 'lithium/file-artifact/acquired'
 require 'lithium/java-artifact/base'
+require 'lithium/java-artifact/runner'
 
 
 class JavaCheckStyle < JavaFileRunner
@@ -12,12 +13,14 @@ class JavaCheckStyle < JavaFileRunner
         super
 
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
-        @checkstyle_home       ||= FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'checkstyle')
-        @checkstyle_config     ||= FileArtifact.assert_file(@checkstyle_home, "crystalloids_checks.xml")
+        @checkstyle_version    ||= '8'
+        @checkstyle_home = FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'checkstyle', @checkstyle_version)
+        FileArtifact.assert_dir(@checkstyle_home)
 
-        raise "Checkstyle config '#{@checkstyle_config}' cannot be found" unless File.file?(@checkstyle_config)
+        @checkstyle_config ||= DEFAULT()
+        @checkstyle_config   = FileArtifact.assert_file(@checkstyle_config)
 
-        puts "Checkstyle home: '#{@checkstyle_home}'\n           config: '#{@checkstyle_config}'"
+        puts "Java Checkstyle (v='#{@checkstyle_version}')\n    home:   '#{@checkstyle_home}'\n    config: '#{@checkstyle_config}'"
 
         cp = File.join(@checkstyle_home, '*.jar')
         REQUIRE {
@@ -25,6 +28,19 @@ class JavaCheckStyle < JavaFileRunner
                 JOIN(cp)
             }
         }
+    end
+
+    def CONFIG(*args)
+        @checkstyle_config = FileArtifact.assert_file(*args)
+        return @checkstyle_config
+    end
+
+    def GOOGLE
+        CONFIG(@checkstyle_home, "google_checkstyle.xml")
+    end
+
+    def DEFAULT
+        CONFIG(@checkstyle_home, "default_checkstyle.xml")
     end
 
     def WITH_TARGETS(src)
@@ -40,7 +56,7 @@ end
 class UnusedJavaCheckStyle < JavaCheckStyle
     def initialize(name, &block)
         super
-        @checkstyle_config = File.join(@checkstyle_home, "unused.xml")
+        CONFIG(@checkstyle_home, "unused.xml")
     end
 end
 
@@ -48,12 +64,13 @@ end
 class PMD < JavaFileRunner
     def initialize(name, &block)
         super
-        @pmd_home ||= File.join($lithium_code, 'ext', 'java', 'pmd')
-        raise "PMD home path cannot be found '#{@pmd_home}'" unless File.directory?(@pmd_home)
 
-        @pmd_rules      ||= File.join('rulesets', 'java', 'quickstart.xml')
+        @checkstyle_version ||= '7'
         @pmd_format     ||= 'text'
         @pmd_main_class ||= 'net.sourceforge.pmd.PMD'
+
+        @pmd_home ||= FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'pmd', @checkstyle_version)
+        raise "PMD '#{@pmd_home}' home path cannot be found" unless File.directory?(@pmd_home)
 
         @targets_from_file = true
 
@@ -71,7 +88,11 @@ class PMD < JavaFileRunner
     end
 
     def WITH_OPTS
-        super + [ @pmd_main_class, '-f', @pmd_format, '-R', @pmd_rules, '-filelist' ]
+        ext = File.extname(fullpath).downcase[1..-1]
+        ext = 'ruby'   if ext == 'rb'
+        ext = 'python' if ext == 'py'
+        pmd_rules = File.join('rulesets', ext, 'quickstart.xml')
+        super + [ @pmd_main_class, '-f', @pmd_format, '-R', pmd_rules, '-filelist' ]
     end
 
     def error_exit_code?(ec)
@@ -83,7 +104,7 @@ end
 class JsonSchemaToPojo < RunJAR
     def initialize(name, &block)
         super
-        @jsonSchemaToPojo_home = File.join($lithium_code, 'ext', 'java', 'jsonschema2pojo')
+        @jsonSchemaToPojo_home = FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'jsonschema2pojo')
         raise "JSON Schema to POJO home path cannot be found '#{@pmd_home}'" unless File.directory?(@jsonSchemaToPojo_home)
 
         cp = File.join(@jsonSchemaToPojo_home, 'lib', '*.jar')

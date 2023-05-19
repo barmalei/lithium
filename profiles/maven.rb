@@ -1,6 +1,5 @@
 
 -> {
-
     REQUIRE {
         Directory('target') {
             BUILT {
@@ -11,6 +10,8 @@
         }
     }
 
+
+    java_version = self['java_version']
     JAVA {
         REQUIRE {
             DefaultClasspath {
@@ -19,6 +20,8 @@
             }
             MavenClasspath()
         }
+
+        SDKMAN(java_version) unless java_version.nil?
     }
 
     PomFile('pom.xml')

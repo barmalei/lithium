@@ -289,8 +289,9 @@ module LogArtifactState
             data = {}
             begin
                 self.class.each_log_attrs { | a |
-                    aa = "@#{a}"
-                    data[a] = self.send(a) }
+                    # call attribute successor method
+                    data[a] = self.send(a)
+                }
                 File.open(path, 'w') { | f | Marshal.dump(data, f) }
             rescue
                 File.delete(path)
@@ -370,11 +371,22 @@ module OptionsSupport
     @@NAMED_OPT = /^(\-{0,2})([^=]+)=?([^=]*)?/
     #@@NAMED_OPT = /^(\-{0,2})([^ ]+)\s?([^- ]*)?/
 
+    def OPTS!(*args)
+        if args.length > 0
+            @_options = _options()
+            @_options.push(*(args.map {  | o | _convert_if_map(o) } ).flatten())
+            return _options().dup
+        else
+            return super
+        end
+    end
+
     def OPTS(*args)
-        @_options = _options()
         if args.length > 0
             @_options = []
-            @_options.push(*args)
+            @_options.push(*(args.map {  | o | _convert_if_map(o) } ).flatten())
+        else
+            @_options = _options()
         end
         _options().dup
     end
@@ -427,6 +439,14 @@ module OptionsSupport
     def _options
         @_options ||= []
         return @_options
+    end
+
+    def _convert_if_map(o)
+        if o.kind_of?(Hash)
+            return o.to_a.map { | e | "-#{e[0]}=#{e[1]}" }
+        else
+            return o
+        end
     end
 end
 
@@ -607,8 +627,7 @@ class Artifact
     # the particular class static variables
     @default_name  = nil
     @default_block = nil
-
-    @auto_registered_arts = []
+    @default_block_inherit = true
 
     # set or get default artifact name
     def self.default_name(*args)
@@ -616,17 +635,22 @@ class Artifact
         @default_name
     end
 
-    def self.default_block(&block)
+    def self.default_block
+        return @default_block, @default_block_inherit
+    end
+
+    # TODO: naming convention ?
+    def self._(inherit = true, &block)
         @default_block = block unless block.nil?
+        @default_block_inherit = inherit
         @default_block
     end
 
-    def self.SELF_REGISTERED
-        unless @auto_registered_arts.index(self.class).nil?
-            puts_warning "Artifact '#{self.class}' has been already registered"
-        else
-            @auto_registered_arts.push(self.class)
-        end
+    def self.run_default_block(instance, clazz)
+        dbf, inh = clazz.default_block
+        pclazz   = clazz.superclass
+        self.run_default_block(instance, pclazz) if inh != false && (pclazz <= Artifact)  == true
+        instance.instance_exec(&dbf) unless dbf.nil?
     end
 
     # !!! this method cares about owner and default name setup, otherwise
@@ -642,9 +666,9 @@ class Artifact
 
         instance = allocate()
         instance.owner = owner
-
         begin
             instance.initialize_called = true
+            self.run_default_block(instance, instance.class)
             instance.send(:initialize, name, &block)
         ensure
             instance.initialize_called = false
@@ -718,10 +742,10 @@ class Artifact
     #
     def method_missing(meth, *args, &block)
         # detect if there is an artifact class exits with the given name to treat it as
-        # required artifact. It is done only if we are still in "requires" method call
+        # required artifact. It is done only if we are still in "require" method call
         if meth.length > 2 && @caller == :require
             # TODO: revised, most likely the code is not required since REQUIRE can be executed outside of constructor
-            raise "REQUIRED artifacts can be defined only in '#{self}' artifact constructor" unless initialize_called?
+#            raise "REQUIRED artifacts can be defined only in '#{self}' artifact constructor" unless initialize_called?
 
             name = args.length == 0 ? nil : args[0]
             clazz, is_internal = Artifact._name_to_clazz(meth)
@@ -822,7 +846,7 @@ class Artifact
             prev = @caller
             begin
                 @caller = :require
-                self.instance_exec &block
+                self.instance_exec(&block)
             ensure
                 @caller = prev
             end
@@ -937,8 +961,8 @@ class Artifact
         return block2 if block1.nil?
         return block1 if block2.nil?
         return Proc.new {
-            self.instance_exec &block1
-            self.instance_exec &block2
+            self.instance_exec(&block1)
+            self.instance_exec(&block2)
         }
     end
 
@@ -966,6 +990,8 @@ end
 # Artifact tree. Provides tree of artifacts that is built basing
 # on resolving artifacts dependencies
 class ArtifactTree
+    @@full_tree = false
+
     attr_accessor :art, :parent, :children, :expired, :expired_by_kid
 
     def initialize(art, parent = nil, &block)
@@ -996,7 +1022,7 @@ class ArtifactTree
             foundNode, node = nil, ArtifactTree.new(name, self)
 
             # existent of a custom block makes the artifact specific even if an artifact with identical object id is already in build tree
-            if name.block.nil?
+            if name.block.nil? && @@full_tree == false
                 # optimize tree to exclude dependencies that are already in the tree
                 foundNode = map.detect { | n | node.art.object_id == n.art.object_id  }
                 # save in list if a new artifact has been detected
@@ -1077,6 +1103,10 @@ class ArtifactTree
             node.traverse(level + 1, &block)
         }
         block.call(self, level)
+    end
+
+    def self.full_tree
+        @@full_tree = true
     end
 end
 
@@ -1615,11 +1645,10 @@ class RunTool < FileMask
     log_attr :_options, :arguments
 
     def initialize(name)
-        @targets_from_file
         super
 
         @arguments ||= []
-        @arguments = $lithium_args.dup if @arguments.length == 0 && $lithium_args.length > 0
+        @arguments = $lithium_args.dup if @arguments.length == 0 && $lithium_args && $lithium_args.length > 0
     end
 
     # ec - Process::Status
@@ -1783,14 +1812,7 @@ module ArtifactContainer
         raise "'#{meta}' definition does not define class for '#{artname}' artifact"         if     meta.clazz.nil?
 
         clazz = meta.clazz
-        art = clazz.new(artname.suffix, owner:self,
-            &(block.nil? && clazz.default_block.nil? ? meta.block : Proc.new {
-                self.instance_exec &clazz.default_block unless clazz.default_block.nil?
-                self.instance_exec &meta.block unless meta.block.nil?
-                self.instance_exec &block unless block.nil?
-            })
-        )
-
+        art   = clazz.new(artname.suffix, owner:self, &Artifact.combine_blocks(meta.block, block))
         art.createdByMeta = meta
         return art
     end
@@ -1901,12 +1923,6 @@ module ArtifactContainer
         end
     end
 
-    # define a default block that will be applied to all instances of the given class
-    # TODO: check if the method is needed
-    def _(clazz, &block)
-        clazz.default_block(&block)
-    end
-
     def delegate_to_owner_if_meta_cannot_be_found?
         false
     end
@@ -1944,15 +1960,14 @@ end
 
 # project artifact
 class Project < ExistentDirectory
-    attr_reader :desc
-
     include ArtifactContainer
+    include OptionsSupport
 
     @@curent_project = nil
 
     def initialize(name, &block)
         super
-        @desc ||= File.basename(name)
+        OPTS($lithium_options)
         LOAD('project.rb')
     end
 
@@ -1975,7 +1990,7 @@ class Project < ExistentDirectory
 
     def self.PROJECT(&block)
         raise "Current project is not known" if self.current.nil?
-        self.current.instance_exec &block
+        self.current.instance_exec(&block)
     end
 
     def artifact(name, clazz = nil, &block)
@@ -1985,7 +2000,8 @@ class Project < ExistentDirectory
         super
     end
 
-    def PROFILE(name)
+    def PROFILE(name, *args)
+        OPTS!(args)
         LOAD(File.join($lithium_code, 'profiles', name + '.rb'))
     end
 
@@ -1996,6 +2012,14 @@ class Project < ExistentDirectory
         else
             self.instance_eval(File.read(path)).call
         end
+    end
+
+    def SILENT(level = 0)
+       $lithium_options['v'] = level
+    end
+
+    def VERBOSE(level = 3)
+       $lithium_options['v'] = level
     end
 
     def homedir
@@ -2374,5 +2398,3 @@ class EnvironmentPath < EnvArtifact
 
     log_attr :paths
 end
-
-

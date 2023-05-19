@@ -81,7 +81,6 @@ class RmFile < ExistentFile
     end
 end
 
-
 class GREP < FileMask
     attr_reader :grep, :matched
 

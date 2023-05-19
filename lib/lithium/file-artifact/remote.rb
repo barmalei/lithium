@@ -32,7 +32,7 @@ class RemoteFile < FileArtifact
     end
 end
 
-class HTTPRemoteFile < RemoteFile
+class HttpRemoteFile < RemoteFile
     def http_fetch(uri)
         Net::HTTP.get_response(uri) { | res |
             raise "Failed (#{res.code}) to get data by '#{uri}'"if res.code != '200'

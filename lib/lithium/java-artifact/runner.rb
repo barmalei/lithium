@@ -1,6 +1,6 @@
 require 'lithium/java-artifact/base'
 
-class JavaFileRunner < RunJavaTool
+class JavaFileRunner < RunJvmTool
     def WITH
         @java.java
     end

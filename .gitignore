@@ -1,11 +1,14 @@
 .logs
 classes
-ext/java/checkstyle/*.jar
+ext/java/checkstyle/10/*.jar
+ext/java/checkstyle/8/*.jar
 ext/java/pmd
 ext/java/junit
 ext/java/jdt
 ext/java/jsonschema2pojo
-examples
-exa mples
-tmp
-vs/
+examples/*.jar
+examples/.lithium/.logs
+examples/.lithium/std-out-entities.json
+ext/java/lithium/.lithium/.logs
+ext/java/lithium/.lithium/std-out-entities.json
+std-out-entities.json

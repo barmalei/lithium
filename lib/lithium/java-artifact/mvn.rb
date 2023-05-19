@@ -14,10 +14,18 @@ class MVN < JVM
         # 
         # making JAVA as dependecy brings to cyclic dep problem
         # !
-        jv = Project.artifact(JAVA)
+        #jv = Project.artifact(JAVA)
         # ENV['JAVA_HOME'] = jv.sdk_home unless jv.nil?
 
         tool_path(tool_name())
+    end
+
+    def SKIPTESTS
+        OPT("-Dmaven.test.skip=true")
+    end
+
+    def PROFILE(name)
+        OPT("-P#{name}")
     end
 
     def SDKMAN(*args)

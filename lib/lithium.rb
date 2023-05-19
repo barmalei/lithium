@@ -9,8 +9,8 @@ require 'pathname'
 #      ans "basedir" as an option makes possible to build an external
 #      artifact in a context of the given project
 # !==================================================================
-$lithium_version    = '5.2.1'
-$lithium_date       = 'Apr 2023'
+$lithium_version    = '5.3.4'
+$lithium_date       = 'May 2023'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
@@ -27,7 +27,7 @@ if $lithium_options.has_key?('basedir')
     bd = $lithium_options['basedir']
     raise 'Nil basedir has been passed' if bd.nil?
     basedir = File.realpath(bd)
-    raise "Invalid project base directory '#{basedir}' has been passed" unless File.directory?(basedir)
+    raise "Invalid '#{basedir}' project base directory has been passed" unless File.directory?(basedir)
     Dir.chdir basedir
 else
     basedir = Dir.pwd

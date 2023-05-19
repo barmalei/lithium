@@ -4,10 +4,13 @@ Usage:
 Predefined classifiers:
   REQUIRE:  - show an artifact dependencies 
   TREE:     - show artifact dependencies tree
+    -full, -show_fn, -hide_owner, -hide_id, -hide_mtime
+
   CLEAN:    - clean artifact
   INFO:     - show info about the given artifact
   INIT:     - initialize lithium project
   META:     - current lithium artifact configuration
+    -current, -owner, -path
  
   run:file             - generic code runner 
   compile:file|mask    - generic code compiler
