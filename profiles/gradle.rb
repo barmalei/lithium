@@ -3,7 +3,7 @@
     REQUIRE {
         Directory('build') {
             BUILT {
-                RunGradle {
+                ENCLOSE(RunGradle) {
                     TARGETS('build')
                 }
             }

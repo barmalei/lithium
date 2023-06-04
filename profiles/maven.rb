@@ -3,13 +3,12 @@
     REQUIRE {
         Directory('target') {
             BUILT {
-                RunMaven(homedir) {
+                ENCLOSE(RunMaven) {
                     TARGETS('compile')
                 }
             }
         }
     }
-
 
     java_version = self['java_version']
     JAVA {
@@ -31,7 +30,7 @@
     JavaCompiler("compile:src/main/java/**/*.java") {
         DESTINATION('target/classes')
         # REQUIRE {
-        #     JvmDestinationDir('target/classes')
+        #     DestinationDirectory('target/classes')
         # }
     }
 
