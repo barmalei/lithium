@@ -1,51 +1,44 @@
 require 'fileutils'
 require 'pathname'
 
-require 'lithium/core'
 require 'lithium/file-artifact/acquired'
 
 module ZipTool
-    def detect_zip
-        @zip_path ||= nil
-        @zip_path = FileArtifact.which('zip') if @zip_path.nil?
-        return @zip_path
+    def self.detect_zip
+        Files.which('zip')
     end
 
-    def detect_unzip
-        @unzip_path ||= nil
-        @unzip_path = FileArtifact.which('unzip') if @unzip_path.nil?
-        return @unzip_path
+    def self.detect_unzip
+        Files.which('unzip')
     end
 
-    def detect_zipinfo
-        @zipinfo_path ||= nil
-        @zipinfo_path = FileArtifact.which('zipinfo') if @zipinfo_path.nil?
-        return @zipinfo_path
+    def self.detect_zipinfo
+        Files.which('zipinfo')
     end
 
-    def zip(archive_path, *files)
+    def self.zip(archive_path, *files)
         raise "There is no any files to be archived in '#{archive_path}' have been specified" if files.length == 0
         args = [ detect_zip, '-9q', "\"#{archive_path}\"" ]
         args = args.concat(files.map { | p | "\"#{p}\"" })
-        raise "ZIP '#{archive_path}' file cannot be created" if Artifact.exec(*args).exitstatus != 0
+        raise "ZIP '#{archive_path}' file cannot be created" if Files.exec(*args).exitstatus != 0
     end
 
-    def unzip(archive_path, dest_dir = nil)
-        archive_path = assert_zip_archive(archive_path)
+    def self.unzip(archive_path, dest_dir = nil)
+        archive_path = Files.assert_file(archive_path)
         args = [ detect_unzip, archive_path ]
         unless dest_dir.nil?
             raise "Invalid '#{dest_dir}' destination zip directory" unless File.directory?(dest_dir)
             args.push('-d', dest_dir)
         end
-        raise "Unzip '#{archive_path}' file failed" if Artifact.exec(*args).exitstatus != 0
+        raise "Unzip '#{archive_path}' file failed" if Files.exec(*args).exitstatus != 0
     end
 
-    def lszip(archive_path, *patterns)
-        archive_path = assert_zip_archive(archive_path)
+    def self.lszip(archive_path, *patterns)
+        archive_path = Files.assert_file(archive_path)
         args = [ detect_zipinfo, '-1', archive_path ]
         args = args.concat(patterns.map { | p | "\"#{p}\"" }) if patterns.length > 0
 
-        err = Artifact.exec(*args) { | stdin, stdout, th |
+        err = Files.exec(*args) { | stdin, stdout, th |
             stdout.each { | line |
                 yield line.chomp if patterns.length == 0 || !line.start_with?('caution:')
             }
@@ -53,19 +46,12 @@ module ZipTool
 
         raise "List zip '#{archive_path}' file failed" if err.exitstatus != 11 && err.exitstatus != 0
     end
-
-    def assert_zip_archive(archive_path)
-        raise "Zip archive '#{archive_path}' doesn't exist" unless File.file?(archive_path)
-        return "\"#{archive_path}\""
-    end
 end
 
 #
 #  Find an item in archive file or files by the @pattern (can be passed as command line argument)
 #
 class FindInZip < FileMask
-    include ZipTool
-
     attr_accessor :patterns
 
     def initialize(name, &block)
@@ -89,7 +75,7 @@ class FindInZip < FileMask
         list_items { | archive_path, m |
             fp       = fullpath(archive_path)
             rel_path = Pathname.new(fp).relative_path_from(Pathname.new(hd))
-            lszip(fp, *(patterns)) { | zip_item_path |
+            ZipTool.lszip(fp, *(patterns)) { | zip_item_path |
                 yield rel_path, zip_item_path
             }
         }
@@ -113,7 +99,8 @@ class ArchiveFile < GeneratedFile
 
         tmp = nil
         begin
-            tmp = GeneratedTmpDirectory.new(File.basename(fp), owner:self.owner) {
+            # TODO: implicit dependency!
+            tmp = GeneratedTmpDirectory.new(owner:self.owner) {
                 @full_copy = true
             }
             tmp.sources(*@sources)
@@ -151,12 +138,10 @@ end
 # Zip implementation of ArchiveFile
 #
 class ZipFile < ArchiveFile
-    include ZipTool
-
     @abbr = 'ZIP'
 
     def generate(src_list)
-        zip(fullpath, *src_list)
+        ZipTool.zip(fullpath, *src_list)
     end
 end
 
@@ -164,7 +149,6 @@ end
 # Helps to get access to archive file items that are unpacked in a virtual folder
 #
 class ArchiveFileContent < FileArtifact
-    include ZipTool
     include FileSourcesSupport::FileSource
 
     @abbr = 'AFC'
@@ -190,14 +174,12 @@ class ArchiveFileContent < FileArtifact
         fp = fullpath
         raise "Archive file '#{fp}' doesn't exist" unless File.file?(fp)
 
-        clean # clean previously generated content
+        clean() # clean previously generated ArchiveFileContent
         begin
             FileUtils.mkdir_p(@vs_directory)
-            chdir(@vs_directory) {
-                unzip(fp)
-            }
+            unzip(fp, @vs_directory)
         rescue Exception => e
-            clean
+            clean()
             raise e
         end
     end
@@ -221,6 +203,18 @@ class ArchiveFileContent < FileArtifact
             }
 
         end
+    end
+
+    def unzip(archive_path, dest)
+        chdir(dest) {
+            ZipTool.unzip(archive_path)
+        }
+    end
+
+    def lszip(archive_path)
+        ZipTool.lszip(archive_path) { | path |
+            yield path
+        }
     end
 
     def vs_home

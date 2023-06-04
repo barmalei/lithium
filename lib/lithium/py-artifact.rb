@@ -1,5 +1,4 @@
-require 'lithium/core'
-require 'lithium/file-artifact/command'
+require 'lithium/core-file-artifact'
 
 class DefaultPythonPath < EnvironmentPath
     def initialize(name, &block)
@@ -10,13 +9,16 @@ end
 
 # Python home
 class PYTHON < SdkEnvironmen
-    @tool_name = 'python3'
+    @tool_name = detect_tool_name('python3', 'python')
 
     log_attr :pyname
 
     def initialize(name, &block)
         REQUIRE DefaultPythonPath
         super
+        fp_re = /([^$^%|$:;,<>]+)/
+        @user_base      = Files.grep_exec(python(), ' -m site --user-base', pattern:fp_re)
+        @user_site_base = Files.grep_exec(python(), ' -m site --user-site', pattern:fp_re)
     end
 
     def pypath
@@ -24,13 +26,53 @@ class PYTHON < SdkEnvironmen
     end
 
     def python
-        tool_path(tool_name)
+        tool_path(tool_name())
+    end
+
+    def pip
+        tool_name.end_with?('3') ? tool_path('pip3') : tool_path('pip3')
+    end
+
+    def user_base
+        @user_base
+    end
+
+    def user_site_base
+        @user_site_base
     end
 
     def tool_name
         @pyname.nil? ? super : @pyname
     end
 end
+
+class PipPackage < EnvArtifact
+    def initialize(name, &block)
+        REQUIRE PYTHON
+        super
+    end
+
+    def build
+        raise "Fail to install #{@name} python package" if Files.exec(@python.pip, 'install --upgrade', File.basename(@name)).exitstatus != 0
+    end
+
+    def expired?
+        n = File.basename(@name)
+        p = File.join(@python.user_site_base, n)
+        raise "#{p} file exists" if File.file?(p)
+
+        # name of package can be different to the name it really stored in file system
+        p = File.join(@python.user_site_base, n.sub(/-/, '_')) unless File.exist?(p)
+        raise "#{p} file exists" if File.file?(p)
+
+        !File.directory?(p)
+    end
+
+    def what_it_does
+        "Deploy '#{@name}' python package"
+    end
+end
+
 
 #  Run python
 class RunPythonScript < ExistentFile
@@ -52,23 +94,25 @@ class RunPythonScript < ExistentFile
         super
         pp = pypath()
         ENV['PYTHONPATH'] = pp.to_s unless pp.EMPTY?
-        raise "Run #{self.class.name} failed" if Artifact.exec(@python.python, @python.OPTS(), OPTS(), q_fullpath) != 0
+        raise "Run #{self.class.name} failed" if Files.exec(@python.python, @python.OPTS(), OPTS(), q_fullpath) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
 end
 
-# TODO: rename it
-class ValidatePythonCode < FileMask
+class RunPyFlake < FileMask
     include OptionsSupport
 
     def initialize(name, &block)
         REQUIRE PYTHON
+        REQUIRE '.env/pyflakes', PipPackage
         super
     end
 
     def build_item(path, mt)
-        raise 'Pyflake python code validation failed' if Artifact.exec('pyflake', OPTS(), q_fullpath(path)) != 0
+        pyf  = File.join(@python.user_base(), 'bin', 'pyflakes')
+        code = Files.exec(pyf, OPTS(), q_fullpath(path)).exitstatus
+        raise 'Pyflake python code validation could not be started' if code != 0 && code != 1
     end
 end
 
@@ -94,3 +138,5 @@ except py_compile.PyCompileError:\n
 
     def what_it_does() "Validate '#{@name}' script" end
 end
+
+

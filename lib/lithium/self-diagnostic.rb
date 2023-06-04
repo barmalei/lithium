@@ -1,11 +1,11 @@
 require 'pathname'
-require 'lithium/core'
+require 'lithium/core-=file-artifact'
 require "test/unit"
 
 class TestCore < Test::Unit::TestCase
     def test_artifact_name
         nn = "compile:test/test/a"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/test/a", aa.path)
         assert_equal("compile:",    aa.prefix)
@@ -14,7 +14,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "compile:test/test/a/"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/test/a", aa.path)
         assert_equal("compile:",    aa.prefix)
@@ -23,7 +23,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "compile:"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal(nil, aa.path)
         assert_equal("compile:",    aa.prefix)
@@ -32,7 +32,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH, aa.mask_type)
 
         nn = "test/test/a"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/test/a", aa.path)
         assert_equal(nil, aa.prefix)
@@ -41,7 +41,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "test/test/a/"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/test/a", aa.path)
         assert_equal(nil, aa.prefix)
@@ -50,7 +50,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "test/../test/a"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/a", aa.path)
         assert_equal(nil, aa.prefix)
@@ -59,7 +59,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "."
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal(".", aa.path)
         assert_equal(nil, aa.prefix)
@@ -68,7 +68,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "test/../test/a/*.java"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/a", aa.path)
         assert_equal(nil, aa.prefix)
@@ -77,7 +77,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "test/../test/a/**/*.java"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/a", aa.path)
         assert_equal(nil, aa.prefix)
@@ -86,7 +86,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "test/../test/a/*"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/a", aa.path)
         assert_equal(nil, aa.prefix)
@@ -95,7 +95,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "aaa:bbb:test/../test/a/*"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("test/a", aa.path)
         assert_equal("aaa:", aa.prefix)
@@ -104,7 +104,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH | File::FNM_PATHNAME, aa.mask_type)
 
         nn = "aaa:*"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal(nil, aa.path)
         assert_equal("aaa:", aa.prefix)
@@ -113,7 +113,7 @@ class TestCore < Test::Unit::TestCase
         assert_equal(File::FNM_DOTMATCH, aa.mask_type)
 
         nn = "aaa:a/*/*"
-        aa = ArtifactName.new(nn)
+        aa = ArtifactPath.new(nn)
         assert_equal(nn, aa.to_s)
         assert_equal("a", aa.path)
         assert_equal("aaa:", aa.prefix)
@@ -139,26 +139,26 @@ class TestCore < Test::Unit::TestCase
     def test_artname_sort()
         for i in 1..10 do
             arts = [
-                ArtifactName.new("compile:test/test/a"),
-                ArtifactName.new("compile:"),
+                ArtifactPath.new("compile:test/test/a"),
+                ArtifactPath.new("compile:"),
 
-                ArtifactName.new("aa:test/test/b"),
-                ArtifactName.new("aa:test/test/b/c"),
-                ArtifactName.new("aa:test/test/*"),
-                ArtifactName.new("aa:test/test/a"),
-                ArtifactName.new("aa:test/*/*"),
-                ArtifactName.new("aa:test/"),
-                ArtifactName.new("aa:"),
+                ArtifactPath.new("aa:test/test/b"),
+                ArtifactPath.new("aa:test/test/b/c"),
+                ArtifactPath.new("aa:test/test/*"),
+                ArtifactPath.new("aa:test/test/a"),
+                ArtifactPath.new("aa:test/*/*"),
+                ArtifactPath.new("aa:test/"),
+                ArtifactPath.new("aa:"),
 
-                ArtifactName.new("test/test/b"),
-                ArtifactName.new("test/test/b/c"),
-                ArtifactName.new("test/test/*"),
-                ArtifactName.new("test/test/a"),
-                ArtifactName.new("test/*/*"),
-                ArtifactName.new("test/"),
+                ArtifactPath.new("test/test/b"),
+                ArtifactPath.new("test/test/b/c"),
+                ArtifactPath.new("test/test/*"),
+                ArtifactPath.new("test/test/a"),
+                ArtifactPath.new("test/*/*"),
+                ArtifactPath.new("test/"),
 
-                ArtifactName.new("compile:test/**/*"),
-                ArtifactName.new("bb:")
+                ArtifactPath.new("compile:test/**/*"),
+                ArtifactPath.new("bb:")
             ]
 
             arts = arts.sort
@@ -418,7 +418,7 @@ class TestCore < Test::Unit::TestCase
     end
 
     def test_artname_match()
-        aa = ArtifactName.new("compile:test/test/a")
+        aa = ArtifactPath.new("compile:test/test/a")
         assert_true(aa.match("compile:test/test/a"))
         assert_false(aa.match("compile:test/test/a/a"))
         assert_false(aa.match("compile:test/test/a/*"))
@@ -427,7 +427,7 @@ class TestCore < Test::Unit::TestCase
         assert_false(aa.match("compile:"))
         assert_false(aa.match("test/test/a"))
 
-        aa = ArtifactName.new("compile:")
+        aa = ArtifactPath.new("compile:")
         assert_true(aa.match("compile:"))
         assert_false(aa.match("compile:test/test/a/a"))
         assert_false(aa.match("compile:test/test/a/*"))
@@ -435,7 +435,7 @@ class TestCore < Test::Unit::TestCase
         assert_false(aa.match("compile:test/**/*"))
         assert_false(aa.match("test/test/a"))
 
-        aa = ArtifactName.new("compile:*")
+        aa = ArtifactPath.new("compile:*")
         assert_false(aa.match("compile:"))
         assert_true(aa.match("compile:test/test/a/a"))
         assert_true(aa.match("compile:test/test/a/*"))
@@ -443,7 +443,7 @@ class TestCore < Test::Unit::TestCase
         assert_true(aa.match("compile:test/**/*"))
         assert_false(aa.match("test/test/a"))
 
-        aa = ArtifactName.new("compile:a/*")
+        aa = ArtifactPath.new("compile:a/*")
         assert_false(aa.match("compile:"))
         assert_true(aa.match("compile:a/a"))
         assert_true(aa.match("compile:a/b"))
@@ -452,7 +452,7 @@ class TestCore < Test::Unit::TestCase
         assert_false(aa.match("compile:test/**/*"))
         assert_false(aa.match("a/a"))
 
-        aa = ArtifactName.new("a/*")
+        aa = ArtifactPath.new("a/*")
         assert_false(aa.match("a"))
         assert_true(aa.match("a/a"))
         assert_true(aa.match("a/b"))
@@ -461,7 +461,7 @@ class TestCore < Test::Unit::TestCase
         assert_false(aa.match("test/**/*"))
         assert_false(aa.match("b/a"))
 
-        aa = ArtifactName.new("a/*/*")
+        aa = ArtifactPath.new("a/*/*")
         assert_false(aa.match("a"))
         assert_false(aa.match("a/a"))
         assert_false(aa.match("a/b"))

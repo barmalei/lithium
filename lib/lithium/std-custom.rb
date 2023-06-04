@@ -1,8 +1,6 @@
 require 'lithium/std-core'
 
 class LithiumStd < Std
-    # TODO: remove one of the following line
-    @@signs_map = ['INF', 'WAR', 'ERR', 'EXC']
     @@signs_map = ['I', 'W', 'E', 'X']
 
     def initialize(prj_home = nil)

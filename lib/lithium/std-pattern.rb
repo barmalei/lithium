@@ -1,6 +1,6 @@
 require 'json'
 
-require 'lithium/core'
+require 'lithium/core-artifact'
 
 class StdPattern
     FILENAME_PATTERN = '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%\[\]]+'

@@ -1,7 +1,7 @@
 require 'fileutils'
 require 'pathname'
 
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 
 module FileSourcesSupport
     module FileSource
@@ -40,7 +40,7 @@ module FileSourcesSupport
 
     def filter_out?(p)
         @filter_out ||= nil
-        @filter_out.nil? || @filter_out.match?(p)
+        !@filter_out.nil? && @filter_out.match?(p)
     end
 
     # yield files from all registered sources:
@@ -280,9 +280,8 @@ end
 
 # Generated temporary directory
 class GeneratedTmpDirectory < GeneratedDirectory
-    def initialize(name, &block)
-        raise "Absolute path '#{name}' cannot be used" if File.absolute_path?(name)
-        dir = Dir.mktmpdir(name)
+    def initialize(&block)
+        dir = Dir.mktmpdir()
         super(dir, &block)
     end
 

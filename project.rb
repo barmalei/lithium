@@ -19,7 +19,7 @@
     }
 
     ZipFile("test.zip") {
-        REQUIRE('.lithium/lib/*', FileMaskSource) {
+        REQUIRE('.lithium/lib/**/*', FileMaskSource) {
             BASE('.lithium/lib')
         }
     }
@@ -30,6 +30,10 @@
 
     UglifiedJSFile("test.min.js") {
         REQUIRE { FileMaskSource('.lithium/examples/easyoop.js') }
+    }
+
+    PYTHON {
+        @tool_name = 'python3.10'
     }
 
     MATCH("run:*") {
@@ -80,7 +84,8 @@
         ValidatePhpScript   ('**/*.php')
         TypeScriptCompiler  ('**/*.ts')
         RunNodejs           ('**/*.js') { OPT '--check'  }
-        ValidatePythonScript('**/*.py')
+        #ValidatePythonScript('**/*.py')
+        RunPyFlake          ('**/*.py')
         MavenCompiler       ('**/pom.xml')
         GradleCompiler      ('**/build.gradle.kts')
         GradleCompiler      ('**/build.gradle')
@@ -94,19 +99,15 @@
         RunDartPubBuild     ('**/pubspec.yaml')
         ValidateDartCode    ('**/*.dart')
 
-        # OTHERWISE { | path |
-        #     raise "Unsupported '#{path}' file type"
-        #     #Project.build("compile:#{path}")
+        # OTHERWISE
+        # OTHERWISE {
+        #     puts("!!!!!!!! #{fullpath}")
         # }
     }
 
     MATCH('check:*') {
         JavaCheckStyle('**/*.java')
         JavaScriptHint('**/*.js')
-
-        # OTHERWISE { | path |
-        #     raise "Unsupported '#{path}' file type"
-        # }
     }
 
     PMD('pmd:**/*.*')

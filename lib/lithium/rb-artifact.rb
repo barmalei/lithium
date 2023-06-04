@@ -1,4 +1,4 @@
-require 'lithium/file-artifact/command'
+require 'lithium/core-file-artifact'
 
 class DefaultRubypath < EnvironmentPath
     def initialize(name, &block)
@@ -59,7 +59,7 @@ class RunRubyScript < ExistentFile
 
     def build
         super
-        raise "Running RUBY '#{@name}' script failed" if Artifact.exec(@ruby.ruby, OPTS(), cmd_rubypath, q_fullpath) != 0
+        raise "Running RUBY '#{@name}' script failed" if Files.exec(@ruby.ruby, OPTS(), cmd_rubypath, q_fullpath) != 0
     end
 
     def what_it_does() "Run '#{@name}' script" end
@@ -79,7 +79,7 @@ class ValidateRubyScript < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if Artifact.exec(@ruby.ruby, OPTS(), q_fullpath(path)) != 0
+        raise "Validation RUBY script '#{path}' failed" if Files.exec(@ruby.ruby, OPTS(), q_fullpath(path)) != 0
     end
 
     def what_it_does() "Validate '#{@name}' script" end

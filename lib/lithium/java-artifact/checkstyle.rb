@@ -1,10 +1,6 @@
 require 'fileutils'
 
-require 'lithium/file-artifact/command'
-require 'lithium/file-artifact/acquired'
-require 'lithium/java-artifact/base'
 require 'lithium/java-artifact/runner'
-
 
 class JavaCheckStyle < JavaFileRunner
     @abbr = 'CHS'
@@ -14,11 +10,11 @@ class JavaCheckStyle < JavaFileRunner
 
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
         @checkstyle_version    ||= '8'
-        @checkstyle_home = FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'checkstyle', @checkstyle_version)
-        FileArtifact.assert_dir(@checkstyle_home)
+        @checkstyle_home = Files.assert_dir($lithium_code, 'ext', 'java', 'checkstyle', @checkstyle_version)
+        Files.assert_dir(@checkstyle_home)
 
         @checkstyle_config ||= DEFAULT()
-        @checkstyle_config   = FileArtifact.assert_file(@checkstyle_config)
+        @checkstyle_config   = Files.assert_file(@checkstyle_config)
 
         puts "Java Checkstyle (v='#{@checkstyle_version}')\n    home:   '#{@checkstyle_home}'\n    config: '#{@checkstyle_config}'"
 
@@ -31,7 +27,7 @@ class JavaCheckStyle < JavaFileRunner
     end
 
     def CONFIG(*args)
-        @checkstyle_config = FileArtifact.assert_file(*args)
+        @checkstyle_config = Files.assert_file(*args)
         return @checkstyle_config
     end
 
@@ -69,7 +65,7 @@ class PMD < JavaFileRunner
         @pmd_format     ||= 'text'
         @pmd_main_class ||= 'net.sourceforge.pmd.PMD'
 
-        @pmd_home ||= FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'pmd', @checkstyle_version)
+        @pmd_home ||= Files.assert_dir($lithium_code, 'ext', 'java', 'pmd', @checkstyle_version)
         raise "PMD '#{@pmd_home}' home path cannot be found" unless File.directory?(@pmd_home)
 
         @targets_from_file = true
@@ -104,7 +100,7 @@ end
 class JsonSchemaToPojo < RunJAR
     def initialize(name, &block)
         super
-        @jsonSchemaToPojo_home = FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'jsonschema2pojo')
+        @jsonSchemaToPojo_home = Files.assert_dir($lithium_code, 'ext', 'java', 'jsonschema2pojo')
         raise "JSON Schema to POJO home path cannot be found '#{@pmd_home}'" unless File.directory?(@jsonSchemaToPojo_home)
 
         cp = File.join(@jsonSchemaToPojo_home, 'lib', '*.jar')

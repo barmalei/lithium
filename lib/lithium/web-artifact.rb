@@ -1,10 +1,9 @@
-require 'lithium/core'
-require 'lithium/file-artifact/command'
+require 'lithium/core-file-artifact'
 
 class CompileSass < FileMask
     def initialize(name, &block)
         super
-        @sass_path ||= FileArtifact.which('sass')
+        @sass_path ||= Files.which('sass')
         raise 'Sass compiler cannot be found' if @sass_path.nil?
     end
 
@@ -19,7 +18,7 @@ class CompileSass < FileMask
             out = out[0..-(ext.length + 1)].concat(".css")
         end
 
-        raise 'Sass compiler failed' if Artifact.exec(@sass_path, "#{q_fullpath(path)} \"#{out}\"")  != 0
+        raise 'Sass compiler failed' if Files.exec(@sass_path, "#{q_fullpath(path)} \"#{out}\"")  != 0
     end
 
     def what_it_does() "Compile '#{@name}' sass to CSS" end

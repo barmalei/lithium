@@ -1,24 +1,26 @@
-require 'lithium/file-artifact/command'
-require 'lithium/rb-artifact'
+require 'lithium/core-file-artifact'
 
 #
 #   Tree top grammar compiler
 #
+# TODO: should be revised
 class CompileTTGrammar < ExistentFile
     @abbr = 'CTT'
 
     def initialize(name, &block)
         REQUIRE RUBY
         super
+        # TODO: can be replaced with destination dir
         @output_dir ||= File.dirname(@name)
         @output_dir = fullpath(@output_dir)
 
-        @tt_path ||= FileArtifact.which("tt")
+        @tt_path ||= Files.which("tt")
         raise 'Cannot detect tree top grammar compiler' if !@tt_path || File.is_directory?(@tt_path)
         @tt_path = path
         raise "Undefined output directory '#{@output_dir}'" unless File.directory?(@output_dir)
     end
 
+    # TODO: this method is never called, valid only in  a case of FileMask
     def build_item(path, mt)
         # kill extension
         oname      = File.basename(path)
@@ -28,7 +30,7 @@ class CompileTTGrammar < ExistentFile
         opath = File.join(@output_dir, oname)
         File.delete(opath) if File.exist?(opath)
 
-        raise "Grammar '#{path}' compilation failed" if Artifact.exec(@ruby.ruby, cmd_rubypath, @tt, q_fullpath(path), '-o', "\"#{opath}\"") != 0
+        raise "Grammar '#{path}' compilation failed" if Files.exec(@ruby.ruby, cmd_rubypath, @tt, q_fullpath(path), '-o', "\"#{opath}\"") != 0
     end
 
     def what_it_does

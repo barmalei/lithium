@@ -1,6 +1,6 @@
 require 'fileutils'
 
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 
 class CLEAN < Artifact
     def build
@@ -67,15 +67,15 @@ class META < Artifact
     def traverse(stack, index, shift = '')
         if index >= 0
             prj = stack[index]
-            artname = ArtifactName.relative_to(@name, prj.homedir)
+            artpath = ArtifactPath.relative_to(@name, prj.homedir)
             puts "#{shift}[+] PROJECT:'#{prj}' {\n"
-            puts_prj_metas(prj, artname, shift)
+            puts_prj_metas(prj, artpath, shift)
             traverse(stack, index - 1, shift + '    ')
             puts "#{shift}}"
         end
     end
 
-    def puts_prj_metas(prj, artname, shift)
+    def puts_prj_metas(prj, artpath, shift)
         count = 0
         prj._meta.each { | m |
             ps = ''
@@ -84,10 +84,10 @@ class META < Artifact
                 ps = " (#{prj.owner.name}:#{pmeta.to_s})" unless pmeta.nil?
                 #ps = " (#{prj.owner} #{pmeta.class})" unless pmeta.nil?
             end
-            pp = m.match(artname) ? " : [ '#{artname}' ]" : ''
+            pp = m.match(artpath) ? " : [ '#{artpath}' ]" : ''
             if OPT?('path') == false || pp.length > 0
                 printf("#{shift}    %-20s => '%s'#{ps}#{pp}\n", m.clazz, m)
-                puts_prj_metas(prj._artifact_by_meta(m, m), artname, shift + '    ') if m.clazz <= FileMaskContainer
+                puts_prj_metas(prj._artifact_by_meta(m, m), artpath, shift + '    ') if m.clazz <= FileMaskContainer
                 count += 1
             end
         }
@@ -105,7 +105,7 @@ class REQUIRE < Artifact
         puts "Artifact '#{@name}:' dependencies list {"
         art = Project.artifact(@name)
         art.each_required { | art |
-            aname = art.kind_of?(Artifact) ? ArtifactName.new(art.name, art.class) : name
+            aname = art.kind_of?(Artifact) ? ArtifactPath.new(art.name, art.class) : name
             printf("    %-20s : '%s'\n", aname, art)
         }
         puts '}'

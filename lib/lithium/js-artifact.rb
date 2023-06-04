@@ -1,9 +1,6 @@
 require 'fileutils'
 require 'tmpdir'
 
-require 'lithium/core'
-require 'lithium/file-artifact/command'
-require 'lithium/java-artifact/runner'
 require 'lithium/file-artifact/acquired'
 
 $NODEJS_MODULES_DIR = 'node_modules'
@@ -17,13 +14,13 @@ class JS < EnvArtifact
     def initialize(name, &block)
         super
 
-        @nodejs ||= FileArtifact.which('node')
+        @nodejs ||= Files.which('node')
         raise 'Node JS cannot be detected' if @nodejs.nil?
 
-        @npm ||= FileArtifact.which('npm')
+        @npm ||= Files.which('npm')
         raise 'Node JS npm cannot be detected' if @npm.nil?
 
-        @tsc ||= FileArtifact.which('tsc')
+        @tsc ||= Files.which('tsc')
         raise 'Node JS tsc cannot be detected' if @tsc.nil?
     end
 
@@ -61,7 +58,7 @@ class NodeJsPackageFile < ExistentFile
         REQUIRE JS
         name         = homedir if name.nil?
         fp           = fullpath(name)
-        packageFile  = FileArtifact.look_file_up(fp, 'package.json', homedir)
+        packageFile  = Files.look_file_up(fp, 'package.json', homedir)
         raise "Package file cannot be detected by '#{fp}' path" if packageFile.nil?
         super(packageFile, &block)
     end
@@ -91,7 +88,7 @@ class InstallNodeJsPackage < NodeJsPackageFile
         raise "Target package JSON artifact cannot be found '#{path}'" unless File.exist?(path)
         target_dir = File.dirname(path)
         chdir(target_dir) {
-            if Artifact.exec(*command()).exitstatus != 0
+            if Files.exec(*command()).exitstatus != 0
                 raise "Pub [#{@targets.join(',')}] running failed"
             end
         }
@@ -118,7 +115,7 @@ class BuildWithTsConf < ExistentFile
 
     def build
         homedir()
-        raise "Running of '#{@name}' type script config failed" if Artifact.exec(@js.tsc, OPTS(), '-p', q_fullpath) != 0
+        raise "Running of '#{@name}' type script config failed" if Files.exec(@js.tsc, OPTS(), '-p', q_fullpath) != 0
     end
 
     def what_it_does
@@ -148,13 +145,13 @@ class NodejsModule < FileArtifact
     def build
         project.go_to_homedir
         puts "Install module in #{Dir.pwd} hd = #{project.go_to_homedir}"
-        raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'install', File.basename(fullpath)) != 0
+        raise "Install of '#{@name}' nodejs module" if Files.exec(@js.npm, 'install', File.basename(fullpath)) != 0
     end
 
     def clean
         if File.exist?(fullpath)
             project.go_to_homedir
-            raise "Install of '#{@name}' nodejs module" if Artifact.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0
+            raise "Install of '#{@name}' nodejs module" if Files.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0
         end
     end
 
@@ -181,7 +178,7 @@ class RunNodejs < ExistentFile
 
     def build
         super
-        raise "Running of '#{@name}' JS script failed" if Artifact.exec(@js.nodejs, OPTS(), q_fullpath) != 0
+        raise "Running of '#{@name}' JS script failed" if Files.exec(@js.nodejs, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does
@@ -192,11 +189,11 @@ end
 # nodejs uglyfier
 # @name : name of the uglified file
 class UglifiedJSFile < GeneratedFile
+    include OptionsSupport
+
     def initialize(name, &block)
-        REQUIRE {
-            JS()
-            NodejsModule('uglify-js')
-        }
+        REQUIRE JS
+        REQUIRE 'uglify-js', NodejsModule
         super
     end
 
@@ -210,7 +207,7 @@ class UglifiedJSFile < GeneratedFile
         raise 'Source list is empty' if list.length == 0
         validate_extension()
         project.go_to_homedir
-        raise 'Uglifier has failed' if Artifact.exec(
+        raise 'Uglifier has failed' if Files.exec(
             File.join(@js.module_home('uglify-js'), 'bin', 'uglifyjs'), 
             OPTS(), 
             list.map { | s |  "\"#{s}\"" }.join(' '), 
@@ -315,7 +312,7 @@ class JavaScriptDoc < FileArtifact
 
         args << i
 
-        Artifact.exec(*args)
+        Files.exec(*args)
 
         FileUtils.rmtree(i) if istmp
     end
@@ -335,7 +332,7 @@ class TypeScriptCompiler < FileMask
 
     def build
         go_to_homedir
-        raise "Compilation of '#{@name}' has failed" if Artifact.exec(@js.tsc, OPTS(), q_fullpath) != 0
+        raise "Compilation of '#{@name}' has failed" if Files.exec(@js.tsc, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does
@@ -351,7 +348,7 @@ class JavaScriptHint < FileMask
     end
 
     def build
-        raise "Linting of '#{@name}' failed" if Artifact.exec('jshint', fullpath) != 0
+        raise "Linting of '#{@name}' failed" if Files.exec('jshint', fullpath) != 0
     end
 
     def what_it_does

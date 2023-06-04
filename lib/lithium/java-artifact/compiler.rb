@@ -1,18 +1,6 @@
 require 'fileutils'
 require 'lithium/java-artifact/base'
 
-class JvmDestinationDir < ExistentDirectory
-    include AssignableDependency[:destination]
-
-    def build
-        unless exists?
-            puts_warning "Create destination '#{fullpath}' folder"
-            FileUtils.mkdir_p(fullpath)
-        end
-        super
-    end
-end
-
 #  Java 
 class JvmCompiler < RunJvmTool
     def initialize(name, &block)
@@ -42,7 +30,7 @@ class JvmCompiler < RunJvmTool
                 fn = "#{cn.gsub('.', '/')}.class"
                 fp = File.join(dest, fn)
                 yield fp, cn if File.exist?(fp)
-                FileArtifact.dir(File.join(dest, "#{cn.gsub('.', '/')}$*.class")) { | item |
+                Files.dir(File.join(dest, "#{cn.gsub('.', '/')}$*.class")) { | item |
                     yield item, cn
                 }
             }
@@ -50,7 +38,6 @@ class JvmCompiler < RunJvmTool
     end
 
     def WITH_OPTS
-        #dst  = destination()
         dst = @destination.fullpath
         raise "Destination '#{dst}' cannot be detected" if dst.nil? || !File.exist?(dst)
         super.push('-d', "\"#{dst}\"")
@@ -63,7 +50,7 @@ class JvmCompiler < RunJvmTool
     end
 
     def DESTINATION(path)
-        REQUIRE(path, JvmDestinationDir)
+        REQUIRE(path, DestinationDirectory)
     end
 
     def what_it_does

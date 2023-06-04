@@ -1,6 +1,6 @@
 require 'fileutils'
 
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 
 #  Touch file - change the file updated time stamp
 class Touch < FileArtifact
@@ -157,7 +157,7 @@ end
 class RunInTerminal < ExistentFile
     def build
         super
-        Artifact.execInTerm(homedir, command)
+        Files.execInTerm(homedir, command)
     end
 
     def command

@@ -1,4 +1,4 @@
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 require 'rexml/parsers/pullparser'
 
 # Validate XML

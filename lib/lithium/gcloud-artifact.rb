@@ -1,6 +1,4 @@
-require 'lithium/core'
-require 'lithium/properties'
-require 'lithium/file-artifact/command'
+require 'lithium/core-file-artifact'
 
 class GCE < SdkEnvironmen
     @tool_name = 'gcloud'
@@ -19,7 +17,7 @@ class GoogleAppFile < ExistentFile
                 break fullpath(name)
             else
                 target = "target/**/#{app_file_name}"
-                paths  = FileArtifact.dir(target)
+                paths  = Files.dir(target)
                 paths  = paths.filter { | path | path.index('generated-sources').nil? } if paths.length > 0
                 raise "Few '#{fp}' application XMLs were found by '#{target}' path" if paths.length > 1
                 break paths[0] if paths.length == 1
@@ -46,7 +44,7 @@ class DeployGoogleApp < GoogleAppFile
 
     def build
         super
-        Artifact.execInTerm(homedir, command())
+        Files.execInTerm(homedir, command())
     end
 
     def command
@@ -80,5 +78,3 @@ class DeployGoogleQueue < RunTool
         "Deploy google queue '#{name}'"
     end
 end
-
-

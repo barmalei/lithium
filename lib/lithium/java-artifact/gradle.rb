@@ -1,7 +1,4 @@
-require 'lithium/file-artifact/remote'
-
 require 'fileutils'
-require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
 require 'lithium/std-core'
 
@@ -26,10 +23,10 @@ class GradleFile < ExistentFile
 
         name = homedir if name.nil?
         fp   = fullpath(name)
-        gradle  = FileArtifact.look_file_up(fp, 'build.gradle.kts', homedir)
-        gradle  = FileArtifact.look_file_up(fp, 'build.gradle', homedir) if  gradle.nil?
+        gradle  = Files.look_file_up(fp, 'build.gradle.kts', homedir)
+        gradle  = Files.look_file_up(fp, 'build.gradle', homedir) if  gradle.nil?
         raise "Gradle build file cannot be detected by '#{fp}' path" if  gradle.nil?
-        super( gradle, &block)
+        super(gradle, &block)
     end
 end
 
@@ -37,6 +34,8 @@ class RunGradle < GradleFile
     include OptionsSupport
 
     @abbr = 'RGR'
+
+    default_name('build.gradle')
 
     def initialize(name, &block)
         super
@@ -52,7 +51,7 @@ class RunGradle < GradleFile
         path = fullpath
         raise "Target gradle artifact cannot be found '#{path}'" unless File.exist?(path)
         chdir(File.dirname(path)) {
-            if Artifact.exec(@gradle.gradle, @gradle.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
+            if Files.exec(@gradle.gradle, @gradle.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
                 raise "Gradle [#{@targets.join(',')}] running failed"
             end
         }
@@ -119,7 +118,7 @@ class GradleClasspath < InFileClasspath
     def build
         fp = fullpath
         chdir(File.dirname(@gradle.fullpath)) {
-            Artifact.exec(["gradle", "hello", "--console", "plain", "-q"]) { | stdin, stdout, th |
+            Files.exec(["gradle", "hello", "--console", "plain", "-q"]) { | stdin, stdout, th |
                 stdin.close
                 while line = stdout.gets do
                     #$stdout.puts line
@@ -132,7 +131,7 @@ class GradleClasspath < InFileClasspath
 
             # cmd = GRADLE_CMD()
             # cmd.push("-Dmdep.outputFile=\"#{fullpath}\"")
-            # raise "Gradle classpath '#{@name}' cannot be generated" if Artifact.exec(*cmd).exitstatus != 0
+            # raise "Gradle classpath '#{@name}' cannot be generated" if Files.exec(*cmd).exitstatus != 0
         }
         super
     end

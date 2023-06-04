@@ -1,7 +1,7 @@
 require 'net/http'
 require 'uri'
 
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 
 class RemoteFile < FileArtifact
     attr_reader :uri

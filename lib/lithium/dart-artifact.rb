@@ -1,5 +1,4 @@
-require 'lithium/core'
-require 'lithium/file-artifact/command'
+require 'lithium/core-file-artifact'
 
 # DART
 class DART < SdkEnvironmen
@@ -36,7 +35,7 @@ class ValidateDartCode < FileMask
 
     def build_item(path, mt)
         puts "Validate '#{path}'"
-        raise "Validation DART script '#{path}' failed" if Artifact.exec(@dart.dart, 'compile', 'jit-snapshot', OPTS(), q_fullpath(path)) != 0
+        raise "Validation DART script '#{path}' failed" if Files.exec(@dart.dart, 'compile', 'jit-snapshot', OPTS(), q_fullpath(path)) != 0
     end
 
     def what_it_does() "Validate '#{@name}' DART code" end
@@ -56,7 +55,7 @@ class RunDartCode < ExistentFile
 
     def build
         super
-        raise "Run #{self.class.name} failed" if Artifact.exec(@dart.dart, OPTS(), q_fullpath) != 0
+        raise "Run #{self.class.name} failed" if Files.exec(@dart.dart, OPTS(), q_fullpath) != 0
     end
 
     def what_it_does() "Run '#{@name}' dart script" end
@@ -73,7 +72,7 @@ class PubspecFile < ExistentFile
         REQUIRE DART
         name = homedir if name.nil?
         fp   = fullpath(name)
-        pubspec  = FileArtifact.look_file_up(fp, 'pubspec.yaml', homedir)
+        pubspec  = Files.look_file_up(fp, 'pubspec.yaml', homedir)
         raise "Pubspec cannot be detected by '#{fp}' path" if pubspec.nil?
         super(pubspec, &block)
     end
@@ -102,7 +101,7 @@ class RunDartPub < PubspecFile
         super
         path = fullpath
         chdir(File.dirname(path)) {
-            if Artifact.exec(*command()).exitstatus != 0
+            if Files.exec(*command()).exitstatus != 0
                 raise "Pub [#{@targets.join(',')}] running failed"
             end
         }

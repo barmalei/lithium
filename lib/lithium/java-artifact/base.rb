@@ -1,5 +1,6 @@
+
 require 'lithium/std-core' # help to run it as a code, since puts_warning is expected
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 
 require 'rexml/document'
 require 'tempfile'
@@ -43,7 +44,7 @@ class WildflyWarClasspath < WarClasspath
     attr_reader :modules_path
 
     def initialize(name, &block)
-        @modules_path = FileArtifact.look_directory_up(homedir, 'modules')
+        @modules_path = Files.look_directory_up(homedir, 'modules')
         raise 'Invalid nil WildFly module path' if modules_path.nil?
         raise "Invalid WildFly module path '#{@modules_path}'" unless File.directory?(@modules_path)
 
@@ -63,7 +64,7 @@ class WildflyWarClasspath < WarClasspath
                     name = el.attributes['name']
                     name = name.gsub('.', '/')
                     root = File.join(_addon_module_root, '**', name, 'main', '*.jar')
-                    FileArtifact.dir(root) { | jar |
+                    Files.dir(root) { | jar |
                         JOIN(jar)
                     }
                 end
@@ -183,7 +184,7 @@ class JVM < SdkEnvironmen
         PATHS.new(homedir).JOIN(@classpaths)
     end
 
-    def undefined_sdk_home
+    def force_sdkhome_detection
         SDKMAN()
     end
 
@@ -229,6 +230,8 @@ class JVM < SdkEnvironmen
                 @sdk_home = File.join(candidates[0])
             end
         end
+
+        return @sdk_home
     end
 
     def self.grep_package(path, pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
@@ -356,7 +359,7 @@ class RunJvmTool < RunTool
     #  [  name, class, block ]
     @JAVA = nil
 
-    attr_reader :classpaths
+#    attr_reader :classpaths
 
     def initialize(name, &block)
         require_java()

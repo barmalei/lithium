@@ -1,6 +1,6 @@
 require 'date'
 
-require 'lithium/core'
+require 'lithium/core-file-artifact'
 require 'lithium/core-command'
 require 'lithium/std-pattern'
 require 'lithium/std-core'
@@ -209,6 +209,14 @@ PATTERNS ({
     ]
 })
 
+$ready_list = []
+
+# Registered with READY code blocks are called when lithium startup
+# initialization is completed
+def READY(&block)
+    $ready_list.push(block)
+end
+
 #
 # @param  artifact        - original artifact target
 # @param  artifact_prefix - artifact prefix including ":". Can be nil
@@ -229,7 +237,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     path       = basedir
     prj        = nil
     while !path.nil? do
-        path = FileArtifact.look_directory_up(path, '.lithium')
+        path = Files.look_directory_up(path, '.lithium')
         unless path.nil?
             path = File.dirname(path)
             prjs_stack.unshift(path) if path != $lithium_code
@@ -276,7 +284,7 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     }
 
     # build target artifact including its dependencies
-    target_artifact = ArtifactName.name_from(artifact_prefix, artifact_path, artifact_mask)
+    target_artifact = ArtifactPath.name_from(artifact_prefix, artifact_path, artifact_mask)
 
     puts "TARGET '#{target_artifact}' in '#{Project.current}' home"
     built_art = Project.current.BUILD(target_artifact)

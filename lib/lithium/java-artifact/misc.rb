@@ -1,4 +1,3 @@
-require 'lithium/core'
 require 'lithium/java-artifact/base'
 require 'lithium/file-artifact/archive'
 
@@ -44,7 +43,7 @@ class LithiumJavaToolRunner < RunJvmTool
     end
 
     def classpath
-        base = FileArtifact.assert_dir($lithium_code, 'ext', 'java', 'lithium')
+        base = Files.assert_dir($lithium_code, 'ext', 'java', 'lithium')
         super.JOIN(File.join(base, 'classes'))
              .JOIN(File.join(base, 'lib/*.jar'))
     end
@@ -126,7 +125,7 @@ class FindInClasspath < Artifact
             unless cp.EMPTY?
                 find(cp, @pattern) { | path, item |
                     path   = File.absolute_path(path)
-                    r_path = FileArtifact.relative_to(path, homedir)
+                    r_path = Files.relative_to(path, homedir)
                     path   = r_path unless r_path.nil?
                     res.push([path, item])
                 }
@@ -171,10 +170,20 @@ class FindInClasspath < Artifact
                     yield path, item.to_s
                 }
             elsif path.end_with?('.jar') || path.end_with?('.zip')
-                # TODO: probably "find" should be static method
-                FindInZip.new(path, owner:self.owner).find(*[ "**/#{pattern}" ]) { | jar_path, item |
-                    yield jar_path, item
+                go_to_homedir {
+                    Dir[path].each { | lib_path |
+                        if File.file?(lib_path)
+                            ZipTool.lszip(lib_path, "**/#{pattern}") { | item |
+                                yield lib_path, item
+                            }
+                        end
+                    }
                 }
+
+                # TODO: probably "find" should be static method
+                # FindInZip.new(path, owner:self.owner).find(*[ "**/#{pattern}" ]) { | jar_path, item |
+                #     yield jar_path, item
+                # }
             else
                 puts_warning "File '#{path}' doesn't exist" unless File.exist?(path)
             end

@@ -1,30 +1,15 @@
-require 'lithium/core'
-require 'lithium/file-artifact/command'
-require 'lithium/java-artifact/runner'
+require 'lithium/core-file-artifact'
 
 class CPP < EnvArtifact
     include LogArtifactState
 
-    log_attr :destination
-
     def initialize(name)
-        @create_destination = true
         super
-        @destination ||= 'bin'
+        DESTINATION('bin')
     end
 
-    def destination
-        unless @destination.nil?
-            @destination = File.join(homedir, @destination) unless File.absolute_path?(@destination)
-            if !File.exist?(@destination) && @create_destination
-                puts_warning "Create destination '#{@destination}' folder"
-                FileUtils.mkdir_p(@destination)
-            end
-
-            return @destination
-        else
-            return homedir
-        end
+    def DESTINATION(path)
+        REQUIRE(path, DestinationDirectory)
     end
 
     def what_it_does() "Initialize C environment '#{@name}'" end
@@ -74,7 +59,7 @@ class RunMakefile < RunTool
 
     def build
         chdir(File.dirname(fullpath)) {
-            Artifact.exec('make', @targets.join(' '))
+            Files.exec('make', @targets.join(' '))
         }
     end
 

@@ -1,6 +1,5 @@
-require 'lithium/file-artifact/remote'
-
 require 'fileutils'
+
 require 'lithium/file-artifact/command'
 require 'lithium/java-artifact/base'
 require 'lithium/std-core'
@@ -100,8 +99,8 @@ class PomFile < ExistentFile
 
     def initialize(name = nil, &block)
         REQUIRE MVN
-        name = FileArtifact.look_file_up(homedir, 'pom.xml', homedir) if name.nil?
-        super
+        name = Files.look_file_up(homedir, 'pom.xml', homedir) if name.nil?
+        super name, &block
     end
 
     def expired?
@@ -130,7 +129,7 @@ class MavenClasspath < InFileClasspath
             cmd = MVN_CMD()
             cmd.push(@mvn.OPTS())
             cmd.push("-Dmdep.outputFile=\"#{fullpath}\"")
-            raise "Maven classpath '#{@name}' cannot be generated" if Artifact.exec(*cmd).exitstatus != 0
+            raise "Maven classpath '#{@name}' cannot be generated" if Files.exec(*cmd).exitstatus != 0
         }
         super
     end
@@ -163,7 +162,7 @@ class MavenDependenciesDir < Directory
         chdir(File.dirname(@pom.fullpath)) {
             cmd = MVN_CMD()
             cmd.push("-DoutputDirectory=\"#{fullpath}\"")
-            raise "Dependency directory '#{@name}' cannot be created" if Artifact.exec(*cmd).exitstatus != 0
+            raise "Dependency directory '#{@name}' cannot be created" if Files.exec(*cmd).exitstatus != 0
         }
     end
 end
@@ -173,6 +172,9 @@ class RunMaven < PomFile
     include StdFormater
 
     @abbr = 'RMV'
+
+    default_name("pom.xml")
+
 
     def initialize(name = nil, &block)
         super
@@ -185,10 +187,11 @@ class RunMaven < PomFile
     end
 
     def build
+        super
         path = fullpath
         raise "Target mvn artifact cannot be found '#{path}'" unless File.exist?(path)
         chdir(File.dirname(path)) {
-            if Artifact.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
+            if Files.exec(@mvn.mvn, @mvn.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
                 raise "Maven [#{@targets.join(',')}] running failed"
             end
         }
