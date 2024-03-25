@@ -3,7 +3,7 @@ require 'pathname'
 # !==================================================================
 #  "basedir" is starting folder to lookup lithium project definition
 #
-    #   1) passing an absolute path of the artifact looks for a "basedir"
+#   1) passing an absolute path of the artifact looks for a "basedir"
 #      (and as a result an owner project) basing on the absolute path
 #   2) passing an absolute path of the artifact looks for a "basedir"
 #      ans "basedir" as an option makes possible to build an external
