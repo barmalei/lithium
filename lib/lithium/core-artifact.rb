@@ -382,8 +382,7 @@ class Artifact
         }
     end
 
-    def created_as_required
-        puts "#{self.class}"
+    def required_was_created(req)
     end
 
     def before_build(is_expired)
@@ -576,6 +575,9 @@ class ArtifactTree
             # dependent artifact has to be assigned
             node.art.assign_me_to(@art) if node.art.class < AssignableDependency
 
+            # notify parent an artifact was created
+            @art.required_was_created(node.art)
+
             # most likely the expired state has to be set here, after assignable dependencies are set
             # since @art.expired? method can require the assigned deps to define its expiration state
             # moreover @art.expired? should not be called here since we can have multiple assignable
@@ -722,7 +724,6 @@ module ArtifactContainer
         raise "'#{meta}' definition does not define class for '#{name}' artifact" if meta.clazz.nil?
         art   = meta.clazz.new(name, owner:self, &Block.combine_blocks(meta.block, block))
         art.createdByMeta = meta
-        art.created_as_required()
         return art
     end
 
