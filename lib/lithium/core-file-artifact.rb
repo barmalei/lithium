@@ -331,7 +331,7 @@ class FileMask < FileArtifact
     end
 end
 
-#
+
 #   <WITH>  <OPTS>  <TARGETS>  <ARGS>
 #     |       |        |          |
 #     |       |        |          +--- test
@@ -345,88 +345,25 @@ end
 #
 class RunTool < FileMask
     include LogArtifactState
-    include OptionsSupport
+    include ToolExecuter
 
     log_attr :_options, :arguments
 
-    def initialize(name)
-        super
-
-        @arguments ||= []
-        @arguments = $lithium_args.dup if @arguments.length == 0 && $lithium_args && $lithium_args.length > 0
+    def WITH_TARGETS
+        list_items_as_array
     end
 
-    # ec - Process::Status
-    def error_exit_code?(ec)
-        ec.exitstatus != 0
-    end
-
-    # can be overridden to transform paths,
-    # e.g. convert path to JAVA file to a class name
-    def transform_target_path(path)
-        path
-    end
-
-    def WITH
-        raise 'Run tool name is not defined'
-    end
-
-    # @return Array
-    def WITH_OPTS
-        OPTS()
-    end
-
-    # @param src - array of [ path1, path2, ... pathN ] or path to file
-    # @return array
-    def WITH_TARGETS(src)
-        return [] if src.nil?
-        return src.is_a?(String) ? [ "\"#{src}\"" ] : src
-    end
-
-    def run_with_output_handler
-        @output_handler
+    def FAILED(*args, err_code:1)
+        # TODO: simplify detailed level fetching
+        level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
+        raise "'#{self.class}' has failed command = '#{args.join(' ')}'" if level == 2
+        raise "'#{self.class}' has failed"
     end
 
     def build(&block)
         super
-
-        begin
-            tmp, src, len = nil, [], 0
-            if @targets_from_file
-                tmp = Tempfile.open('lithium')
-                begin
-                    list_items { | path, t |
-                        tmp.puts(transform_target_path(path))
-                        len = len + 1
-                    }
-                ensure
-                   tmp.close
-                end
-                src = tmp.path
-            else
-                list_items{ | path, t |
-                    src.push("\"#{transform_target_path(path)}\"")
-                }
-                len = src.length
-            end
-
-            puts_warning "Source files cannot be detected by '#{@name}'" if src.nil?
-
-            cmd = [ WITH() ] + WITH_OPTS() + WITH_TARGETS(src) + @arguments
-
-            go_to_homedir()
-            ec = block.nil? ? Files.exec(*cmd) : Files.exec(*cmd, &block)
-
-            if error_exit_code?(ec)
-                # TODO: simplify detailed level fetching
-                level = !$lithium_options.nil? && $lithium_options.key?('v') ? $lithium_options['v'].to_i : 0
-                raise "'#{self.class}' has failed cmd = '#{cmd}'" if level == 2
-                raise "'#{self.class}' has failed"
-            end
-            puts "#{len} source files have been processed with '#{self.class}'"
-        ensure
-            tmp.unlink unless tmp.nil?
-        end
+        go_to_homedir()
+        EXEC(&block)
     end
 end
 
@@ -435,6 +372,7 @@ class RunShell < RunTool
         'bash'
     end
 end
+
 
 # mask container
 class FileMaskContainer < FileMask

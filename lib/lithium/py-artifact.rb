@@ -16,7 +16,10 @@ class PYTHON < SdkEnvironmen
     def initialize(name, &block)
         REQUIRE DefaultPythonPath
         super
-        fp_re = /([^$^%|$:;,<>]+)/
+
+        puts("!!! Constructor PYTHON() #{self.object_id} #{self.owner}")
+
+        fp_re           = /([^$^%|:;,<>]+)/
         @user_base      = Files.grep_exec(python(), ' -m site --user-base', pattern:fp_re)
         @user_site_base = Files.grep_exec(python(), ' -m site --user-site', pattern:fp_re)
     end
@@ -29,8 +32,19 @@ class PYTHON < SdkEnvironmen
         tool_path(tool_name())
     end
 
+    # TODO: improve
     def pip
-        tool_name.end_with?('3') ? tool_path('pip3') : tool_path('pip3')
+        if @pip_name.nil?
+            m = /[a-zA-Z_]+([0-9.]+$)?/.match(tool_name())
+            suffix = m[1]
+            if suffix.nil?
+                return tool_path('pip')
+            else
+                return tool_path("pip#{suffix}")
+            end
+        else
+            return tool_path(@pip_name)
+        end
     end
 
     def user_base
@@ -47,25 +61,35 @@ class PYTHON < SdkEnvironmen
 end
 
 class PipPackage < EnvArtifact
+    include ToolExecuter
+
     def initialize(name, &block)
         REQUIRE PYTHON
         super
+        OPT('--upgrade')
+    end
+
+    def WITH
+        @python.pip
+    end
+
+    def WITH_COMMANDS
+        [ 'install' ]
+    end
+
+    def WITH_TARGETS
+        [ File.basename(@name) ]
     end
 
     def build
-        raise "Fail to install #{@name} python package" if Files.exec(@python.pip, 'install --upgrade', File.basename(@name)).exitstatus != 0
+        super()
+        EXEC()
     end
 
     def expired?
-        n = File.basename(@name)
-        p = File.join(@python.user_site_base, n)
-        raise "#{p} file exists" if File.file?(p)
-
-        # name of package can be different to the name it really stored in file system
-        p = File.join(@python.user_site_base, n.sub(/-/, '_')) unless File.exist?(p)
-        raise "#{p} file exists" if File.file?(p)
-
-        !File.directory?(p)
+        #ver = Files.grep_exec(@python.pip, 'show', File.basename(@name), pattern:/Version:\s*(.*)/)
+        #return ver.nil?
+        return false
     end
 
     def what_it_does
@@ -73,11 +97,8 @@ class PipPackage < EnvArtifact
     end
 end
 
-
 #  Run python
-class RunPythonScript < ExistentFile
-    include OptionsSupport
-
+class RunPythonScript < RunTool
     @abbr = 'RPS'
 
     def initialize(name, &block)
@@ -86,21 +107,31 @@ class RunPythonScript < ExistentFile
         super
     end
 
+    def WITH_TARGETS
+        return [ @module_name ] unless @module_name.nil?
+        return super()
+    end
+
+    def WITH
+        @python.python
+    end
+
     def pypath
         @python.pypath
     end
 
     def build
-        super
         pp = pypath()
         ENV['PYTHONPATH'] = pp.to_s unless pp.EMPTY?
-        raise "Run #{self.class.name} failed" if Files.exec(@python.python, @python.OPTS(), OPTS(), q_fullpath) != 0
+        super
     end
 
-    def what_it_does() "Run '#{@name}' script" end
+    def what_it_does
+        "Run '#{@name}' script"
+    end
 end
 
-class RunPyFlake < FileMask
+class RunPyFlake < RunTool
     include OptionsSupport
 
     def initialize(name, &block)
@@ -109,34 +140,26 @@ class RunPyFlake < FileMask
         super
     end
 
-    def build_item(path, mt)
-        pyf  = File.join(@python.user_base(), 'bin', 'pyflakes')
-        code = Files.exec(pyf, OPTS(), q_fullpath(path)).exitstatus
-        raise 'Pyflake python code validation could not be started' if code != 0 && code != 1
+    def WITH
+        File.join(@python.user_base(), 'bin', 'pyflakes')
     end
 end
 
-class ValidatePythonScript < ExistentFile
+class RunPySetup < RunTool
+    include OptionsSupport
+
     def initialize(name, &block)
         REQUIRE PYTHON
+        OPT('install')
         super
     end
 
-    def build
-        super
-script = "
-import py_compile, sys\n
-
-try:\n
-    py_compile.compile('#{fullpath}', doraise=True)\n
-except py_compile.PyCompileError:\n
-    print sys.exc_info()[1]\n
-    exit(1)
-"
-        raise 'Validation failed' unless exec(@python.python, '-c', "\"#{script}\"")
+    def WITH_TARGETS
+        [ File.dirname(fullpath) ]
     end
 
-    def what_it_does() "Validate '#{@name}' script" end
+    def WITH
+        @python.pip
+    end
 end
-
 

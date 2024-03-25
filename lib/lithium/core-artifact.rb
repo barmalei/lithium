@@ -53,17 +53,15 @@ class ArtifactPath < String
 
         if name.nil? && !@clazz.nil?
             name = @clazz.default_name
-            raise "Artifact default name cannot be detected by '#{@clazz}'' class" if name.nil?
+            raise "Artifact default name cannot be detected by '#{@clazz}' class" if name.nil?
         end
 
         name = ArtifactPath.assert_notnil_name(name)
 
-        @mask_type = File::FNM_DOTMATCH
-        @prefix = name[/^\w\w+\:/]
-        @suffix = @prefix.nil? ? name : name[@prefix.length .. name.length]
-        @suffix = nil if !@suffix.nil? && @suffix.length == 0
+        @path, @path_mask, @mask_type = nil, nil, File::FNM_DOTMATCH
+        @prefix = ArtifactPath.prefix(name)
+        @suffix = ArtifactPath.suffix(name)
 
-        @path = @path_mask = nil
         @path = @suffix[/((?<![a-zA-Z])[a-zA-Z]:)?[^:]+$/] unless @suffix.nil?
         unless @path.nil?
             @path, @path_mask = Files.cut_fmask(@path)
@@ -82,6 +80,17 @@ class ArtifactPath < String
         @block = block
 
         super(name)
+    end
+
+    def self.prefix(path)
+        path[/^\w\w+\:/]
+    end
+
+    def self.suffix(path)
+        prefix = self.prefix(path)
+        suffix = prefix.nil? ? path : path[prefix.length .. path.length]
+        suffix = nil if !suffix.nil? && suffix.length == 0
+        suffix
     end
 
     #
@@ -113,7 +122,6 @@ class ArtifactPath < String
         return name
     end
 
-
     def env_path?
         !path.nil? && path.start_with?('.env/')
     end
@@ -122,7 +130,8 @@ class ArtifactPath < String
         name = ArtifactPath.new(name)
 
         # prefix doesn't match each other
-        return false if @prefix != name.prefix
+        # TODO: not clear how classes has to be compared !!!
+        return false if @prefix != name.prefix  #|| (!name.clazz.nil? && !@clazz.nil? && name.clazz != @clazz)
         unless @path_mask.nil?
             # Condition "(name.env_path? ^ env_path?)" helps to prevent eating environment
             # artifact with file masks. For instance imagine we have file mask "**/*"
@@ -214,9 +223,9 @@ class Artifact
     # !!! owner and default name initialization depends on when an artifact
     # !!! instance call super
     def self.new(name = nil, owner:nil, &block)
-        name = self.default_name if name.nil?
+        #name = self.default_name if name.nil?
         unless owner.nil? || owner.kind_of?(ArtifactContainer)
-            raise "Invalid owner '#{owner.class}' type for '#{name}' artifact, an artifact container class instance is expected"
+            raise "Invalid owner '#{owner.class}' type for '#{self.class}' artifact, an artifact container class instance is expected"
         end
 
         instance = allocate()
@@ -237,8 +246,11 @@ class Artifact
     end
 
     def initialize(name = nil, &block)
-        # test if the name of the artifact is not nil or empty string
-        @name = name
+        if name.nil?
+            @name = self.class.default_name
+        else
+            @name = name
+        end
 
         # block can be passed to artifact
         # it is expected the block setup class instance
@@ -325,8 +337,9 @@ class Artifact
 #            raise "REQUIRED artifacts can be defined only in '#{self}' artifact constructor" unless initialize_called?
 
             name = args.length == 0 ? nil : args[0]
-            clazz, is_internal = Artifact._name_to_clazz(meth)
-            if is_internal
+            clazz, is_resuse = Artifact._name_to_clazz(meth)
+
+            if is_resuse
                 raise "Block was not defined for updating '#{clazz}:#{name}' requirement" if block.nil?
                 @requires ||= []
                 art_name = ArtifactPath.new(name, clazz)
@@ -367,6 +380,10 @@ class Artifact
         req.each { | dep |
             yield dep
         }
+    end
+
+    def created_as_required
+        puts "#{self.class}"
     end
 
     def before_build(is_expired)
@@ -447,11 +464,13 @@ class Artifact
             raise "Artifact instance '#{name}' cannot be used as a required artifact"
         else
             art_name = ArtifactPath.new(name, clazz, &block)
+            # TODO: this search doesn't allow override JAVA or PYTHON etc to another requirement if its
+            # name doesn't match each other. Check it it correct.
             i = @requires.index { | req | req.to_s == art_name.to_s && req.clazz == art_name.clazz }
             if i.nil?
                 @requires.push(art_name)
             else
-                puts_warning "Artifact '#{art_name}' requirement has been already defined"
+                puts_warning "'#{art_name}' requirement has been already defined in '#{self.class}'"
                 @requires[i] = art_name
             end
         end
@@ -479,8 +498,8 @@ class Artifact
         name = name.strip
         raise "'#{name}' class name is too short" if name.length < 3
 
-        clazz, is_internal = nil, false
-        name, is_internal = name[..-2].to_sym, true if name[-1] == '!'
+        clazz, is_reuse = nil, false
+        name, is_reuse = name[..-2].to_sym, true if name[-1] == '!'
         begin
              clazz = Module.const_get(name)
         rescue
@@ -489,7 +508,7 @@ class Artifact
         end
 
         raise "'#{clazz}' doesn't inherit an Artifact class" unless clazz < Artifact
-        return clazz, is_internal
+        return clazz, is_reuse
     end
 end
 
@@ -540,7 +559,7 @@ class ArtifactTree
             while parent && parent.art != node.art
                 parent = parent.parent
             end
-            raise "#{@art.class}:'#{art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
+#            raise "#{@art.class}:'#{art}' has CYCLIC dependency on #{parent.art.class}:'#{parent.art}'" unless parent.nil?
 
             # build sub-tree to evaluate expiration
             if foundNode.nil?
@@ -625,6 +644,8 @@ module ArtifactContainer
 
         # fund local info about the given artifact
         meta, meta_ow = match_meta(artname)
+
+
         if meta.nil?
             unless owner.nil?
                 # There are two types of container: project and file mask containers. File mask containers
@@ -633,7 +654,11 @@ module ArtifactContainer
                 # to avoid duplication of multiple artifacts created with the same meta. For instance
                 # JAVA artifact instance for java compiler (.*) and Java runner mask containers have to
                 # the same if it is not re-defined on the level of the container.
-                return owner.artifact(artname, &block) if delegate_to_owner_if_meta_cannot_be_found?
+                if delegate_to_owner_if_meta_cannot_be_found?
+                    # TODO: could be critical for FileMaskContainer since that delegates creation of artifact to its owner (Project?)
+                    # it is not clear what is a side effect
+                    return owner.artifact(artname, &block)
+                end
                 meta, meta_ow = owner.match_meta(artname, true)
             end
 
@@ -648,6 +673,7 @@ module ArtifactContainer
 
             raise "No artifact definition is associated with '#{name}'" if meta.nil?
         end
+
 
         # manage cache
         _remove_from_cache(artname)          unless block.nil?  # remove from cache if a custom block has been passed
@@ -696,6 +722,7 @@ module ArtifactContainer
         raise "'#{meta}' definition does not define class for '#{name}' artifact" if meta.clazz.nil?
         art   = meta.clazz.new(name, owner:self, &Block.combine_blocks(meta.block, block))
         art.createdByMeta = meta
+        art.created_as_required()
         return art
     end
 
@@ -850,7 +877,7 @@ class SdkEnvironmen < EnvArtifact
     def initialize(name, &block)
         super
 
-        unless @sdk_home
+        if @sdk_home.nil? && !tool_name.nil?
             @sdk_home = Files.which(tool_name, true)
             @sdk_home = File.dirname(File.dirname(@sdk_home)) unless @sdk_home.nil?
         end
@@ -881,8 +908,6 @@ class SdkEnvironmen < EnvArtifact
 
     def tool_name
         @tool_name.nil? ? self.class.tool_name : @tool_name
-
-        #return self.class.tool_name
     end
 
     def tool_version(version_opt = '--version', pattern = /([0-9]+\.[0-9]+(\.[0-9]+|_[0-9]+)?)/)
@@ -908,4 +933,3 @@ class EnvironmentPath < EnvArtifact
 
     log_attr :paths
 end
-

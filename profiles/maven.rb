@@ -3,7 +3,7 @@
     REQUIRE {
         Directory('target') {
             BUILT {
-                ENCLOSE(RunMaven) {
+                ENCLOSE('pom.xml', RunMaven) {
                     TARGETS('compile')
                 }
             }
@@ -17,6 +17,7 @@
                 JOIN('target/classes')
                 JOIN('target/test-classes')
             }
+
             MavenClasspath()
         }
 
@@ -25,13 +26,10 @@
 
     PomFile('pom.xml')
 
-    MavenClasspath()
+#    MavenClasspath()
 
     JavaCompiler("compile:src/main/java/**/*.java") {
         DESTINATION('target/classes')
-        # REQUIRE {
-        #     DestinationDirectory('target/classes')
-        # }
     }
 
 #     MATCH("src/test/**/*.java") {
@@ -54,9 +52,9 @@
         DESTINATION('target/test-classes')
     }
 
-    Directory("apidoc") {
-        REQUIRE {
-            GenerateJavaDoc("src/main/java/**/*.java")
-        }
-    }
+    # Artifact("gendoc") {
+    #     REQUIRE {
+    #         GenerateJavaDoc("src/main/java/**/*.java")
+    #     }
+    # }
 }

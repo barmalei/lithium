@@ -6,7 +6,7 @@ class DART < SdkEnvironmen
 
     def initialize(name, &block)
         super
-        @version = Artifact.grep_exec(dart, "--version", pattern:/version:\s+([0-9]+)\.([0-9]+)\.([0-9]+)/)
+        @version = Files.grep_exec(dart, '--version', pattern:/version:\s+([0-9]+)\.([0-9]+)\.([0-9]+)/)
         puts "DART version = #{@version.join('.')}"
     end
 
@@ -23,29 +23,26 @@ class DART < SdkEnvironmen
     end
 end
 
-class ValidateDartCode < FileMask
-    include OptionsSupport
-
+class ValidateDartCode < RunTool
     @abbr = 'VDC'
 
     def initialize(name, &block)
         REQUIRE DART
         super
+        OPTS('compile', 'jit-snapshot')
     end
 
-    def build_item(path, mt)
-        puts "Validate '#{path}'"
-        raise "Validation DART script '#{path}' failed" if Files.exec(@dart.dart, 'compile', 'jit-snapshot', OPTS(), q_fullpath(path)) != 0
+    def WITH
+        @dart.dart
     end
 
-    def what_it_does() "Validate '#{@name}' DART code" end
+    def what_it_does
+        "Validate '#{@name}' DART code"
+    end
 end
 
-
 #  Run dart
-class RunDartCode < ExistentFile
-    include OptionsSupport
-
+class RunDartCode < RunTool
     @abbr = 'RDS'
 
     def initialize(name, &block)
@@ -53,12 +50,13 @@ class RunDartCode < ExistentFile
         super
     end
 
-    def build
-        super
-        raise "Run #{self.class.name} failed" if Files.exec(@dart.dart, OPTS(), q_fullpath) != 0
+    def WITH
+        @dart.dart
     end
 
-    def what_it_does() "Run '#{@name}' dart script" end
+    def what_it_does
+        "Run '#{@name}' dart script"
+    end
 end
 
 class PubspecFile < ExistentFile
@@ -69,21 +67,21 @@ class PubspecFile < ExistentFile
     @abbr = 'PSP'
 
     def initialize(name = nil, &block)
-        REQUIRE DART
-        name = homedir if name.nil?
-        fp   = fullpath(name)
-        pubspec  = Files.look_file_up(fp, 'pubspec.yaml', homedir)
-        raise "Pubspec cannot be detected by '#{fp}' path" if pubspec.nil?
-        super(pubspec, &block)
+        name = File.join(homedir, 'pubspec.yaml') if name.nil?
+        super(name, &block)
     end
 end
 
-class RunDartPub < PubspecFile
-    include OptionsSupport
+class RunDartPub < Artifact
+    include ToolExecuter
+
+    default_name(".env/dart/pub")
 
     @abbr = 'RPS'
 
     def initialize(name, &block)
+        REQUIRE PubspecFile
+        REQUIRE DART
         super
         @targets ||= [ 'get' ]
     end
@@ -93,26 +91,34 @@ class RunDartPub < PubspecFile
         @targets.concat(args)
     end
 
+    def WITH
+        if @dart.version[0].to_i == 1
+            @dart.pub
+        else
+            @dart.dart
+        end
+    end
+
+    def WITH_OPTS
+        if @dart.version[0].to_i == 1
+            super
+        else
+            [ 'pub' ] + super
+        end
+    end
+
+    def WITH_TARGETS
+        @targets
+    end
+
     def expired?
         true
     end
 
     def build
         super
-        path = fullpath
-        chdir(File.dirname(path)) {
-            if Files.exec(*command()).exitstatus != 0
-                raise "Pub [#{@targets.join(',')}] running failed"
-            end
-        }
-    end
-
-    def command
-        if @dart.version[0].to_i == 1
-            return [ @dart.pub, OPTS(), @targets.join(' ') ]
-        else
-            return [ @dart.dart, 'pub', OPTS(), @targets.join(' ') ]
-        end
+        go_to_homedir
+        EXEC()
     end
 
     def what_it_does
@@ -121,24 +127,34 @@ class RunDartPub < PubspecFile
 end
 
 class RunDartPubBuild < RunDartPub
+    default_name('.env/dart/pub.build')
+
     def initialize(name, &block)
         super
         TARGETS('build')
     end
 
-    def command
+    def WITH_OPTS
         if @dart.version[0].to_i == 1
-            return super
+            super
         else
-            # TODO: option should be set in initialize, but @dart is resolved only on build stage
-            OPT("--output web:build") if @dart.version[0].to_i > 1
-            return [ 'webdev', @targets.join(' '), OPTS() ]
+            [ '--output web:build' ] + super
+        end
+    end
+
+    def WITH
+        if @dart.version[0].to_i == 1
+            super
+        else
+            'webdev'
         end
     end
 end
 
 class RunDartPubGet < RunDartPub
-    def initialize(name, &block)
+    default_name('.env/dart/pub.get')
+
+    def initialize(name = nil, &block)
         super
         TARGETS('get')
     end

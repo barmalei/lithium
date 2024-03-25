@@ -17,8 +17,11 @@ module FileSourcesSupport
 
         def BASE(base)
             @base = base
-            @base = base[0 .. base.length - 1] unless base.nil? || base[-1] != '/'
-            return self
+            if base == '.'
+                @base = File.dirname(@name)
+            else
+                @base = base[0 .. base.length - 1] unless base.nil? || base[-1] != '/'
+            end
         end
     end
 
@@ -92,9 +95,7 @@ end
 # file that contains artifacts paths of a composite target artifact
 class MetaFile < ExistentFile
     include LogArtifactState
-
-    attr_accessor :validate_items
-    log_attr :base
+    include FileSourcesSupport::FileSource
 
     def list_items
         fp = fullpath
@@ -241,7 +242,7 @@ class GeneratedDirectory < Directory
 
                 unless File.exist?(dest) && File.mtime(dest).to_i > mtime
                     if File.exist?(dest)
-                        puts "Updating '#{from}'\n    with '#{dest}'"
+                        puts "Updating '#{dest}'\n    with '#{from}'"
                     else
                         puts "Copying '#{from}'\n     to '#{dest}'"
                     end

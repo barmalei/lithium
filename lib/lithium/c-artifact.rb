@@ -57,10 +57,12 @@ class RunMakefile < RunTool
         @targets ||= []
     end
 
-    def build
-        chdir(File.dirname(fullpath)) {
-            Files.exec('make', @targets.join(' '))
-        }
+    def WITH
+        'make'
+    end
+
+    def WITH_OPTS
+        super + @targets
     end
 
     def what_it_does

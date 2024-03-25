@@ -14,7 +14,7 @@ class RunJavaClass < JavaFileRunner
     @abbr = 'RJC'
 
     def transform_target_path(path)
-        n = paths.dup
+        n = path.dup
         n[/[.]class$/] = '' if n.end_with?('.class')
         n
     end
@@ -59,7 +59,7 @@ class RunJUnit < JavaFileRunner
         return cp
     end
 
-    def WITH_TARGETS(src)
+    def WITH_TARGETS
         juv = detect_junit_version()
         if juv == 5
             return [
@@ -68,10 +68,10 @@ class RunJUnit < JavaFileRunner
                 '--disable-banner',
                 '--details=none',
                 '-c'
-            ].concat(super(src)).concat([ '--classpath', classpath() ])
+            ].concat(super()).concat([ '--classpath', classpath() ])
 
         else
-            return [ 'org.junit.runner.JUnitCore', super(src) ]
+            return [ 'org.junit.runner.JUnitCore', super() ]
         end
     end
 
@@ -85,6 +85,8 @@ end
 
 class RunJavaCodeWithJUnit < RunJUnit
     def transform_target_path(path)
+        puts "!!!! #{path}"
+
         cn  = JVM.grep_classname(path)
         res = FileArtifact.grep(path, '@Test')
         if res.nil? || res.length == 0
@@ -108,9 +110,9 @@ class RunJavaClassWithJUnit < RunJUnit
 end
 
 class RunJAR < JavaFileRunner
-    def WITH_TARGETS(src)
+    def WITH_TARGETS
         t = [ '-jar' ]
-        t.concat(super(src))
+        t.concat(super())
         return t
     end
 end

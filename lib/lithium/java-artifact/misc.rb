@@ -1,85 +1,78 @@
 require 'lithium/java-artifact/base'
 require 'lithium/file-artifact/archive'
+require 'lithium/utils'
 
 class GenerateJavaDoc < RunJvmTool
+    include FromFileToolExecuter
+
     @abbr = 'JDC'
 
-    def initialize(name, &block)
-        super
-        @targets_from_file = true
-        @destination ||= 'apidoc'
-    end
+    default_name('src/main/java/**/*.java')
 
-    def destination
-        dest = fullpath(@destination)
-        return dest if File.directory?(dest)
-        raise "Invalid destination directory '#{dest}'" if File.exist?(dest)
-        return dest
+    def initialize(name = nil, &block)
+        DESTINATION('apidoc')
+        super
     end
 
     def WITH
         @java.javadoc
     end
 
-    def WITH_TARGETS(src)
-        super("@#{src}")
+    def WITH_OPTS
+        super + [ '-d', @destination.q_fullpath ]
     end
 
-    def WITH_OPTS
-        super.push('-d', destination())
+    def DESTINATION(path)
+        REQUIRE(path, DestinationDirectory)
     end
 
     def clean
-        dest = destination()
+        dest = @destination.fullpath
         FileUtils.rm_r(dest) unless File.directory?(dest)
     end
 end
 
-class LithiumJavaToolRunner < RunJvmTool
-    @java_tool_command_name = 'Unknown java tool command'
+class LiJavaToolClasspath < DefaultClasspath
+    default_name('.env/li/classpath')
 
-    def self.java_tool_command_name
-        @java_tool_command_name
-    end
-
-    def classpath
+    def initialize(name = nil, &block)
+        super
         base = Files.assert_dir($lithium_code, 'ext', 'java', 'lithium')
-        super.JOIN(File.join(base, 'classes'))
-             .JOIN(File.join(base, 'lib/*.jar'))
+        JOIN(File.join(base, 'classes'))
+        JOIN(File.join(base, 'lib/*.jar'))
+    end
+end
+
+class LiJavaToolRunner < RunJvmTool
+    def initialize(name, &block)
+        super
+        REQUIRE LiJavaToolClasspath
+        if @command.nil?
+            p = ArtifactPath.prefix(name)
+            @command = p[0 ..-2] unless p.nil?
+        end
     end
 
     def WITH
         @java.java
     end
 
-    def WITH_TARGETS(src)
-        t = [ 'lithium.JavaTools', "#{self.class.java_tool_command_name}:#{File.basename(@name)}" ]
-        t.concat(super(src))
+    # available commands:
+    #   'methods', 'classInfo', 'module', 'field', 'class'
+    def COMMAND(cmd)
+        @command = cmd
+        return self
     end
-end
 
-class ShowClassMethods < LithiumJavaToolRunner
-    @java_tool_command_name = 'methods'
-end
-
-class ShowClassInfo < LithiumJavaToolRunner
-    @java_tool_command_name = 'classInfo'
-end
-
-class ShowClassModule < LithiumJavaToolRunner
-    @java_tool_command_name = 'module'
-end
-
-class ShowClassField < LithiumJavaToolRunner
-    @java_tool_command_name = 'field'
-end
-
-class DetectJvmClassByName < LithiumJavaToolRunner
-    @java_tool_command_name = 'class'
+    def WITH_TARGETS
+        [ 'lithium.JavaTools', "#{@command}:#{File.basename(@name)}" ] + super
+    end
 end
 
 # TODO: revise !!!
 class FindInClasspath < Artifact
+    include ClassPathHolder
+
     def initialize(name, &block)
         super
         REQUIRE(name)
@@ -88,17 +81,6 @@ class FindInClasspath < Artifact
         @cacheEnabled   = true if @cacheEnabled.nil?
         raise 'Pattern has not been defined' if @pattern.nil?
         @cache = _load_cache() if @cacheEnabled == true
-    end
-
-    # [name, is_array]
-    def assign_req_as(art)
-        return [ :classpaths, true ] if art.is_a?(JVM) || art.is_a?(JavaClasspath)
-        return nil
-    end
-
-    def classpath
-        @classpaths ||= []
-        PATHS.new(homedir).JOIN(@classpaths.map { | art |  art.is_a?(JVM) ? art.classpath : art } ) if @classpaths.length > 0
     end
 
     def build
@@ -134,7 +116,7 @@ class FindInClasspath < Artifact
             end
 
             if @findJvmClasses
-                ArtifactTree.new(DetectJvmClassByName.new(@pattern, owner:self.owner)).build { | stdin, stdout, th |
+                ArtifactTree.new(LiJavaToolRunner.new(@pattern, owner:self.owner).COMMAND('class')).build { | stdin, stdout, th |
                     prefix = 'detected:'
                     stdout.each { | line |
                         res.push(['JVM', line.chomp[prefix.length..]]) if line.start_with?(prefix)
@@ -179,11 +161,6 @@ class FindInClasspath < Artifact
                         end
                     }
                 }
-
-                # TODO: probably "find" should be static method
-                # FindInZip.new(path, owner:self.owner).find(*[ "**/#{pattern}" ]) { | jar_path, item |
-                #     yield jar_path, item
-                # }
             else
                 puts_warning "File '#{path}' doesn't exist" unless File.exist?(path)
             end
@@ -227,4 +204,3 @@ class FindInClasspath < Artifact
         "Looking for '#{@pattern}' in classpath"
     end
 end
-

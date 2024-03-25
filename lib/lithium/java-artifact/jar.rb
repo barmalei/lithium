@@ -37,7 +37,10 @@ class JarFileContent < ArchiveFileContent
 end
 
 # generate JAR file
+#  TODO: re-work with ToolExecuter
 class JarFile < ArchiveFile
+    include ToolExecuter
+
     @abbr = 'JAR'
 
     def initialize(name, &block)

@@ -3,7 +3,8 @@ require 'json'
 require 'lithium/core-artifact'
 
 class StdPattern
-    FILENAME_PATTERN = '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%\[\]]+'
+    # take in account window letter
+    FILENAME_PATTERN = (File::PATH_SEPARATOR == ';' ? '([a-zA-Z]\:)?' : '') + '[^\:\,\!\?\;\~\`\&\^\*\(\)\=\+\{\}\|\>\<\%\[\]]+'
 
     class StdMatch
         def initialize(msg, groups, level)

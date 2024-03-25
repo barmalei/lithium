@@ -59,15 +59,19 @@ class FindInZip < FileMask
         @patterns ||= $lithium_args.dup
     end
 
+    # TODO: the idea is response with JSON
     def build
         raise 'No any archive pattern has been defined' if @patterns.nil? || @patterns.length == 0
         counter = 0
+
+        puts '['
         find(*(@patterns)) { | rel_path, zip_item_path |
-            puts "    [#{rel_path} => #{zip_item_path}]"
+            puts "  #{counter > 0 ? ',':' '}{ \"archive\":\"#{rel_path}\", \"item\":\"#{zip_item_path}\" }"
             counter += 1
         }
+        puts ']'
 
-        puts_warning "No a zip item matches by '#{@patterns}' patterns" if counter == 0
+        #puts_warning "No a zip item matches by '#{@patterns}' patterns" if counter == 0
     end
 
     def find(*patterns)

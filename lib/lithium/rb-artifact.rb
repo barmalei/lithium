@@ -28,9 +28,7 @@ class RUBY < SdkEnvironmen
 end
 
 # Run ruby script
-class RunRubyScript < ExistentFile
-    include OptionsSupport
-
+class RunRubyScript < RunTool
     @abbr = 'RRS'
 
     def initialize(name, &block)
@@ -38,13 +36,21 @@ class RunRubyScript < ExistentFile
         super
     end
 
-    def rubypath
-        @ruby.rubypath
+    def WITH
+        @ruby.ruby
     end
 
-    def cmd_rubypath
+    def WITH_OPTS
+        super + rubypath()
+    end
+
+    #
+    # Returns list of ruby paths
+    # @return <array> list of ruby paths
+    #
+    def rubypath
         rpath = []
-        rubypath.paths.each { | path |
+        @ruby.rubypath.paths.each { | path |
             if File.directory?(path)
                 rpath.push("-I\"#{path}\"")
             else
@@ -54,21 +60,15 @@ class RunRubyScript < ExistentFile
 
         path = File.join(homedir, '.lithium', 'lib')
         rpath.push("-I\"#{path}\"") if File.directory?(path)
-        return rpath.join(' ')
+        return rpath
+        #return rpath.join(' ')
     end
 
-    def build
-        super
-        raise "Running RUBY '#{@name}' script failed" if Files.exec(@ruby.ruby, OPTS(), cmd_rubypath, q_fullpath) != 0
-    end
-
-    def what_it_does() "Run '#{@name}' script" end
+     def what_it_does() "Run '#{@name}' RUBY script" end
 end
 
 # Validate RUBY script
-class ValidateRubyScript < FileMask
-    include OptionsSupport
-
+class ValidateRubyScript < RunTool
     @abbr = 'VRS'
 
     def initialize(name, &block)
@@ -77,10 +77,11 @@ class ValidateRubyScript < FileMask
         super
     end
 
-    def build_item(path, mt)
-        puts "Validate '#{path}'"
-        raise "Validation RUBY script '#{path}' failed" if Files.exec(@ruby.ruby, OPTS(), q_fullpath(path)) != 0
+    def WITH
+        @ruby.ruby
     end
 
-    def what_it_does() "Validate '#{@name}' script" end
+    def what_it_does
+        "Validate '#{@name}' RUBY script"
+    end
 end

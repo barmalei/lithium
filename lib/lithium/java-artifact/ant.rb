@@ -11,29 +11,44 @@ class ANT < SdkEnvironmen
     end
 end
 
+class AntFile < ExistentFile
+    include LogArtifactState
+    include AssignableDependency[:antfile]
+
+    default_name('build.xml')
+
+    @abbr = 'ANF'
+
+    def expired?
+        false
+    end
+end
+
+
 # Simple ant runner
-class RunANT < ExistentFile
-    include OptionsSupport
+class RunANT < Artifact
+    include ToolExecuter
 
     @abbr = 'RAN'
 
-    def initialize(name, &block)
+    default_name('.env/ant/build')
+
+    def initialize(name = nil, &block)
         REQUIRE ANT
-        ant_build = Files.look_file_up(fullpath(name), 'build.xml', homedir)
-        raise "ANT build file cannot be detected by '#{fullpath(name)}'" if ant_build.nil?
-        super(ant_build, &block)
+        REQUIRE AntFile
+        super(name, &block)
     end
 
-    def build
-        super
-        fp = fullpath()
-        chdir(File.dirname(fp)) {
-            raise 'ANT error' if 0 != Files.exec(@ant.ant, '-buildfile', "\"#{fp}\"", OPTS())
-        }
+    def WITH
+        @ant.ant
+    end
+
+    def WITH_TARGETS
+        [ '-buildfile', @antfile.q_fullpath ] + super
     end
 
     def what_it_does
-        "Run ANT '#{fullpath()}'"
+        "Run ANT '#{fullpath}'"
     end
 end
 

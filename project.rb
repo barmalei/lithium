@@ -18,6 +18,13 @@
         }
     }
 
+    GeneratedDirectory("test33") {
+        REQUIRE {
+            MetaFile("test33.meta")
+        }
+    }
+
+
     ZipFile("test.zip") {
         REQUIRE('.lithium/lib/**/*', FileMaskSource) {
             BASE('.lithium/lib')
@@ -43,7 +50,10 @@
         RunPhpScript     ('**/*.php')
         RunShell         ('**/*.sh')
         RunJAR           ('**/*.jar')
+
+        # TODO: this doesn't work since RunMaven is not a file artifact
         RunMaven         ('**/pom.xml')
+
         RunGradle        ('**/build.gradle.kts')
         RunGradle        ('**/build.gradle')
         RunGroovyScript  ('**/*.groovy')
@@ -60,6 +70,9 @@
         BuildWithTsConf  ('**/tsconfig.json')
         DeployGoogleApp  ('**/appengine-*.xml')
         DeployGoogleApp  ('**/app*.yaml')
+
+        # TODO: BUG that prevents recognizing "**/*.py" mask if un-comment the line below
+        #RunPySetup       ('**/setup.py')
 
         # REQUIRE {
         #     Directory(".lithium") {
@@ -84,7 +97,6 @@
         ValidatePhpScript   ('**/*.php')
         TypeScriptCompiler  ('**/*.ts')
         RunNodejs           ('**/*.js') { OPT '--check'  }
-        #ValidatePythonScript('**/*.py')
         RunPyFlake          ('**/*.py')
         MavenCompiler       ('**/pom.xml')
         GradleCompiler      ('**/build.gradle.kts')
@@ -105,12 +117,24 @@
         # }
     }
 
+    # GenerateJavaDoc._ {
+    #     @default_name = '.lithium/examples/test.java'
+    # }
+
+    Directory('apidoc') {
+        REQUIRE ".lithium/examples/test.java", GenerateJavaDoc
+    }
+
+
     MATCH('check:*') {
         JavaCheckStyle('**/*.java')
         JavaScriptHint('**/*.js')
     }
 
-    PMD('pmd:**/*.*')
+    PmdCheckFiles('pmd_check:**/*')
+    PmdCheckDir('pmd_check_dir:**/*')
+    PmdCopyPasteDup('pmd_dup:**/*')
+
     #MavenJarFile('mavenjar:**/*.jar')
 
     GREP('grep:')

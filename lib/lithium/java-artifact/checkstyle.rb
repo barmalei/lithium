@@ -9,7 +9,7 @@ class JavaCheckStyle < JavaFileRunner
         super
 
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
-        @checkstyle_version    ||= '8'
+        @checkstyle_version    ||= '10'
         @checkstyle_home = Files.assert_dir($lithium_code, 'ext', 'java', 'checkstyle', @checkstyle_version)
         Files.assert_dir(@checkstyle_home)
 
@@ -39,13 +39,8 @@ class JavaCheckStyle < JavaFileRunner
         CONFIG(@checkstyle_home, "default_checkstyle.xml")
     end
 
-    def WITH_TARGETS(src)
-        [ @checkstyle_main_class , '-c', @checkstyle_config, super(src) ]
-    end
-
-    def classpath
-        # only checkstyle classpath related JARs are required
-        PATHS.new(homedir).JOIN(@classpaths)
+    def WITH_TARGETS
+        [ @checkstyle_main_class , '-c', @checkstyle_config ] + super()
     end
 end
 
@@ -56,47 +51,8 @@ class UnusedJavaCheckStyle < JavaCheckStyle
     end
 end
 
-#  PMD code analyzer
-class PMD < JavaFileRunner
-    def initialize(name, &block)
-        super
 
-        @checkstyle_version ||= '7'
-        @pmd_format     ||= 'text'
-        @pmd_main_class ||= 'net.sourceforge.pmd.PMD'
-
-        @pmd_home ||= Files.assert_dir($lithium_code, 'ext', 'java', 'pmd', @checkstyle_version)
-        raise "PMD '#{@pmd_home}' home path cannot be found" unless File.directory?(@pmd_home)
-
-        @targets_from_file = true
-
-        cp = File.join(@pmd_home, 'lib', '*.jar')
-        REQUIRE {
-            DefaultClasspath('.env/pmd_classpath') {
-                JOIN(cp)
-            }
-        }
-    end
-
-    def classpath
-        # only PMD classpath related JARs are required
-        PATHS.new(homedir).JOIN(@classpaths)
-    end
-
-    def WITH_OPTS
-        ext = File.extname(fullpath).downcase[1..-1]
-        ext = 'ruby'   if ext == 'rb'
-        ext = 'python' if ext == 'py'
-        pmd_rules = File.join('rulesets', ext, 'quickstart.xml')
-        super + [ @pmd_main_class, '-f', @pmd_format, '-R', pmd_rules, '-filelist' ]
-    end
-
-    def error_exit_code?(ec)
-        ec.exitstatus != 0 && ec.exitstatus != 4
-    end
-end
-
-# TODO: complete the code !
+# TODO: complete or remove this code !
 class JsonSchemaToPojo < RunJAR
     def initialize(name, &block)
         super
@@ -111,10 +67,11 @@ class JsonSchemaToPojo < RunJAR
         }
     end
 
-    def WITH_TARGETS(src)
-        t = t.concat(super(src))
+    def WITH_TARGETS
+        t = t.concat(super())
         t = [ File.join(@jsonSchemaToPojo_home, 'jsonschema2pojo-cli-1.1.1.jar'), '--source', fullpath, '--target', 'java-gen' ]
         return t
     end
 end
+
 

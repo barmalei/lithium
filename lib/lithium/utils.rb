@@ -146,7 +146,7 @@ module Files
         }
     end
 
-    def self.grep_exec(*args, pattern:nil)
+    def self.grep_exec(*args, pattern:nil, &block)
         self.exec(*args) { | stdin, stdout, thread |
             while line = stdout.gets do
                 m = pattern.match(line.chomp)
@@ -170,7 +170,7 @@ module Files
         if  pl == 'darwin'
             `osascript -e 'tell app "Terminal"
                 activate
-                do script "cd #{hd}; #{cmd}"
+                do script "#{cmd}"
             end tell'`
         else
             raise "Terminal execution is not supported for '#{pl}' platform"
@@ -178,7 +178,7 @@ module Files
     end
 
     def self.dir(path, ignore_dirs = true, &block)
-        raise 'Path cannot be nil'            if path.nil?
+        raise 'Path cannot be nil' if path.nil?
 
         pp, mask = self.cut_fmask(path)
         raise "Path '#{path}' points to file" if File.file?(path)
@@ -319,9 +319,7 @@ module AssignableDependency
             raise "Target is nil and cannot be assigned with a value provided by #{self.class}:#{self.name}" if target.nil?
             raise "Nil assignable property name for #{self.class}:#{self.name}"                              if clazz.assign_with_name.nil?
 
-            # TODO: would be nice to avoid assign_req_as logic
-            attr_name, is_array = target.assign_req_as(self)                               if target.respond_to?(:assign_req_as)
-            attr_name, is_array = self.class.assign_with_name, self.class.assign_as_array? if attr_name.nil?
+            attr_name, is_array = self.class.assign_with_name, self.class.assign_as_array?
 
             new_value = self
             attr_name = "@#{attr_name}"
@@ -330,7 +328,7 @@ module AssignableDependency
                 cur_value = [] if cur_value.nil?
                 target.instance_variable_set(attr_name, cur_value.push(new_value)) if cur_value.index(new_value).nil?
             else
-                raise "Other artifact has been already assigned to '#{attr_name}' attribute of #{target.class}:#{target.name} artifact" unless cur_value.nil? || cur_value == new_value
+                raise "Other '#{cur_value.name}' artifact has been already assigned to '#{attr_name}' attribute of #{target.class}:#{target.name} artifact" unless cur_value.nil? || cur_value == new_value
                 target.instance_variable_set(attr_name, new_value)
             end
         end
@@ -597,6 +595,120 @@ module OptionsSupport
     end
 end
 
+
+#
+#   <WITH>  <COMMANDS> <OPTS>  <TARGETS>  <ARGS>
+#     |         |        |        |          |
+#     |         |        |        |          +--- test
+#     |         |        |        |   +--- [ file_list ]
+#     |         |        |        +---|
+#     |         |        |            +--- path_to_tmp_file (contains files to be processed)
+#     |         |        |
+#     |         |        s+--- e.g -cp classes:lib
+#     |         |
+#     |         +--- install
+#     |
+#     +--- e.g java
+#
+module ToolExecuter
+    include OptionsSupport
+
+    # ec - Process::Status
+    def error_exit_code?(ec)
+        ec.exitstatus != 0
+    end
+
+    # can be overridden to transform paths,
+    # e.g. convert path to JAVA file to a class name
+    def transform_target_path(path)
+        "\"#{path}\""
+    end
+
+    def WITH_COMMANDS
+        []
+    end
+
+    def WITH
+        raise "Tool name is not defined in '#{self.class.name}' class"
+    end
+
+    # @return Array
+    def WITH_OPTS
+        OPTS()
+    end
+
+    def ARGS(*args)
+        @arguments = [] + args
+    end
+
+    def WITH_ARGS
+        @arguments ||= []
+        @arguments = $lithium_args.dup if @arguments.length == 0 && $lithium_args && $lithium_args.length > 0
+        @arguments
+    end
+
+    def WITH_TARGETS
+        []
+    end
+
+    def CMD(run_with, cmds, opts, targets, args)
+        [ run_with ] + cmds + opts + targets + args
+    end
+
+    def EXEC(&block)
+        targets = WITH_TARGETS().map { | path | "#{transform_target_path(path)}" }
+        cmd = CMD(WITH(), WITH_COMMANDS(), WITH_OPTS(), targets, WITH_ARGS())
+        _exec(*cmd, &block)
+    end
+
+    def FAILED(*args, err_code:1)
+        raise "'#{self.class}' has failed cmd = '#{args}'"
+    end
+
+    # private method
+    def _exec(*args, &block)
+        #puts args.join(" ")
+
+        ec = block.nil? ? Files.exec(*args) : Files.exec(*args, &block)
+        if error_exit_code?(ec)
+            FAILED(*args, err_code:ec.exitstatus)
+        else
+            puts "'#{self.class}' was successfully executed"
+        end
+    end
+end
+
+#transform_targets
+#from_file
+
+module FromFileToolExecuter
+    include ToolExecuter
+
+    def transform_target_file(path)
+        "@#{path}"
+    end
+
+    def EXEC(&block)
+        targets, tmp = WITH_TARGETS(), Tempfile.open('lithium')
+        begin
+            targets.each { | path |
+                tmp.puts(transform_target_path(path))
+            }
+        ensure
+           tmp.close
+        end
+        targets = [ transform_target_file(tmp.path) ]
+
+        cmd = CMD(WITH(), WITH_COMMANDS(), WITH_OPTS(), targets, WITH_ARGS())
+        begin
+            _exec(*cmd)
+        ensure
+            tmp.unlink unless tmp.nil?
+        end
+    end
+end
+
+
 class Properties
     def self.parse(str)
         str = str.gsub!(/(^\s*[!\#].*$)|(^\s+)|(\s+$)|(\\\s*$[\n\r]+)|(^\s*[\n\r]\s*$)/, '')
@@ -633,4 +745,3 @@ class Properties
         self.fromMask(mask, find_first)[name]
     end
 end
-

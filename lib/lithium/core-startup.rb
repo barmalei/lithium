@@ -12,6 +12,7 @@ require 'lithium/file-artifact/archive'
 require 'lithium/java-artifact/jar'
 require 'lithium/java-artifact/misc'
 require 'lithium/java-artifact/checkstyle'
+require 'lithium/java-artifact/pmd'
 require 'lithium/java-artifact/vaadin-sass'
 require 'lithium/java-artifact/mvn'
 require 'lithium/java-artifact/gradle'
@@ -38,7 +39,7 @@ require 'lithium/xml-artifact'
 
 #     PATTERN {
 #         any('^\s*File\s+'); group(:location) { dquotes { file('py') }; any(',\s*line\s+'); line; }
-#     }.TO(ValidatePythonScript, RunPythonScript)
+#     }.TO(RunPythonScript)
 # }
 
 # STD recognizer
@@ -94,7 +95,7 @@ PATTERNS ({
         GroovyCompileErrorPattern.new()
     ],
 
-    [ ValidatePythonScript, RunPythonScript ] => [
+    RunPythonScript => [
         StdPattern.new {
             any('^\s*File\s+'); group(:location) { dquotes { file('py') }; any(',\s*line\s+'); line; }
         }
@@ -140,9 +141,18 @@ PATTERNS ({
         }
     ],
 
-    PMD => [
+    PmdCheckRunner => [
         StdPattern.new() {
             location('java'); spaces(); group(:message, '.*$')
+        }
+    ],
+
+    PmdCopyPasteDup => [
+        StdPattern.new() {
+            any('^Starting at line\s*');
+            group(:location) {
+                line; spaces; any('of'); spaces; file('java')
+            }
         }
     ],
 
@@ -268,14 +278,14 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     prjs_stack.each { | prj_home | prj = Project.new(prj_home, owner:prj) }
 
     # print header
-    dt = DateTime.now.strftime("%H:%M:%S.%L")
+    dt = Time.now()
     unless $lithium_options.has_key?('header') && $lithium_options['header'] != '2'
         puts "+#{'—'*73}+"
         puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
         puts "+#{'—'*73}+"
         $stdout.flush()
     else
-        puts "#{dt} Running lithium v#{$lithium_version}" if $lithium_options['header'] == '1'
+        puts "#{dt.strftime('%H:%M:%S')}: Running lithium v#{$lithium_version}" if $lithium_options['header'] == '1'
     end
 
     # call block that has to be run after lithium has been initialized and ready to process
@@ -308,5 +318,12 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
         }
     end
 
-    puts "#{DateTime.now.strftime('%H:%M:%S.%L')} Building of '#{artifact}' has been done"
+    puts "#{Time.now.strftime('%H:%M:%S')}/#{Time.now - dt}s: Building of '#{artifact}' has been done"
 end
+
+
+READY {
+    #a = MavenRunner.new(owner:Project.current)
+    #a.build()
+    #class A
+}

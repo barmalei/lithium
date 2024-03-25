@@ -8,10 +8,14 @@ class GCE < SdkEnvironmen
     end
 end
 
+# TODO: not clear why the class was built
+# revise it !
 class GoogleAppFile < ExistentFile
+    include AssignableDependency[:gceapp]
+
     @abbr = 'GAF'
 
-    def initialize(name = nil, &block)
+    def initialize(name, &block)
         app_file_path = [ 'appengine-web.xml', 'app.yaml' ].map { | app_file_name |
             if !name.nil? && app_file_name == File.basename(name)
                 break fullpath(name)
@@ -30,25 +34,50 @@ class GoogleAppFile < ExistentFile
     end
 end
 
-class DeployGoogleApp < GoogleAppFile
-    include OptionsSupport
+class DeployGoogleApp < ExistentFile
+    include ToolExecuter
+
+    default_name('.env/gce/deploy')
 
     @abbr = 'DGA'
 
     def initialize(name, &block)
         REQUIRE GCE
         super
-        OPT "--no-promote"
-        OPTS($lithium_args) if $lithium_args.length > 0
+        NO_PROMOTE()
+    end
+
+    def transform_target_path(path)
+        path
     end
 
     def build
         super
-        Files.execInTerm(homedir, command())
+        EXEC()
     end
 
-    def command
-        [ @gce.gcloud, 'app', 'deploy', fullpath, @gce.OPTS(), OPTS() ].join(' ')
+    def NO_PROMOTE
+        OPT "--no-promote"
+    end
+
+    def WITH
+        @gce.gcloud
+    end
+
+    def WITH_TARGETS
+        []
+    end
+
+    def WITH_COMMANDS
+        [ 'app', 'deploy', fullpath ]
+    end
+
+    def WITH_OPTS
+        @gce.OPTS() + super
+    end
+
+    def _exec(*cmd)
+        Files.execInTerm(homedir, cmd.join(' '))
     end
 
     def what_it_does
@@ -64,14 +93,11 @@ class DeployGoogleQueue < RunTool
     def initialize(name, &block)
         REQUIRE GCE
         super
+        OPT('deploy')
     end
 
     def WITH
         @gce.gcloud
-    end
-
-    def WITH_OPTS(opts)
-        opts.push('deploy')
     end
 
     def what_it_does

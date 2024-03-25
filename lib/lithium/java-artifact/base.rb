@@ -5,6 +5,81 @@ require 'lithium/core-file-artifact'
 require 'rexml/document'
 require 'tempfile'
 
+
+#
+#  Methods to detect SDKMAN packages by candidate name and optionally version
+#  If version was not passed current one will be used. If tool name was not defined
+#  it tries to fetch it via "tool_name" method (SdkEnvironmen classes define it)
+#
+module SdkmanTool
+    def force_sdkhome_detection
+        SDKMAN()
+    end
+
+    def SDKMAN(version = nil)
+        sdkman_pkg_home(respond_to?(:tool_name) ? tool_name : nil, version)
+    end
+
+    # detect home version
+    # @param  candidate
+    # @param  version
+    def sdkman_pkg_home(candidate, version = nil)
+        raise "Invalid '#{candidate}' candidate"  if candidate.nil? || candidate.length < 3
+
+        sdk_home = File.expand_path("~/.sdkman/candidates/#{candidate}")
+        raise "Invalid '#{sdk_home}' SDKMAN #{candidate} candidates folder" unless File.directory?(sdk_home)
+
+        if version.nil?
+            path = File.join(sdk_home, 'current')
+            if File.directory?(path)
+                sdk_home = File.expand_path(path)
+            else
+                candidates = Dir.glob(File.join(sdk_home, '*')).filter { | path |
+                    File.directory?(path)
+                }
+
+                if candidates.length > 0
+                    sdk_home = File.join(candidates[0])
+                else
+                    raise "SDKMAN '#{candidate}' version cannot be detected"
+                end
+            end
+        else
+            candidates = Dir.glob(File.join(sdk_home, "#{version}*")).filter { | path | File.directory?(path) }
+            if candidates.length == 0
+                raise "SDKMAN '#{version}' #{candidate} version cannot be detected"
+            else
+                sdk_home = File.join(candidates[0])
+            end
+        end
+
+        sdk_home = File.realdirpath(sdk_home) if !sdk_home.nil? && File.symlink?(sdk_home)
+        return sdk_home
+    end
+end
+
+
+class SDKMAN < SdkEnvironmen
+    include SdkmanTool
+
+    @@sdkman_base = '.env/sdkman/'
+
+    def initialize(name, &block)
+        raise "Invalid '#{self.class}' artifact '#{name}' name " unless name.start_with?(@@sdkman_base)
+        super
+    end
+
+    def force_sdkhome_detection
+        path = Files.relative_to(@name, @@sdkman_base)
+        raise "'#{@name}' doesn't contain candidate" if path.nil?
+        parts = path.split('/')
+        rasie "'#{@name}' path is invalid" if parts.length > 2
+        candidate = parts[0]
+        version   = parts.length > 1 ? parts[1] : nil
+        sdkman_pkg_home(candidate, version)
+    end
+end
+
 class JavaClasspath < EnvArtifact
     include LogArtifactState
     include PATHS
@@ -120,12 +195,10 @@ class WildflyWarClasspath < WarClasspath
     end
 end
 
-class InFileClasspath < ExistentFile
+class InFileClasspath < FileArtifact
     include AssignableDependency[ :classpaths, true ]
     include LogArtifactState
     include PATHS
-
-    default_name(".lithium/classpath")
 
     log_attr :exclude
 
@@ -169,69 +242,33 @@ class InFileClasspath < ExistentFile
     end
 end
 
-class JVM < SdkEnvironmen
+#
+# Module implements aggregated classpath
+#
+module ClassPathHolder
     attr_reader :classpaths # array of PATHS instances
+
+    def classpath
+        cp = instance_variables
+            .map    { | n | instance_variable_get(n) }
+            .map    { | v | v.is_a?(JVM) ? v.classpath : v.is_a?(JavaClasspath) ? v : nil }
+            .select { | e | !e.nil? }
+
+        @classpaths ||= []
+        cp.concat(@classpaths)
+        PATHS.new(homedir).JOIN(cp)
+    end
+end
+
+class JVM < SdkEnvironmen
+    include ClassPathHolder
+    include SdkmanTool
 
     def list_classpaths
         return 'None' if @classpaths.length == 0
         @classpaths.map { | clz |
             clz.name
         }.join(',')
-    end
-
-    def classpath
-        @classpaths ||= []
-        PATHS.new(homedir).JOIN(@classpaths)
-    end
-
-    def force_sdkhome_detection
-        SDKMAN()
-    end
-
-    def SDKMAN(*args)
-        candidate = tool_name
-        if args.length == 2
-            candidate = args[0]
-            version   = args[1]
-        elsif args.length == 1
-            version = args[0]
-        elsif args.length == 0  
-            version = nil
-        else
-            raise "Invalid number of arguments"
-        end
-
-        raise "Invalid '#{candidate}' candidate"                 if candidate.nil? || candidate.length < 3
-        raise "Invalid '#{version}' #{candidate} SDKMAN version" if !version.nil?  && version.length   < 2
-
-        sdk_home = File.expand_path("~/.sdkman/candidates/#{candidate}")
-        raise "Invalid '#{sdk_home}' SDKMAN #{candidate} candidates folder" unless File.directory?(sdk_home)
-
-        if version.nil?
-            path = File.join(sdk_home, 'current')
-            if File.directory?(path)
-                @sdk_home = File.expand_path(path)
-            else
-                candidates = Dir.glob(File.join(sdk_home, '*')).filter { | path | 
-                    File.directory?(path) 
-                }
-
-                if candidates.length > 0
-                    @sdk_home = File.join(candidates[0])
-                else
-                    raise "SDKMAN '#{candidate}' version cannot be detected"            
-                end                 
-            end
-        else
-            candidates = Dir.glob(File.join(sdk_home, "*#{version}*")).filter { | path | File.directory?(path) }
-            if candidates.length == 0
-                raise "SDKMAN '#{version}' #{candidate} version cannot be detected" 
-            else
-                @sdk_home = File.join(candidates[0])
-            end
-        end
-
-        return @sdk_home
     end
 
     def self.grep_package(path, pattern = /^package[ \t]+([a-zA-Z0-9_.]+)[ \t]*/)
@@ -272,17 +309,20 @@ class JAVA < JVM
     log_attr :java_version
 
     def initialize(name, &block)
-        unless @sdk_home || !ENV['JAVA_HOME']
-            @sdk_home = ENV['JAVA_HOME']
-            @sdk_home.gsub('\\','/') # windows !
-            puts_warning 'Java home has not been defined by project. Use Java home specified by env. variable'
-        end
-
         super
-
         # Java home variable has to be initialized
         # JAVA_HOME can be required by other JVM based langs like kotlin, groovy etc
-        ENV['JAVA_HOME'] = @sdk_home if !ENV['JAVA_HOME']
+        ENV['JAVA_HOME'] = @sdk_home
+    end
+
+    def force_sdkhome_detection
+        var_name = 'JAVA_HOME'
+        unless !ENV[var_name]
+            puts_warning "Java home '#{var_name}' variable is detected. Use it as java home"
+            java_home = ENV[var_name].gsub('\\','/') # windows !
+            return java_home
+        end
+        super
     end
 
     def javac()   tool_path('javac')     end
@@ -332,6 +372,7 @@ class KOTLIN < JVM
 
     def initialize(name, &block)
         super
+
         # TODO: redesign, may be replace KotlinClasspath with DefaultClasspath ?
         hm = @sdk_home
         REQUIRE {
@@ -356,51 +397,41 @@ class SCALA < JVM
 end
 
 class RunJvmTool < RunTool
-    #  [  name, class, block ]
-    @JAVA = nil
+    include ClassPathHolder
 
-#    attr_reader :classpaths
+    # Internal field to customize JAVA, should be used only by self.JAVA method
+    @JAVA = nil
 
     def initialize(name, &block)
         require_java()
         super
     end
 
-    def assign_req_as(art)
-        @jvm_classpath = art.classpath if art.is_a?(JVM)
-        return nil
-    end
-
-    def classpath
-        cp = []
-        cp = cp.append(@jvm_classpath) if @jvm_classpath
-        cp = cp.append(@classpaths)    if @classpaths
-        PATHS.new(homedir).JOIN(cp)
-    end
-
-    def error_exit_code?(ec)
-        ec != 0
-    end
-
     def require_java
-        java_args  = self.class.JAVA
-        java_block = java_args[2]
-        REQUIRE java_args[0], java_args[1], &java_block
+        name, block = self.class.JAVA
+        REQUIRE name, JAVA, &block
     end
 
     def WITH_OPTS
-        op = super
-        cp = classpath
-        op.push('-classpath', "\"#{cp}\"") unless cp.EMPTY?
-        return op
+        super + classpath_opts
     end
 
+    def classpath_opts
+        cp = classpath
+        cp.EMPTY? ? [] : [ '-classpath', "\"#{cp}\"" ]
+    end
+
+    #
+    # Method to customize JAVA on the level of tool class:
+    #   ToolName.JAVA {
+    #       SDKMAN("21")
+    #   }
+    #
     def self.JAVA(name = nil, &block)
         if name.nil? && block.nil?
-            return @JAVA.nil? ? [ JAVA.default_name(), JAVA, block ] : @JAVA
+            return @JAVA.nil? ? [ JAVA.default_name(), block ] : @JAVA
         else
-            @JAVA = [ name.nil? ? ".env/#{self.name}/JAVA" : name, JAVA, block ]
+            @JAVA = [ name.nil? ? ".env/#{self.name}/JAVA" : name, block ]
         end
     end
 end
-

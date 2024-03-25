@@ -4,7 +4,7 @@ require 'lithium/core-file-artifact'
 #   Tree top grammar compiler
 #
 # TODO: should be revised
-class CompileTTGrammar < ExistentFile
+class CompileTTGrammar < RunTool
     @abbr = 'CTT'
 
     def initialize(name, &block)
@@ -20,23 +20,32 @@ class CompileTTGrammar < ExistentFile
         raise "Undefined output directory '#{@output_dir}'" unless File.directory?(@output_dir)
     end
 
-    # TODO: this method is never called, valid only in  a case of FileMask
-    def build_item(path, mt)
-        # kill extension
+    def WITH
+        @ruby.ruby
+    end
+
+    def WITH_OPTS
+        rubypath() + [ @tt ] + super
+    end
+
+    def WITH_ARGS
+        [ '-o' ] + super + [ "\"#{output_path()}\"" ]
+    end
+
+    def build
+        opath = output_path()
+        File.delete(opath) if File.exist?(opath)
+        super
+    end
+
+    def output_path
         oname      = File.basename(path)
         ext        = File.extname(oname)
         oname[ext] = '.rb' if ext
-
-        opath = File.join(@output_dir, oname)
-        File.delete(opath) if File.exist?(opath)
-
-        raise "Grammar '#{path}' compilation failed" if Files.exec(@ruby.ruby, cmd_rubypath, @tt, q_fullpath(path), '-o', "\"#{opath}\"") != 0
+        return File.join(@output_dir, oname)
     end
 
     def what_it_does
         "Compile '#{@name}' tree top grammar to '#{@output_dir}'"
     end
 end
-
-
-

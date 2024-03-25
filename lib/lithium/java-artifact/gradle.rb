@@ -16,45 +16,52 @@ class GradleFile < ExistentFile
     include StdFormater
     include AssignableDependency[:gradle]
 
+    default_name('build.gradle.kts')
+
     @abbr = 'GRF'
 
-    def initialize(name = nil, &block)
-        REQUIRE GRADLE
-
-        name = homedir if name.nil?
-        fp   = fullpath(name)
-        gradle  = Files.look_file_up(fp, 'build.gradle.kts', homedir)
-        gradle  = Files.look_file_up(fp, 'build.gradle', homedir) if  gradle.nil?
-        raise "Gradle build file cannot be detected by '#{fp}' path" if  gradle.nil?
-        super(gradle, &block)
+    def expired?
+        false
     end
 end
 
-class RunGradle < GradleFile
-    include OptionsSupport
+class RunGradle < Artifact
+    include ToolExecuter
 
     @abbr = 'RGR'
 
-    default_name('build.gradle')
+    default_name('.env/gradle/run')
 
-    def initialize(name, &block)
+    def initialize(name = nil, &block)
+        REQUIRE GradleFile
+        REQUIRE GRADLE
         super
         @targets ||= [ 'build' ]
     end
+
+    def WITH
+        @gradle.gradle
+    end
+
+    def WITH_OPTS
+        @gradle.OPTS() + super
+    end
+
 
     def TARGETS(*args)
         @targets = []
         @targets.concat(args)
     end
 
+    # TODO: replace with WITH_COMMANDS
+    def WITH_TARGETS
+        @targets
+    end
+
     def build
-        path = fullpath
-        raise "Target gradle artifact cannot be found '#{path}'" unless File.exist?(path)
-        chdir(File.dirname(path)) {
-            if Files.exec(@gradle.gradle, @gradle.OPTS(), OPTS(), @targets.join(' ')).exitstatus != 0
-                raise "Gradle [#{@targets.join(',')}] running failed"
-            end
-        }
+        super
+        go_to_homedir()
+        EXEC()
     end
 
     def what_it_does
@@ -62,8 +69,11 @@ class RunGradle < GradleFile
     end
 end
 
+# TODO: revise, not completed code
 class RunGradleTest < RunGradle
-    def initialize(name, &block)
+    default_name('.env/gradle/test')
+
+    def initialize(name = nil, &block)
         fp = fullpath(name)
         super
         TARGETS('test')
@@ -79,7 +89,9 @@ class RunGradleTest < RunGradle
 end
 
 class GradleCompiler < RunGradle
-    def initialize(name)
+    default_name('.env/gradle/test')
+
+    def initialize(name = nil, &block)
         super
         TARGETS('compileJava')
     end
@@ -87,25 +99,15 @@ class GradleCompiler < RunGradle
     def expired?
         false
     end
-
-    def list_items
-        dir = File.join(File.dirname(fullpath), 'src', '**', '*')
-        FileMask.new(dir, owner:self.owner).list_items { | f, t |
-            yield f, t
-        }
-
-        super { | f, t |
-            yield f, t
-        }
-    end
 end
 
+# TODO: not completed
 class GradleClasspath < InFileClasspath
     include StdFormater
 
     log_attr :excludeGroupIds, :excludeTransitive
 
-    default_name(".lithium/gradle_classpath")
+    default_name(".lithium/gradle/classpath")
 
     def initialize(name, &block)
         super
@@ -117,6 +119,7 @@ class GradleClasspath < InFileClasspath
 
     def build
         fp = fullpath
+        # TODO: test code
         chdir(File.dirname(@gradle.fullpath)) {
             Files.exec(["gradle", "hello", "--console", "plain", "-q"]) { | stdin, stdout, th |
                 stdin.close

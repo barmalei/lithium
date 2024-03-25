@@ -125,32 +125,40 @@ end
 
 
 # nodejs module
-class NodejsModule < FileArtifact
+class NodejsModule < RunTool
     def initialize(name ,&block)
         REQUIRE JS
 
-        unless File.absolute_path?(name)
-            bn = File.basename(File.dirname(name))
-            name = File.join($NODEJS_MODULES_DIR, name) if bn != $NODEJS_MODULES_DIR
-        end
+        # unless File.absolute_path?(name)
+        #     bn = File.basename(File.dirname(name))
+        #     name = File.join($NODEJS_MODULES_DIR, name) if bn != $NODEJS_MODULES_DIR
+        # end
 
         super
 
-        bn = File.basename(File.dirname(fullpath))
-        if bn != $NODEJS_MODULES_DIR
-            raise "Invalid module '#{fullpath}' path. '[<homedir>/]node_modules/<module-name>' path is expected"
-        end
+        # bn = File.basename(File.dirname(fullpath))
+        # if bn != $NODEJS_MODULES_DIR
+        #     raise "Invalid module '#{fullpath}' path. '[<homedir>/]node_modules/<module-name>' path is expected"
+        # end
     end
 
-    def build
-        project.go_to_homedir
-        puts "Install module in #{Dir.pwd} hd = #{project.go_to_homedir}"
-        raise "Install of '#{@name}' nodejs module" if Files.exec(@js.npm, 'install', File.basename(fullpath)) != 0
+    def WITH
+        @js.npm
+    end
+
+    def WITH_TARGETS
+        super().map { | item | File.basename(item) }
+    end
+
+    def WITH_OPTS
+        op = super
+        op.push('i')
+        return op
     end
 
     def clean
         if File.exist?(fullpath)
-            project.go_to_homedir
+            go_to_homedir
             raise "Install of '#{@name}' nodejs module" if Files.exec(@js.npm, 'uninstall', File.basename(fullpath)) != 0
         end
     end
@@ -166,9 +174,7 @@ end
 
 
 # Run JS with nodejs
-class RunNodejs < ExistentFile
-    include OptionsSupport
-
+class RunNodejs < RunTool
     @abbr = 'RJS'
 
     def initialize(name, &block)
@@ -176,9 +182,8 @@ class RunNodejs < ExistentFile
         super
     end
 
-    def build
-        super
-        raise "Running of '#{@name}' JS script failed" if Files.exec(@js.nodejs, OPTS(), q_fullpath) != 0
+    def WITH
+        @js.nodejs
     end
 
     def what_it_does
@@ -189,7 +194,7 @@ end
 # nodejs uglyfier
 # @name : name of the uglified file
 class UglifiedJSFile < GeneratedFile
-    include OptionsSupport
+    include ToolExecuter
 
     def initialize(name, &block)
         REQUIRE JS
@@ -197,23 +202,27 @@ class UglifiedJSFile < GeneratedFile
         super
     end
 
-    def build
+    def WITH_TARGETS
         list = []
         list_sources_items { | source, from, from_m, dest |
             raise "Source from file '#{from}' doesn't exists or points to directory" unless File.file?(from)
             list.push(from)
         }
+        return list
+    end
 
-        raise 'Source list is empty' if list.length == 0
+    def WITH_OPTS
+        super + [ '-o', q_fullpath ]
+    end
+
+    def WITH
+        File.join(@js.module_home('uglify-js'), 'bin', 'uglifyjs')
+    end
+
+    def build
         validate_extension()
-        project.go_to_homedir
-        raise 'Uglifier has failed' if Files.exec(
-            File.join(@js.module_home('uglify-js'), 'bin', 'uglifyjs'), 
-            OPTS(), 
-            list.map { | s |  "\"#{s}\"" }.join(' '), 
-            '-o',
-            q_fullpath
-        ) != 0
+        go_to_homedir()
+        EXEC()
     end
 
     def clean
@@ -322,17 +331,14 @@ class JavaScriptDoc < FileArtifact
     end
 end
 
-class TypeScriptCompiler < FileMask
-    include OptionsSupport
-
+class TypeScriptCompiler < RunTool
     def initialize(name, &block)
         REQUIRE JS
         super
     end
 
-    def build
-        go_to_homedir
-        raise "Compilation of '#{@name}' has failed" if Files.exec(@js.tsc, OPTS(), q_fullpath) != 0
+    def WITH
+        @js.tsc
     end
 
     def what_it_does
@@ -340,15 +346,15 @@ class TypeScriptCompiler < FileMask
     end
 end
 
-
-class JavaScriptHint < FileMask
+class JavaScriptHint < RunTool
     def initialize(name, &block)
         REQUIRE JS
+        REQUIRE
         super
     end
 
-    def build
-        raise "Linting of '#{@name}' failed" if Files.exec('jshint', fullpath) != 0
+    def WITH
+        'jshint'
     end
 
     def what_it_does
