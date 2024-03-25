@@ -40,7 +40,7 @@
     }
 
     PYTHON {
-        @tool_name = 'python3.10'
+        #@tool_name = 'python3.10'
     }
 
     MATCH("run:*") {
