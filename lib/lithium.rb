@@ -9,8 +9,8 @@ require 'pathname'
 #      ans "basedir" as an option makes possible to build an external
 #      artifact in a context of the given project
 # !==================================================================
-$lithium_version    = '5.4.0'
-$lithium_date       = 'Jul 2023'
+$lithium_version    = '5.4.4'
+$lithium_date       = 'Mar 2024'
 $lithium_code       = File.dirname(File.expand_path(__dir__).gsub("\\", '/'))
 $lithium_options    = Hash[ ARGV.take_while { | a | a[0] == '-' }.collect() { | a | a[1..-1].split('=') } ]  # -name=value
 $lithium_args       = ARGV.dup[($lithium_options.length + 1) .. -1]
