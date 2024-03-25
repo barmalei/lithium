@@ -107,14 +107,18 @@ module Files
     def self.which(cmd, realpath = false)
         exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
         ENV['PATH'].split(File::PATH_SEPARATOR).each do | path |
-            path = path.sub('\\', '/') if File::PATH_SEPARATOR == ';'
+            path = path.gsub('\\', '/') if File::PATH_SEPARATOR == ';'
             exts.each { | ext |
                 exe = File.join(path, "#{cmd}#{ext}")
 
-                # checking file is mandatory, since for example folder
-                # '/Users/brigadir/projects/.lithium/lib/lithium' is
-                # executable because 'lithium' script exists
-                return realpath ? File.realdirpath(exe) : exe if File.executable?(exe) && File.file?(exe)
+                if File.executable?(exe) && File.file?(exe)
+                    if realpath
+                        pp = File.realdirpath(exe)
+                    else
+                        pp = exe
+                    end
+                    return pp
+                end
             }
         end
         return nil
@@ -146,23 +150,35 @@ module Files
         }
     end
 
-    def self.grep_exec(*args, pattern:nil, &block)
+    def self.grep_exec(*args, pattern:nil, find_first:true, &block)
+        acc = []
         self.exec(*args) { | stdin, stdout, thread |
             while line = stdout.gets do
                 m = pattern.match(line.chomp)
                 if m
-                    stdout.close
                     if m.length > 1
-                        return m[1..]
+                        r = m[1..]
                     elsif m.length == 1
-                        return m[1]
+                        r = m[1]
                     else
-                        return m[0]
+                        r = m[0]
+                    end
+
+                    if find_first == true
+                        stdout.close
+                        return r
+                    else
+                        acc.append(r)
                     end
                 end
             end
         }
-        return nil
+
+        if find_first == true || acc.length == 0
+            return nil
+        else
+            return acc
+        end
     end
 
     def self.execInTerm(hd, cmd)

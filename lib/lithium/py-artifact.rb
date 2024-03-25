@@ -9,7 +9,7 @@ end
 
 # Python home
 class PYTHON < SdkEnvironmen
-    @tool_name = detect_tool_name('python3', 'python')
+    @tool_name = detect_tool_name('python3', 'python3.10', 'python', 'py')
 
     log_attr :pyname
 
@@ -17,11 +17,20 @@ class PYTHON < SdkEnvironmen
         REQUIRE DefaultPythonPath
         super
 
-        puts("!!! Constructor PYTHON() #{self.object_id} #{self.owner}")
+        res = Files.grep_exec(pip(), 'list -v', pattern:/^([a-zA-Z_\-.0-9]+)\s+([^ ]+)\s+(.*)\s+pip$/, find_first:false)
 
-        fp_re           = /([^$^%|:;,<>]+)/
-        @user_base      = Files.grep_exec(python(), ' -m site --user-base', pattern:fp_re)
-        @user_site_base = Files.grep_exec(python(), ' -m site --user-site', pattern:fp_re)
+        #
+        # { <mod_name> => {  path: '', version: ''}}
+        #
+        @modules = {}
+        unless res.nil?
+          res.each { | e |
+            @modules[e[0]] = {
+                'path'    => e[2].gsub('\\', '/'),
+                'version' => e[1]
+            }
+          }
+        end
     end
 
     def pypath
@@ -47,12 +56,12 @@ class PYTHON < SdkEnvironmen
         end
     end
 
-    def user_base
-        @user_base
+    def modules(nm = nil)
+        nm.nil? ? @modules : @modules[nm]
     end
 
-    def user_site_base
-        @user_site_base
+    def user_base
+        @user_base
     end
 
     def tool_name
@@ -67,6 +76,20 @@ class PipPackage < EnvArtifact
         REQUIRE PYTHON
         super
         OPT('--upgrade')
+    end
+
+    def required_was_created(req)
+        if req.kind_of?(PYTHON)
+            @module_name = File.basename(@name)
+            m = @python.modules(@module_name)
+            unless m.nil?
+                @module_ver  = m['version']
+                @module_path = File.join(m['path'], @module_name)
+            else
+                @module_ver  = nil
+                @module_path = nil
+            end
+        end
     end
 
     def WITH
@@ -87,13 +110,20 @@ class PipPackage < EnvArtifact
     end
 
     def expired?
+        #raise "#{p} file exists" if File.file?(p)
+        # name of package can be different to the name it really stored in file system
+        # p = File.join(@python.user_site_base, n.gsub(/-/, '_')) unless File.exist?(p)
+        # raise "#{p} file exists" if File.file?(p)
+
+        @module_name.nil? || !File.directory?(@module_path)
+
         #ver = Files.grep_exec(@python.pip, 'show', File.basename(@name), pattern:/Version:\s*(.*)/)
         #return ver.nil?
-        return false
+        #return false
     end
 
     def what_it_does
-        "Deploy '#{@name}' python package"
+        "Install '#{@name}' python package"
     end
 end
 
@@ -141,7 +171,13 @@ class RunPyFlake < RunTool
     end
 
     def WITH
-        File.join(@python.user_base(), 'bin', 'pyflakes')
+        m = @python.modules('pyflakes')
+        p = m['path']
+        if File::PATH_SEPARATOR == ';'
+            File.join(File.dirname(p), 'Scripts', 'pyflakes')
+        else
+            File.join(File.expand_path("../../..", p), 'bin', 'pyflakes')
+        end
     end
 end
 
@@ -162,4 +198,3 @@ class RunPySetup < RunTool
         @python.pip
     end
 end
-

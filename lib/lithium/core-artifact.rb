@@ -904,7 +904,15 @@ class SdkEnvironmen < EnvArtifact
     end
 
     def tool_path(nm)
-        File.join(@sdk_home, 'bin', nm)
+        path = File.join(@sdk_home, 'bin', nm)
+        if File.exist?(path)
+            return path
+        elsif File::PATH_SEPARATOR == ';' && File.exist?(path + '.exe')
+            return path + '.exe'
+        else
+            puts_warning "'#{path}' not found. Use '#{nm}' tool as is"
+            return nm
+        end
     end
 
     def tool_name

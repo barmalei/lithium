@@ -334,13 +334,6 @@ class JAVA < JVM
         @sdk_home = super
     end
 
-    def tool_path(pp)
-        path = super
-        return path if File.exist?(path) || (File::PATH_SEPARATOR == ';' && File.exist?(path + '.exe'))
-        puts_warning "'#{path}' not found. Use '#{tool}' as is"
-        return tool
-    end
-
     def tool_version(version = '-version')
         super
     end
