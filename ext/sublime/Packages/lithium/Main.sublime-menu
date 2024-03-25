@@ -11,22 +11,23 @@
                     ,{ "caption": "Run",        "command": "li", "args": { "command": "run:{file}"      } }
                     ,{ "caption": "Run Tests",  "command": "li", "args": { "command": "test:{file}"     } }
                     ,{ "caption": "Check",      "command": "li", "args": { "command": "check:{file}"    } }
-                    ,{ "caption": "PMD Check",  "command": "li", "args": { "command": "pmd:{file}"      } }
+                    ,{ "caption": "PMD Check",  "command": "li", "args": { "command": "pmd_check:{file}"      } }
 
                     ,{ "caption": "-" }
 
-                    ,{ "caption": "Maven clean/install",  "command": "li", "args": { "command": "mvn:{file}" } }
-                    ,{ "caption": "Maven compile",  "command": "li",       "args": { "command": "MavenCompiler:{file}" } }
-                    ,{ "caption": "Maven test",  "command": "li",          "args": { "command": "RunMavenTest:{file}" } }
-                    ,{ "caption": "Artifact deps",  "command": "li",          "args": { "command": "ShowMavenArtifactTree:{file}/{symbol}" } }
-                    ,{ "caption": "Open POM",  "command": "pom", "args" : { "command": "POM" } }
+                    ,{ "caption": "Maven clean/install",  "command": "li",  "args": { "command": "mvn:{file}" } }
+                    ,{ "caption": "Maven compile",        "command": "li",  "args": { "command": "MavenCompiler:{file}" } }
+                    ,{ "caption": "Maven test",           "command": "li",  "args": { "command": "RunMavenTest:{file}" } }
+                    ,{ "caption": "Artifact deps",        "command": "li",  "args": { "command": "ShowMavenArtifactTree:{file}/{symbol}" } }
+                    ,{ "caption": "Open POM",             "command": "pom", "args": { "command": "POM" } }
 
                     ,{ "caption": "-" }
 
-                    ,{ "caption": "Compile All",   "command": "li", "args": {"command":"compile:{src_home}/**/*{src_ext}" } }
-                    ,{ "caption": "Check All",     "command": "li", "args": {"command":"check:{src_home}/**/*{src_ext}"   } }
-                    ,{ "caption": "PMD Check All", "command": "li", "args": {"command":"pmd:{src_home}/**/*{src_ext}"     } }
-                    ,{ "caption": "Clean", "command": "CLEAN" }
+                    ,{ "caption": "Compile All",        "command": "li", "args": {"command":"compile:{src_home}/**/*{src_ext}" } }
+                    ,{ "caption": "Check All",          "command": "li", "args": {"command":"check:{src_home}/**/*{src_ext}"   } }
+                    ,{ "caption": "PMD Check All",      "command": "li", "args": {"command":"pmd_check_dir:{src_home}"         } }
+                    ,{ "caption": "PMD All Duplicates", "command": "li", "args": {"command":"pmd_dup:{src_home}"               } }
+                    ,{ "caption": "Clean",              "command": "CLEAN" }
 
                     ,{ "caption": "-" }
 

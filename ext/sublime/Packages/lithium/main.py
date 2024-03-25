@@ -452,7 +452,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
             if self.package_name is not None:
                 self.full_class_name = self.package_name + "." + self.class_name
                 self.exec(
-                    "ShowClassMethods:%s" % self.full_class_name,
+                    "LiJavaToolRunner:methods:%s" % self.full_class_name,
                     self.match_output,
                     self.error_output,
                     False, { "std": "none" }
@@ -564,7 +564,7 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
         if package is not None:
             self.full_class_name = package + "." + class_name
             self.exec(
-                "ShowClassModule:%s" % self.full_class_name, self.match_output, self.error_output, False, { "std": "none" }
+                "LiJavaToolRunner:module:%s" % self.full_class_name, self.match_output, self.error_output, False, { "std": "none" }
             )
 
             if len(self.detected_modules) > 0:
@@ -611,7 +611,7 @@ class LiShowClassInfoCommand(LiJavaTextCommand):
         if pkg is not None:
             full_class_name = pkg + "." + class_name
 
-            self.exec("ShowClassInfo:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" })
+            self.exec("LiJavaToolRunner:classInfo:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" })
             if len(self.matched_results) > 0:
                 LiClassInfo(json.loads(''.join(self.matched_results))).show(self.view)
             else:
@@ -659,7 +659,7 @@ class LiShowClassFieldCommand(LiJavaTextCommand):
         if pkg is not None:
             full_class_name = pkgf + "." + class_name
             self.exec(
-                "ShowClassField:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" }
+                "LiJavaToolRunner:field:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" }
             )
 
             if self.outputText is not None and len(self.outputText) > 0:

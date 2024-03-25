@@ -1,6 +1,6 @@
 {
     "lithium" : {
-        "command" : "ruby --enable-yjit /Users/brigadir/projects/.lithium/lib/lithium.rb",
+        "command" : "ruby /Users/brigadir/projects/.lithium/lib/lithium.rb",
         "opts"    : {
             "verbosity": "2",
             "std"      : "SublimeStd",
