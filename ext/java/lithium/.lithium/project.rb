@@ -7,4 +7,8 @@
             }
         }
     }
+
+    JavaCheckStyle("check:**/*.java") {
+        @checkstyle_version = "8"
+    }
 }

@@ -1,6 +1,5 @@
 package lithium;
 
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Constructor;
@@ -15,8 +14,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import java.util.regex.Pattern;
 
 import java.net.URL;
@@ -328,6 +325,11 @@ public class JavaTools {
 
 //        Map
         String info = "<methods:className> or <class:className> or <module:className> commands are expected";
+
+
+        // args = new String[] {
+        //     "class:Date"
+        // };
 
         // detectConstantValue("lithium.JavaTools");
         // // TODO: removeme
