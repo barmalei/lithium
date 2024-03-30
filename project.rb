@@ -70,6 +70,7 @@
         BuildWithTsConf  ('**/tsconfig.json')
         DeployGoogleApp  ('**/appengine-*.xml')
         DeployGoogleApp  ('**/app*.yaml')
+        RunBqSql         ('**/*.sql')
 
         # TODO: BUG that prevents recognizing "**/*.py" mask if un-comment the line below
         #RunPySetup       ('**/setup.py')
@@ -110,6 +111,7 @@
         CppCompiler         ('**/*.c')
         RunDartPubBuild     ('**/pubspec.yaml')
         ValidateDartCode    ('**/*.dart')
+        ValidateBqSql       ('**/*.sql')
 
         # OTHERWISE
         # OTHERWISE {

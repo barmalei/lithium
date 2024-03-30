@@ -132,7 +132,6 @@ module Files
 
         # use quotas to surround process if necessary
         args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
-
         # merged stderr and stdout
         Open3.popen2e(args.join(' ')) { | stdin, stdout, thread |
             stdout.set_encoding(Encoding::UTF_8)
@@ -140,9 +139,13 @@ module Files
                 # close stdin
                 stdin.close
 
-                while line = stdout.gets do
+                stdout.each { | line |
                     $stdout.puts line
-                end
+                }
+
+                # while line = stdout.gets do
+                #     $stdout.puts line
+                # end
             else
                 block.call(stdin, stdout, thread)
             end
@@ -717,7 +720,7 @@ module FromFileToolExecuter
 
         cmd = CMD(WITH(), WITH_COMMANDS(), WITH_OPTS(), targets, WITH_ARGS())
         begin
-            _exec(*cmd)
+            _exec(*cmd, &block)
         ensure
             tmp.unlink unless tmp.nil?
         end

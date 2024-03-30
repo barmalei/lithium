@@ -26,7 +26,8 @@ require 'lithium/rb-artifact'
 require 'lithium/php-artifact'
 require 'lithium/tt-artifact'
 require 'lithium/dart-artifact'
-require 'lithium/gcloud-artifact'
+require 'lithium/gcp/gcloud-artifact'
+require 'lithium/gcp/bq'
 require 'lithium/web-artifact'
 require 'lithium/c-artifact'
 
@@ -180,6 +181,16 @@ PATTERNS ({
         StdPattern.new {
             any('Parse error\:'); any; any('in\s+'); group(:location) {
                 file('php'); any('\s+on line\s+'); line;
+            }
+        }
+    ],
+
+    [ ValidateBqSql, RunBqSql ] => [
+        StdPattern.new(2) {
+            group(:message, '.*'); spaces; any('at'); spaces; group(:current_location) {
+                brackets {
+                    line; any(':'); column
+                };
             }
         }
     ],
