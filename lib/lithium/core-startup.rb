@@ -291,9 +291,9 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     # print header
     dt = Time.now()
     unless $lithium_options.has_key?('header') && $lithium_options['header'] != '2'
-        puts "+#{'—'*73}+"
-        puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date})  ask@zebkit.org (c) #{dt} │"
-        puts "+#{'—'*73}+"
+        puts "+#{'—'*69}+"
+        puts "│ Lithium (build tool) v#{$lithium_version} (#{$lithium_date}) #{dt}    │"
+        puts "+#{'—'*69}+"
         $stdout.flush()
     else
         puts "#{dt.strftime('%H:%M:%S')}: Running lithium v#{$lithium_version}" if $lithium_options['header'] == '1'
