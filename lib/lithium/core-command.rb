@@ -310,7 +310,7 @@ eval \"$vc\"
 "
 @win_script="
 @set LITHIUM_HOME=#{$lithium_code}
-@ruby %LITHIUM_HOME%/lib/lithium.rb %
+@ruby %LITHIUM_HOME%/lib/lithium.rb %*
 "
         if @os == :unix
             @script_path = "/usr/local/bin/#{@script_name}"
