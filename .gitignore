@@ -6,6 +6,7 @@ ext/java/pmd/lib
 ext/java/junit/**/*.jar
 ext/java/jdt/*.jar
 ext/java/parser/*.jar
+ext/java/lithium/**/*.jar
 examples/*.jar
 examples/.lithium/.logs
 examples/.lithium/std-out-entities.json
