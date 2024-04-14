@@ -3,6 +3,10 @@ classes
 ext/java/checkstyle/**/*.jar
 ext/java/pmd/bin
 ext/java/pmd/lib
+ext/java/pmd/conf
+ext/java/pmd/sbom
+ext/java/pmd/*.zip
+ext/java/pmd/LICENSE
 ext/java/junit/**/*.jar
 ext/java/jdt/*.jar
 ext/java/parser/*.jar
@@ -13,4 +17,4 @@ examples/.lithium/std-out-entities.json
 ext/java/lithium/.lithium/.logs
 ext/java/lithium/.lithium/std-out-entities.json
 std-out-entities.json
- _gsdata_
+ _gsdata_/
