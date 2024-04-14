@@ -149,7 +149,7 @@ class MavenDependenciesDir < Directory
     end
 
     def WITH_OPTS
-        super + [ "-DoutputDirectory=\"#{fullpath}\"" ]
+        super + [ "-DoutputDirectory=#{q_fullpath}" ]
     end
 end
 

@@ -229,3 +229,29 @@ class ArchiveFileContent < FileArtifact
         "Represent '#{fullpath}' archive file content"
     end
 end
+
+class UnzipDirectory < Directory
+    include ToolExecuter
+
+    def initialize(name, &block)
+        super
+    end
+
+    def WITH
+        ZipTool.detect_unzip
+    end
+
+    def WITH_TARGETS
+        [ @source ]
+    end
+
+    def WITH_ARGS
+        [ '-d', fullpath ]
+    end
+
+    def build
+        super
+        EXEC()
+    end
+end
+

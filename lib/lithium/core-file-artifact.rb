@@ -45,7 +45,7 @@ class FileArtifact < Artifact
 
     def q_fullpath(path = @name)
         p = fullpath(path)
-        return "\"#{p}\"" unless p.nil?
+        return "\"#{p}\"" unless p.nil? || p[0] == "\""
         return p
     end
 
