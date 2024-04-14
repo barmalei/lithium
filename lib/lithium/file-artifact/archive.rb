@@ -235,6 +235,7 @@ class UnzipDirectory < Directory
 
     def initialize(name, &block)
         super
+        OPT('-o')
     end
 
     def WITH
@@ -247,6 +248,10 @@ class UnzipDirectory < Directory
 
     def WITH_ARGS
         [ '-d', fullpath ]
+    end
+
+    def expired?
+        mtime < File.mtime(@source).to_i
     end
 
     def build
