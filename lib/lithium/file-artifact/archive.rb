@@ -251,7 +251,7 @@ class UnzipDirectory < Directory
     end
 
     def expired?
-        !File.exists?(@source) || mtime < File.mtime(@source).to_i
+        !File.exist?(@source) || mtime < File.mtime(@source).to_i
     end
 
     def build
