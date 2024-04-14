@@ -5,7 +5,7 @@ ext/java/pmd/bin
 ext/java/pmd/lib
 ext/java/junit/**/*.jar
 ext/java/jdt/*.jar
-ext/java/jsonschema2pojo
+ext/java/parser/*.jar
 examples/*.jar
 examples/.lithium/.logs
 examples/.lithium/std-out-entities.json
