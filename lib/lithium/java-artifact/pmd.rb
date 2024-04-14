@@ -45,9 +45,8 @@ class PmdCheckRunner < RunJvmTool
         [ 'check' ]
     end
 
-    def classpath_opts
-        cp = classpath()
-        cp.EMPTY? ? [] : [ '--aux-classpath', cp ]
+    def WITH_CLASSPATH_OPT(opt_name = '--aux-classpath')
+        super(opt_name)
     end
 
     def error_exit_code?(ec)

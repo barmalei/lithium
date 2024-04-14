@@ -12,6 +12,7 @@ class RemoteFile < FileArtifact
     end
 
     def build()
+        raise 'Remote artifact URI was not specified' if @uri.nil?
         uri = URI.parse(@uri)
         m = method("#{uri.scheme.downcase}_fetch")
         raise "Unsupported protocol '#{uri.scheme}'" if m.nil?
@@ -33,14 +34,28 @@ class RemoteFile < FileArtifact
 end
 
 class HttpRemoteFile < RemoteFile
+    def https_fetch(uri)
+        http_fetch(uri)
+    end
+
+    def fetch(uri)
+        response = Net::HTTP.get_response(uri)
+        case response
+          when Net::HTTPSuccess then
+            response
+          when Net::HTTPRedirection then
+            location = response['location']
+            puts_warning("Redirected to '#{location}'")
+            fetch(URI(location))
+          else
+            raise "HTTP code = '#{response.code}', msg = '#{response.message}' error"
+        end
+    end
+
     def http_fetch(uri)
-        Net::HTTP.get_response(uri) { | res |
-            raise "Failed (#{res.code}) to get data by '#{uri}'"if res.code != '200'
-            File.open(fullpath, 'w') { | f |
-                res.read_body { | data |
-                    f.write(data)
-                }
-            }
+        r = fetch(uri)
+        open(fullpath, 'wb') { | file |
+            file.write(r.body)
         }
     end
 end

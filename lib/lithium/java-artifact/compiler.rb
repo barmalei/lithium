@@ -61,11 +61,6 @@ end
 class JavaCompiler < JvmCompiler
     @abbr = 'JVC'
 
-    def initialize(name, &block)
-        REQUIRE JAVA
-        super
-    end
-
     def LINT(*args)
         OPT("-Xlint:#{args.join(',')}")
     end
@@ -81,8 +76,8 @@ class JDTCompiler < JavaCompiler
     def initialize(name, &block)
         super
         @jdt_home    ||= File.join($lithium_code, 'ext', 'java', 'jdt')
-        raise "JDT home '#{@jdt_home}' cannot be found" unless File.file?(@jdt_home)
-        @target_version ||= '1.8'
+        raise "JDT home '#{@jdt_home}' cannot be found" unless File.directory?(@jdt_home)
+        @target_version ||= '17'
     end
 
     def WITH
@@ -90,7 +85,8 @@ class JDTCompiler < JavaCompiler
     end
 
     def WITH_OPTS
-        super.push('-jar', File.join(@jdt_home, '*.jar'), @target_version)
+        #puts super + [ '-jar', File.join(@jdt_home, '*.jar'), '-target', @target_version ]
+        [ '-jar', File.join(@jdt_home, '*.jar'), '-source', @target_version, '-target', @target_version ] + super
     end
 end
 

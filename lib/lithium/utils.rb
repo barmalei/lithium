@@ -347,7 +347,7 @@ module AssignableDependency
                 cur_value = [] if cur_value.nil?
                 target.instance_variable_set(attr_name, cur_value.push(new_value)) if cur_value.index(new_value).nil?
             else
-                raise "Other '#{cur_value.name}' artifact has been already assigned to '#{attr_name}' attribute of #{target.class}:#{target.name} artifact" unless cur_value.nil? || cur_value == new_value
+                #raise "Other '#{cur_value.name}' artifact has been already assigned to '#{attr_name}' attribute of #{target.class}:#{target.name} artifact" unless cur_value.nil? || cur_value == new_value
                 target.instance_variable_set(attr_name, new_value)
             end
         end

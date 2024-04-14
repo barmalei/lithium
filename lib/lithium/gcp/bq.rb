@@ -85,7 +85,7 @@ class RunBqSql < BqRunner
     def initialize(name, &block)
         super
         OPT('--format=sparse')
-        OPT('--maximum_bytes_billed=100')
+        #OPT('--maximum_bytes_billed=100')
     end
 end
 

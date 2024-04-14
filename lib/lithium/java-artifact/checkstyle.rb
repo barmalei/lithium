@@ -7,6 +7,8 @@ class JavaCheckStyle < JavaFileRunner
 
     def initialize(name, &block)
         super
+        disable_jvm_classpath()
+
 
         @checkstyle_main_class ||= 'com.puppycrawl.tools.checkstyle.Main'
         @checkstyle_version    ||= '10'
@@ -50,7 +52,6 @@ class UnusedJavaCheckStyle < JavaCheckStyle
         CONFIG(@checkstyle_home, "unused.xml")
     end
 end
-
 
 # TODO: complete or remove this code !
 class JsonSchemaToPojo < RunJAR

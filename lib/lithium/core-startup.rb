@@ -6,9 +6,12 @@ require 'lithium/std-pattern'
 require 'lithium/std-core'
 require 'lithium/std-custom'
 
+require 'lithium/file-artifact/archive'
+require 'lithium/file-artifact/remote'
+
 require 'lithium/java-artifact/compiler'
 require 'lithium/java-artifact/runner'
-require 'lithium/file-artifact/archive'
+require 'lithium/java-artifact/junit'
 require 'lithium/java-artifact/jar'
 require 'lithium/java-artifact/misc'
 require 'lithium/java-artifact/checkstyle'
@@ -76,7 +79,7 @@ PATTERNS ({
 
             MATCHED {
                 convert?(:level) { | l |
-                    return l.downcase() if ['WARNING', 'ERROR'].include?(l)
+                    ['WARNING', 'ERROR'].include?(l) ? l.downcase() : l
                 }
             }
         }
@@ -332,9 +335,14 @@ def STARTUP(artifact, artifact_prefix, artifact_path, artifact_mask, basedir)
     puts "#{Time.now.strftime('%H:%M:%S')}/#{Time.now - dt}s: Building of '#{artifact}' has been done"
 end
 
-
 READY {
-    #a = MavenRunner.new(owner:Project.current)
-    #a.build()
-    #class A
+    # p = JUnit5Classpath.new()
+    # puts p.name, p.junit_home
+
+    # a = UnzipDirectory.new("/Users/brigadir/projects/.lithium/ext/java/junit/4/") {
+    #     @source = "/Users/brigadir/projects/.lithium/ext/java/junit/4/package.zip"
+    # }
+    # #a = MavenRunner.new(owner:Project.current)
+    # a.build()
+    # #class A
 }
