@@ -251,12 +251,22 @@ module ClassPathHolder
     def classpath
         cp = instance_variables
             .map    { | n | instance_variable_get(n) }
-            .map    { | v | v.is_a?(JVM) ? v.classpath : v.is_a?(JavaClasspath) ? v : nil }
+            .map    { | v | v.is_a?(JVM) && @disable_jvm_classpath != true ? v.classpath : v.is_a?(JavaClasspath) ? v : nil }
             .select { | e | !e.nil? }
 
         @classpaths ||= []
         cp.concat(@classpaths)
-        PATHS.new(homedir).JOIN(cp)
+        return PATHS.new(homedir).JOIN(cp)
+    end
+
+    def disable_jvm_classpath
+        @disable_jvm_classpath = true
+    end
+
+    def WITH_CLASSPATH_OPT(opt_name = '-classpath')()
+        raise 'Nil classpath option name' if opt_name.nil?
+        cp = classpath
+        return cp.EMPTY? ? [] : [ opt_name, "\"#{cp}\"" ]
     end
 end
 
@@ -400,18 +410,13 @@ class RunJvmTool < RunTool
         super
     end
 
+    def WITH_OPTS
+        super + WITH_CLASSPATH_OPT()
+    end
+
     def require_java
         name, block = self.class.JAVA
         REQUIRE name, JAVA, &block
-    end
-
-    def WITH_OPTS
-        super + classpath_opts
-    end
-
-    def classpath_opts
-        cp = classpath
-        cp.EMPTY? ? [] : [ '-classpath', "\"#{cp}\"" ]
     end
 
     #
