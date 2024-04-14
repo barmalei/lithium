@@ -1,0 +1,7 @@
+-> {
+    REQUIRE {
+        MavenDependenciesDir(".") {
+            TRANSITIVE(false)
+        }
+    }
+}
