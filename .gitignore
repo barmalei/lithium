@@ -1,11 +1,9 @@
 .logs
 classes
-ext/java/checkstyle/10/*.jar
-ext/java/checkstyle/8/*.jar
+ext/java/checkstyle/**/*.jar
 ext/java/pmd/bin
 ext/java/pmd/lib
-ext/java/junit/5/*.jar
-ext/java/junit/4/*.jar
+ext/java/junit/**/*.jar
 ext/java/jdt/*.jar
 ext/java/jsonschema2pojo
 examples/*.jar
