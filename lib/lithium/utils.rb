@@ -237,22 +237,6 @@ module Files
         FileUtils.cp(src, dest)
     end
 
-    def self.cpdir(src, dest, em = nil)
-        self.testdir(src) && self.testdir(dest)
-
-        Dir.foreach(src) { |path|
-            next if path == '.' || path == '..' || (em && (path =~ em) != nil)
-            dpath, spath = dest/path, src/path
-
-            if File.directory?(spath)
-                Dir.mkdir(dpath)
-                cpdir(spath, dpath, em)
-            else
-                File.cp(spath, dpath)
-            end
-        }
-    end
-
     def self.assert_dir(*args)
         path = File.join(*args)
         raise "Expected directory '#{path}' points to a file" if File.file?(path)
