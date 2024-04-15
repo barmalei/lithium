@@ -239,7 +239,9 @@ class UnzipDirectory < Directory
     end
 
     def WITH
-        ZipTool.detect_unzip
+        tool = ZipTool.detect_unzip
+        raise 'unzip tool cannot be detected' if tool.nil?
+        tool
     end
 
     def WITH_TARGETS
