@@ -85,8 +85,9 @@ class JDTCompiler < JavaCompiler
     end
 
     def WITH_OPTS
-        #puts super + [ '-jar', File.join(@jdt_home, '*.jar'), '-target', @target_version ]
-        [ '-jar', File.join(@jdt_home, '*.jar'), '-source', @target_version, '-target', @target_version ] + super
+        res = Dir.glob(File.join(@jdt_home, '*.jar'))
+        raise "'#{@jdt_home}' doesn't contain a JAR file" if res.length == 0
+        [ '-jar', res[0], '-source', @target_version, '-target', @target_version ] + super
     end
 end
 

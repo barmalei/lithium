@@ -184,6 +184,14 @@ module Files
         end
     end
 
+    # def self.unzip(path, destination)
+    #     raise "'#{path}' path doesn't exist or points to a directory" unless File.file?(path)
+    #     assert_dir(destination)
+    #     zipfile.foreach(path) { | c |
+    #         puts c
+    #     }
+    # end
+
     def self.execInTerm(hd, cmd)
         pl = Gem::Platform.local.os
         if  pl == 'darwin'

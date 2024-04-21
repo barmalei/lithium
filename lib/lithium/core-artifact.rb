@@ -83,7 +83,7 @@ class ArtifactPath < String
     end
 
     def self.prefix(path)
-        path[/^\w\w+\:/]
+        path[/^\w+\:/]
     end
 
     def self.suffix(path)
@@ -230,27 +230,18 @@ class Artifact
 
         instance = allocate()
         instance.owner = owner
-        begin
-            instance.initialize_called = true
-            self.run_default_block(instance, instance.class)
-            if name.nil?
-                instance.send(:initialize, &block)
-            else
-                instance.send(:initialize, name, &block)
-            end
-            ArtifactPath.assert_notnil_name(instance.name)
-        ensure
-            instance.initialize_called = false
+        self.run_default_block(instance, instance.class)
+        if name.nil?
+            instance.send(:initialize, &block)
+        else
+            instance.send(:initialize, name, &block)
         end
+        ArtifactPath.assert_notnil_name(instance.name)
         return instance
     end
 
     def initialize(name = nil, &block)
-        if name.nil?
-            @name = self.class.default_name
-        else
-            @name = name
-        end
+        @name = name.nil? ? self.class.default_name : name
 
         # block can be passed to artifact
         # it is expected the block setup class instance
@@ -273,14 +264,6 @@ class Artifact
 
     def createdByMeta=(m)
         @createdByMeta = m
-    end
-
-    def initialize_called=(v)
-        @_init_called = v
-    end
-
-    def initialize_called?
-       @_init_called == true
     end
 
     def owner=(value)
@@ -333,9 +316,6 @@ class Artifact
         # detect if there is an artifact class exits with the given name to treat it as
         # required artifact. It is done only if we are still in "require" method call
         if meth.length > 2 && @caller == :require
-            # TODO: revised, most likely the code is not required since REQUIRE can be executed outside of constructor
-#            raise "REQUIRED artifacts can be defined only in '#{self}' artifact constructor" unless initialize_called?
-
             name = args.length == 0 ? nil : args[0]
             clazz, is_resuse = Artifact._name_to_clazz(meth)
 

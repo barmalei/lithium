@@ -45,7 +45,7 @@ module SdkmanTool
                 end
             end
         else
-            candidates = Dir.glob(File.join(sdk_home, "#{version}*")).filter { | path | File.directory?(path) }
+            candidates = Dir.glob(File.join(sdk_home, "*#{version}*")).filter { | path | File.directory?(path) }
             if candidates.length == 0
                 raise "SDKMAN '#{version}' #{candidate} version cannot be detected"
             else
