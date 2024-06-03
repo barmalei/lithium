@@ -11,7 +11,7 @@ end
 class RUBY < SdkEnvironmen
     @tool_name = 'ruby'
 
-    self.default_name(".env/RBV")
+    self.default_name("@RBV")
 
     def initialize(name, &block)
         REQUIRE DefaultRubypath

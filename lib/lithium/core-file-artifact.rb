@@ -50,7 +50,7 @@ class FileArtifact < Artifact
     end
 
     def fullpath(path = @name)
-        return path if path.start_with?('.env/')
+        return path if path.start_with?('@')
 
         if path == '.' || path == './'
             return Pathname.new(File.join(Dir.pwd, path)).cleanpath.to_s

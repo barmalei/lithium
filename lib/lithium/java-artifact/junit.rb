@@ -18,7 +18,7 @@ class JUnitClasspath < DefaultClasspath
 end
 
 class JUnit4Classpath < JUnitClasspath
-    default_name('.env/junit4/classpath')
+    default_name('@junit4/classpath')
 
     def junit_home()
         super('4')
@@ -26,7 +26,7 @@ class JUnit4Classpath < JUnitClasspath
 end
 
 class JUnit5Classpath < JUnitClasspath
-    default_name('.env/junit5/classpath')
+    default_name('@junit5/classpath')
 
     def junit_home()
         super('5')

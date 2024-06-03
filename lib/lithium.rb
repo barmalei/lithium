@@ -58,7 +58,7 @@ unless artifact_path.nil?
         artifact_path = basedir
     elsif artifact_path.start_with?('./') || artifact_path.start_with?('../')
         artifact_path = File.join(basedir, artifact_path)
-    elsif !artifact_path.start_with?('.env/')
+    elsif !artifact_path.start_with?('@')
         artifact_path = File.join(basedir, artifact_path)
     end
 

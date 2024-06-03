@@ -6,7 +6,7 @@ require 'lithium/utils'
 class PMD < SdkEnvironmen
     @tool_name = 'pmd'
 
-    self.default_name(".env/PMD")
+    self.default_name("@PMD")
 
     def force_sdkhome_detection
         Files.assert_dir($lithium_code, 'ext', 'java', 'pmd')

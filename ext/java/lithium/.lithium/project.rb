@@ -12,7 +12,7 @@
         @checkstyle_version = "8"
     }
 
-    EnvArtifact('.env/DEPLOY') {
+    EnvArtifact('@DEPLOY') {
         REQUIRE {
             MavenDependenciesDir("lib")
         }

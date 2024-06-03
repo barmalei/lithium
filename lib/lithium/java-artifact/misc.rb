@@ -33,7 +33,7 @@ class GenerateJavaDoc < RunJvmTool
 end
 
 class LiJavaToolClasspath < DefaultClasspath
-    default_name('.env/li/classpath')
+    default_name('@li/classpath')
 
     def initialize(name = nil, &block)
         super

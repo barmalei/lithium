@@ -30,7 +30,7 @@ class RunGradle < Artifact
 
     @abbr = 'RGR'
 
-    default_name('.env/gradle/run')
+    default_name('@gradle/run')
 
     def initialize(name = nil, &block)
         REQUIRE GradleFile
@@ -71,7 +71,7 @@ end
 
 # TODO: revise, not completed code
 class RunGradleTest < RunGradle
-    default_name('.env/gradle/test')
+    default_name('@gradle/test')
 
     def initialize(name = nil, &block)
         fp = fullpath(name)
@@ -89,7 +89,7 @@ class RunGradleTest < RunGradle
 end
 
 class GradleCompiler < RunGradle
-    default_name('.env/gradle/test')
+    default_name('@gradle/test')
 
     def initialize(name = nil, &block)
         super

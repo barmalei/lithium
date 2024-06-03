@@ -24,14 +24,13 @@ class AntFile < ExistentFile
     end
 end
 
-
 # Simple ant runner
 class RunANT < Artifact
     include ToolExecuter
 
     @abbr = 'RAN'
 
-    default_name('.env/ant/build')
+    default_name('@ant/build')
 
     def initialize(name = nil, &block)
         REQUIRE ANT

@@ -14,14 +14,14 @@
         }
     }
 
-    JAVA('.env/junit5/java') {
+    JAVA('@junit5/java') {
         REQUIRE {
             DefaultClasspath() { JOIN('classes') }
             JUnit5Classpath()
         }
     }
 
-    JAVA('.env/junit4/java') {
+    JAVA('@junit4/java') {
         REQUIRE {
             DefaultClasspath() { JOIN('classes') }
             JUnit4Classpath()
@@ -30,25 +30,25 @@
 
     JDTCompiler('compile:JDTCode.java') {
         REQUIRE {
-            JAVA(".env/java17")  {
+            JAVA("@java17")  {
                 SDKMAN("17")
             }
         }
     }
 
     JavaCompiler('compile:JUnit5Test.java') {
-        REQUIRE '.env/junit5/java'
+        REQUIRE '@junit5/java'
     }
 
     RunJavaCodeWithJUnit('test:JUnit5Test.java') {
-        REQUIRE '.env/junit5/java'
+        REQUIRE '@junit5/java'
     }
 
     JavaCompiler('compile:JUnit4Test.java') {
-        REQUIRE '.env/junit4/java'
+        REQUIRE '@junit4/java'
     }
 
     RunJavaCodeWithJUnit('test:JUnit4Test.java') {
-        REQUIRE '.env/junit4/java'
+        REQUIRE '@junit4/java'
     }
 }

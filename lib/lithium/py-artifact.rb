@@ -46,11 +46,7 @@ class PYTHON < SdkEnvironmen
         if @pip_name.nil?
             m = /[a-zA-Z_]+([0-9.]+$)?/.match(tool_name())
             suffix = m[1]
-            if suffix.nil?
-                return tool_path('pip')
-            else
-                return tool_path("pip#{suffix}")
-            end
+            return suffix.nil? ? tool_path('pip') : tool_path("pip#{suffix}")
         else
             return tool_path(@pip_name)
         end
@@ -166,7 +162,7 @@ class RunPyFlake < RunTool
 
     def initialize(name, &block)
         REQUIRE PYTHON
-        REQUIRE '.env/pyflakes', PipPackage
+        REQUIRE '@pyflakes', PipPackage
         super
     end
 

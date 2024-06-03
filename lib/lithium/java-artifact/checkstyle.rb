@@ -22,7 +22,7 @@ class JavaCheckStyle < JavaFileRunner
 
         cp = File.join(@checkstyle_home, '*.jar')
         REQUIRE {
-            DefaultClasspath('.env/checkstyle_classpath') {
+            DefaultClasspath('@checkstyle_classpath') {
                 JOIN(cp)
             }
         }
@@ -62,7 +62,7 @@ class JsonSchemaToPojo < RunJAR
 
         cp = File.join(@jsonSchemaToPojo_home, 'lib', '*.jar')
         REQUIRE {
-            DefaultClasspath('.env/jsonSchemaToPojo_classpath') {
+            DefaultClasspath('@jsonSchemaToPojo_classpath') {
                 JOIN(cp)
             }
         }

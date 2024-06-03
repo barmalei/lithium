@@ -314,7 +314,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     self.found_items = []
                     self.edit        = edit
                     self.process     = self.exec(
-                        "FindInClasspath:\"%s\" %s.class" % (os.path.join(".env", self.syntax().upper()), self.word),
+                        "FindInClasspath:\"%s%s\" %s.class" % ('@', self.syntax().upper(), self.word),
                         self.match_output,
                         self.error_output,
                         False
@@ -843,4 +843,3 @@ class LiShowLocationsCommand(LiTextCommand):
 class LiOpenFileCommand(LiWindowCommand):
     def run(self, file):
         self.window.open_file(file, sublime.ENCODED_POSITION)
-

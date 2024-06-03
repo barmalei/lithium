@@ -75,7 +75,7 @@ end
 class RunDartPub < Artifact
     include ToolExecuter
 
-    default_name(".env/dart/pub")
+    default_name("@dart/pub")
 
     @abbr = 'RPS'
 
@@ -127,7 +127,7 @@ class RunDartPub < Artifact
 end
 
 class RunDartPubBuild < RunDartPub
-    default_name('.env/dart/pub.build')
+    default_name('@dart/pub.build')
 
     def initialize(name, &block)
         super
@@ -152,7 +152,7 @@ class RunDartPubBuild < RunDartPub
 end
 
 class RunDartPubGet < RunDartPub
-    default_name('.env/dart/pub.get')
+    default_name('@dart/pub.get')
 
     def initialize(name = nil, &block)
         super

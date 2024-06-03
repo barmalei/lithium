@@ -158,7 +158,7 @@ class RunMaven < Artifact
 
     @abbr = 'RMV'
 
-    default_name('.env/mvn/run')
+    default_name('@mvn/run')
 
     def initialize(name = nil, &block)
         REQUIRE MVN
@@ -191,7 +191,7 @@ class RunMaven < Artifact
 end
 
 class RunMavenTest < RunMaven
-    default_name('.env/mvn/test')
+    default_name('@mvn/test')
 
     def initialize(name = nil, &block)
         super
@@ -204,7 +204,7 @@ class RunMavenTest < RunMaven
 end
 
 class MavenCompiler < RunMaven
-    default_name('.env/mvn/compile')
+    default_name('@mvn/compile')
 
     def initialize(name = nil, &block)
         super
@@ -215,7 +215,7 @@ end
 class ShowMavenArtifactTree < RunMaven
     include MavenDependencyOptions
 
-    default_name('.env/mvn/deptree')
+    default_name('@mvn/deptree')
 
     def initialize(name, &block)
         super(File.dirname(name), &block)

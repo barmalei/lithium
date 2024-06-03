@@ -37,7 +37,7 @@ end
 class DeployGoogleApp < ExistentFile
     include ToolExecuter
 
-    default_name('.env/gce/deploy')
+    default_name('@gce/deploy')
 
     @abbr = 'DGA'
 

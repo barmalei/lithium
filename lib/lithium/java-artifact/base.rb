@@ -62,7 +62,7 @@ end
 class SDKMAN < SdkEnvironmen
     include SdkmanTool
 
-    @@sdkman_base = '.env/sdkman/'
+    @@sdkman_base = '@sdkman/'
 
     def initialize(name, &block)
         raise "Invalid '#{self.class}' artifact '#{name}' name " unless name.start_with?(@@sdkman_base)
@@ -429,7 +429,7 @@ class RunJvmTool < RunTool
         if name.nil? && block.nil?
             return @JAVA.nil? ? [ JAVA.default_name(), block ] : @JAVA
         else
-            @JAVA = [ name.nil? ? ".env/#{self.name}/JAVA" : name, block ]
+            @JAVA = [ name.nil? ? "@#{self.name}/JAVA" : name, block ]
         end
     end
 end

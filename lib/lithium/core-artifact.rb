@@ -123,7 +123,7 @@ class ArtifactPath < String
     end
 
     def env_path?
-        !path.nil? && path.start_with?('.env/')
+        !path.nil? && path.start_with?('@')
     end
 
     def match(name)
@@ -135,7 +135,7 @@ class ArtifactPath < String
         unless @path_mask.nil?
             # Condition "(name.env_path? ^ env_path?)" helps to prevent eating environment
             # artifact with file masks. For instance imagine we have file mask "**/*"
-            # defined in project.rb, in this case the artifact will match '.env/JAVA' what
+            # defined in project.rb, in this case the artifact will match '@JAVA' what
             # cause the instantiated artifact will have invalid type
             return false if name.suffix.nil? || (name.env_path? ^ env_path?) # one of the path is environment but not both
             return File.fnmatch(@suffix, name.suffix, @mask_type)
@@ -830,10 +830,10 @@ class EnvArtifact < Artifact
         @default_name ||= nil
 
         if args.length > 0
-            raise "Invalid environment artifact '#{args[0]}' name ('.env/<artifact_name>' is expected)" unless args[0].start_with?('.env/')
+            raise "Invalid environment artifact '#{args[0]}' name ('#{}<artifact_name>' is expected)" unless args[0].start_with?('@')
             @default_name = args[0]
         elsif @default_name.nil?
-            @default_name = File.join('.env', self.name)
+            @default_name = "@#{self.name}"
         end
 
         return @default_name
