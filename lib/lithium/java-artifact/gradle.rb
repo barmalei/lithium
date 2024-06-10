@@ -14,9 +14,9 @@ end
 class GradleFile < ExistentFile
     include LogArtifactState
     include StdFormater
-    include AssignableDependency[:gradle]
+    include AssignableDependency[:gradlefile]
 
-    default_name('build.gradle.kts')
+    default_name('build.gradle')
 
     @abbr = 'GRF'
 
@@ -25,8 +25,23 @@ class GradleFile < ExistentFile
     end
 end
 
-class RunGradle < Artifact
+module GradleExecutor
     include ToolExecuter
+    include StdFormater
+
+    def WITH
+        @gradle.gradle
+    end
+
+    def build
+        go_to_homedir
+        EXEC()
+        super
+    end
+end
+
+class RunGradle < Artifact
+    include GradleExecutor
 
     @abbr = 'RGR'
 
@@ -37,10 +52,6 @@ class RunGradle < Artifact
         REQUIRE GRADLE
         super
         @targets ||= [ 'build' ]
-    end
-
-    def WITH
-        @gradle.gradle
     end
 
     def WITH_OPTS
@@ -58,33 +69,17 @@ class RunGradle < Artifact
         @targets
     end
 
-    def build
-        super
-        go_to_homedir()
-        EXEC()
-    end
-
     def what_it_does
         "Run gradle: '#{@name}'\n    Targets = [ #{@targets.join(', ')} ]\n    OPTS    = '#{OPTS()}', '#{@gradle.OPTS()}'"
     end
 end
 
-# TODO: revise, not completed code
 class RunGradleTest < RunGradle
     default_name('@gradle/test')
 
     def initialize(name = nil, &block)
-        fp = fullpath(name)
         super
         TARGETS('test')
-        if fp.end_with?('.java')
-            pkg = JVM.grep_package(fp)
-            fp  = File.basename(fp)
-            fp[/\.java$/] = ''
-            cls = pkg + '.' + fp
-            OPT("-Dtest=#{cls}")
-            puts "Single gradle test case '#{cls}' is detected"
-        end
     end
 end
 
@@ -101,49 +96,44 @@ class GradleCompiler < RunGradle
     end
 end
 
-# TODO: not completed
 class GradleClasspath < InFileClasspath
-    include StdFormater
-
-    log_attr :excludeGroupIds, :excludeTransitive
+    include GradleExecutor
 
     default_name(".lithium/gradle/classpath")
 
     def initialize(name, &block)
         super
-        REQUIRE { 
-            GRADLE()
-            GradleFile(homedir)
-        }
+        REQUIRE GRADLE
+        REQUIRE GradleFile
+    end
+
+    def WITH_OPTS
+        [ '-q', "-I #{File.join($lithium_code, 'ext', 'java', 'gradle', 'init.gradle')}" ]
+    end
+
+    def WITH_TARGETS
+        super + [ 'classpath' ]
     end
 
     def build
-        fp = fullpath
-        # TODO: test code
-        chdir(File.dirname(@gradle.fullpath)) {
-            Files.exec(["gradle", "hello", "--console", "plain", "-q"]) { | stdin, stdout, th |
-                stdin.close
-                while line = stdout.gets do
-                    #$stdout.puts line
-                    line = line.chomp
-                    File.open(fp, 'w') { | f |
-                        f.print(line)
-                    }
-                end
-            }
-
-            # cmd = GRADLE_CMD()
-            # cmd.push("-Dmdep.outputFile=\"#{fullpath}\"")
-            # raise "Gradle classpath '#{@name}' cannot be generated" if Files.exec(*cmd).exitstatus != 0
+        go_to_homedir
+        class_path = []
+        EXEC { | stdin, stdout, thread |
+            while line = stdout.gets do
+                class_path.push(line.chomp)
+            end
+            stdout.close
         }
-        super
-    end
 
-    def GRADLE_CMD
-        [  @gradle.gradle ]
+        fp  = fullpath
+        dir = File.dirname(fp)
+        FileUtils.mkdir_p(dir) unless File.directory?(dir)
+        File.open(fp, 'w') { | f |
+            f.write(class_path.join(File::PATH_SEPARATOR))
+        }
     end
 
     def what_it_does
-        "Build gradle classpath by '#{@gradle.fullpath}' in '#{fullpath}'"
+        "Build gradle classpath by '#{@gradlefile.fullpath}' in '#{fullpath}'"
     end
 end

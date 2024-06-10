@@ -1,0 +1,7 @@
+allprojects {
+    task classpath {
+        doLast {
+            println configurations.compileClasspath.asPath
+        }
+    }
+}

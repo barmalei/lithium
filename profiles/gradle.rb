@@ -31,19 +31,19 @@
     }
 
     KotlinCompiler("compile:src/main/kotlin/**/*.kt") {
-        @destination = 'build/classes/kotlin/main'
+        DESTINATION('build/classes/kotlin/main')
     }
 
     JavaCompiler("compile:src/main/java/**/*.java") {
-        @destination = 'build/classes/java/main'
+        DESTINATION('build/classes/java/main')
     }
 
     KotlinCompiler("compile:src/test/java/**/*.java") {
-        @destination = 'build/classes/kotlin/test'
+        DESTINATION('build/classes/kotlin/test')
     }
 
     JavaCompiler("compile:src/test/java/**/*.java") {
-        @destination = 'build/classes/java/main'
+        DESTINATION('build/classes/java/main')
     }
 
     Directory("apidoc") {
