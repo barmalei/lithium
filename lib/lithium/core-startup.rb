@@ -33,6 +33,7 @@ require 'lithium/gcp/gcloud-artifact'
 require 'lithium/gcp/bq'
 require 'lithium/web-artifact'
 require 'lithium/c-artifact'
+require 'lithium/tf-artifact'
 
 require 'lithium/xml-artifact'
 

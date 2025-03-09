@@ -71,6 +71,7 @@
         DeployGoogleApp  ('**/appengine-*.xml')
         DeployGoogleApp  ('**/app*.yaml')
         RunBqSql         ('**/*.sql')
+        RunTf            ('**/*.tf')
 
         # TODO: BUG that prevents recognizing "**/*.py" mask if un-comment the line below
         #RunPySetup       ('**/setup.py')
@@ -112,6 +113,7 @@
         RunDartPubBuild     ('**/pubspec.yaml')
         ValidateDartCode    ('**/*.dart')
         ValidateBqSql       ('**/*.sql')
+        ValidateTf          ('**/*.tf')
 
         # OTHERWISE
         # OTHERWISE {

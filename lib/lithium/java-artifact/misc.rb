@@ -204,3 +204,14 @@ class FindInClasspath < Artifact
         "Looking for '#{@pattern}' in classpath"
     end
 end
+
+
+# Dir['/Users/brigadir/projects/current/rituals-dna/target/appengine-staging/*'].each { | lib_path |
+#     #puts("Revise: #{lib_path}")
+#     if File.file?(lib_path) && lib_path.end_with?('.jar')
+#         ZipTool.lszip(lib_path, "**/HttpURI.class") { | item |
+#             puts "#{lib_path} => #{item}"
+#         }
+#     end
+# }
+
