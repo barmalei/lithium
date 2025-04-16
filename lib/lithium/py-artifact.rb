@@ -16,21 +16,6 @@ class PYTHON < SdkEnvironmen
     def initialize(name, &block)
         REQUIRE DefaultPythonPath
         super
-
-        res = Files.grep_exec(pip(), 'list -v', pattern:/^([a-zA-Z_\-.0-9]+)\s+([^ ]+)\s+(.*)\s+pip$/, find_first:false)
-
-        #
-        # { <mod_name> => {  path: '', version: ''}}
-        #
-        @modules = {}
-        unless res.nil?
-          res.each { | e |
-            @modules[e[0]] = {
-                'path'    => e[2].gsub('\\', '/'),
-                'version' => e[1]
-            }
-          }
-        end
     end
 
     def pypath
@@ -52,7 +37,26 @@ class PYTHON < SdkEnvironmen
         end
     end
 
+    def flush_modules
+        @modules = nil
+    end
+
     def modules(nm = nil)
+        if @modules.nil?
+            res = Files.grep_exec(pip(), 'list -v', pattern:/^([a-zA-Z_\-.0-9]+)\s+([^ ]+)\s+(.*)\s+pip$/, find_first:false)
+
+            # { <mod_name> => {  path: '', version: ''}}
+            @modules = {}
+            unless res.nil?
+              res.each { | e |
+                @modules[e[0]] = {
+                    'path'    => e[2].gsub('\\', '/'),
+                    'version' => e[1]
+                }
+              }
+            end
+        end
+
         nm.nil? ? @modules : @modules[nm]
     end
 
@@ -77,6 +81,8 @@ class PipPackage < EnvArtifact
     def required_was_created(req)
         if req.kind_of?(PYTHON)
             @module_name = File.basename(@name)
+            @module_name = @module_name[1..] if @module_name[0] == '@'
+
             m = @python.modules(@module_name)
             unless m.nil?
                 @module_ver  = m['version']
@@ -97,12 +103,13 @@ class PipPackage < EnvArtifact
     end
 
     def WITH_TARGETS
-        [ File.basename(@name) ]
+        [ @module_name ]
     end
 
     def build
         super()
         EXEC()
+        @python.flush_modules()
     end
 
     def expired?
@@ -111,7 +118,7 @@ class PipPackage < EnvArtifact
         # p = File.join(@python.user_site_base, n.gsub(/-/, '_')) unless File.exist?(p)
         # raise "#{p} file exists" if File.file?(p)
 
-        @module_name.nil? || !File.directory?(@module_path)
+        @module_name.nil? || @module_path.nil? || !File.directory?(@module_path)
 
         #ver = Files.grep_exec(@python.pip, 'show', File.basename(@name), pattern:/Version:\s*(.*)/)
         #return ver.nil?
