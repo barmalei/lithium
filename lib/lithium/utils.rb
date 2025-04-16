@@ -94,7 +94,7 @@ module Files
     # @return true or false
     #
     def self.path_start_with?(path, from)
-        from = from[0..-2] if from[-1]   == '/'
+        from = from[0..-2] if from[-1] == '/'
         path = path[0..-2] if path[-1] == '/'
 
         return true  if from == path
