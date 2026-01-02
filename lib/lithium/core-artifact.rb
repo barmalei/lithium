@@ -232,7 +232,7 @@ class Artifact
         instance.owner = owner
         self.run_default_block(instance, instance.class)
         if name.nil?
-            instance.send(:initialize, &block)
+            instance.send(:initialize, instance.class.default_name, &block)
         else
             instance.send(:initialize, name, &block)
         end
@@ -922,3 +922,4 @@ class EnvironmentPath < EnvArtifact
 
     log_attr :paths
 end
+

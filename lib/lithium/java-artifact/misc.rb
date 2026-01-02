@@ -70,6 +70,11 @@ class LiJavaToolRunner < RunJvmTool
 end
 
 # TODO: revise !!!
+#
+# To find classes:
+#
+#  $ lithium FindInClasspath:@JAVA <name>
+#
 class FindInClasspath < Artifact
     include ClassPathHolder
 

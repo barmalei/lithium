@@ -18,7 +18,8 @@ class BqRunner < ExistentFile
         if self['project_id'].nil?
             m = FileArtifact.grep_file(fullpath(), /`([a-zA-Z0-9_\-]+)\.[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-*]+`/)
             unless m.nil?
-                prj = m[0][:matched_part]
+                #prj = m[0][:matched_part]
+                prj = m[1]
                 puts "BQ project was auto detected by SQL as '{prj}'"
                 PROJECT_ID(prj)
             end

@@ -10,34 +10,34 @@
 
     #RunMaven('mvn:*')
 
-    GeneratedDirectory("test22") {
-        @full_copy = true
-        REQUIRE {
-            FileMaskSource('.lithium/lib/*')
-            FileMaskSource('classes/com/**/*')
-        }
-    }
+    # GeneratedDirectory("test22") {
+    #     @full_copy = true
+    #     REQUIRE {
+    #         FileMaskSource('.lithium/lib/*')
+    #         FileMaskSource('classes/com/**/*')
+    #     }
+    # }
 
-    GeneratedDirectory("test33") {
-        REQUIRE {
-            MetaFile("test33.meta")
-        }
-    }
+    # GeneratedDirectory("test33") {
+    #     REQUIRE {
+    #         MetaFile("test33.meta")
+    #     }
+    # }
 
 
-    ZipFile("test.zip") {
-        REQUIRE('.lithium/lib/**/*', FileMaskSource) {
-            BASE('.lithium/lib')
-        }
-    }
+    # ZipFile("test.zip") {
+    #     REQUIRE('.lithium/lib/**/*', FileMaskSource) {
+    #         BASE('.lithium/lib')
+    #     }
+    # }
 
-    JarFile("test.jar") {
-        REQUIRE('.lithium/lib/*', FileMaskSource)
-    }
+    # JarFile("test.jar") {
+    #     REQUIRE('.lithium/lib/*', FileMaskSource)
+    # }
 
-    UglifiedJSFile("test.min.js") {
-        REQUIRE { FileMaskSource('.lithium/examples/easyoop.js') }
-    }
+    # UglifiedJSFile("test.min.js") {
+    #     REQUIRE { FileMaskSource('.lithium/examples/easyoop.js') }
+    # }
 
     PYTHON {
         #@tool_name = 'python3.10'

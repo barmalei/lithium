@@ -40,7 +40,6 @@ import java.util.Optional;
  * @author Federico Tomassetti
  */
 public final class Navigator {
-
     private Navigator() {
         // prevent instantiation
     }

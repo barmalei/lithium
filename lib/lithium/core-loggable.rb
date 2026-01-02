@@ -10,7 +10,7 @@ require 'digest'
 #  artifact class methods with "original_<method_name>" methods.
 #  It used by LogArtifact to intercept the method calls with "method_missing"
 #  method.
-module HookMethods
+module InterceptMethods
     @@hooked = [ :clean, :built, :mtime, :expired? ]
 
     def included(clazz)
@@ -19,22 +19,22 @@ module HookMethods
 
             clazz.instance_methods().each { | m |
                 m = m.intern
-                HookMethods.hook_method(clazz, m) if @@hooked.index(m)
+                InterceptMethods.hook_method(clazz, m) if @@hooked.index(m)
             }
 
             def clazz.method_added(m)
                 unless @adding
                     @adding = true
-                    HookMethods.hook_method(self, m) if @@hooked.index(m) && self.method_defined?(m)
+                    InterceptMethods.hook_method(self, m) if @@hooked.index(m) && self.method_defined?(m)
                     @adding = false
                 end
             end
         else
-            clazz.extend(HookMethods)
+            clazz.extend(InterceptMethods)
         end
     end
 
-    def HookMethods.hook_method(clazz, m)
+    def InterceptMethods.hook_method(clazz, m)
         clazz.class_eval {
             n = "original_#{m}"
             alias_method n, m.to_s
@@ -43,11 +43,142 @@ module HookMethods
     end
 end
 
+#
+#       {
+#           name: <mtime>:<value>
+#       }
+# @name - property
+# name - path
+#
+module LogArtifactStateNew
+    extend InterceptMethods
+
+    def initialize(name, &block)
+        super
+        @logged_data = load_log()
+    end
+
+    # catch target artifact methods call to manage artifact expiration state
+    def method_missing(meth, *args)
+        if meth == :clean
+            original_clean()
+            expire_log()
+        elsif meth == :built
+            original_built()
+            update_log()
+        elsif meth == :mtime
+            t = detect_log_mtime()
+            return original_mtime() if t < 0
+            tt = original_mtime()
+            return t > tt ? t : tt
+        elsif meth == :expired?
+            return log_expired? || original_expired?
+        else
+            super
+        end
+    end
+
+    def log_enabled?
+        true
+    end
+
+    def log_path
+        @log_path ||= File.join(logs_home_dir, "#{self.class.to_s}_#{Digest::MD5.hexdigest(self.name)}")
+        return @log_path
+    end
+
+    def logs_home_dir
+        hd = homedir
+        raise 'Cannot detect log directory since project home is unknown' if hd.nil?
+        log_hd = File.join(hd, '.lithium', '.logs')
+        unless File.exist?(log_hd)
+            puts_warning "LOG directory '#{log_hd}' cannot be found. Try to create it ..."
+            Dir.mkdir(log_hd)
+        end
+        return log_hd
+    end
+
+    # expire log to make the target artifact expired
+    def expire_log
+        p = log_path()
+        File.delete(p) if log_enabled? && File.exist?(p)
+    end
+
+    def log_mtime
+        p = log_path()
+        log_enabled? && File.exist?(p) ? File.mtime(p).to_i : -1
+    end
+
+    def log_expired?
+        log_enabled? && !File.exist?(log_path())
+    end
+
+    def load_log
+        if log_enabled?
+            p = log_path()
+            if File.exist?(p)
+                File.open(p, 'r') { | f |
+                    d = nil
+                    begin
+                        d = Marshal.load(f)
+                    rescue
+                        File.delete(p)
+                        raise
+                    end
+
+                    raise "Incorrect serialized object type '#{d.class}' (Hash is expected)" if !d.kind_of?(Hash)
+                    return d
+                }
+            end
+        end
+        return nil
+    end
+
+    def update_log
+        if log_enabled?
+            log = {}
+            list_logged_items { | name, v |
+                log[name] = v
+            }
+
+            path = log_path()
+            if log.length > 0
+                begin
+                    File.open(path, 'w') { | f | Marshal.dump(log, f) }
+                rescue
+                    File.delete(path)
+                    raise
+                end
+            else
+                File.delete(path) if File.exist?(path)
+            end
+
+            # t = Time.now
+            # File.utime(t, t, p) if File.exist?(p)
+        end
+    end
+
+
+    def list_logged_items(&block)
+
+    end
+end
+
+
+
 # The module has to be included in an artifact to track its update date. It is possible
 # to control either an artifact items state that has to be returned by implementing
 # "list_items" method or an attribute state that has to be declared via log_attr method
 module LogArtifactState
-    extend HookMethods
+    extend InterceptMethods
+
+
+    def initialize(name, &block)
+        super
+        @logged_items = load_items_log()
+        @logged_attrs = load_attrs_log()
+    end
+
 
     # catch target artifact methods call to manage artifact expiration state
     def method_missing(meth, *args)
@@ -69,7 +200,7 @@ module LogArtifactState
         end
     end
 
-    # class level method a class has to be extends
+    # class level method a class has to be extended
     module LoggedAttrs
         def log_attr(*args)
             @logged_attrs ||= []
@@ -303,18 +434,9 @@ module LogArtifactState
         @items_log_id = id
     end
 
-    def list_expired_attrs(&block)
-        # check attributes state expiration
-
-        # collect tracked attributes
-        attrs = []
-        self.class.each_log_attrs { | a |
-            attrs << a
-        }
-
+    def load_attrs_log
         if self.class.has_log_attrs()
             path = attrs_log_path()
-
             if File.exist?(path)
                 File.open(path, 'r') { | f |
                     d = nil
@@ -326,20 +448,39 @@ module LogArtifactState
                     end
 
                     raise "Incorrect serialized object type '#{d.class}' (Hash is expected)" if !d.kind_of?(Hash)
-                    attrs.each { | a |
-                        if !d.key?(a)
-                            block.call(a, nil)
-                        elsif self.send(a) != d[a]
-                            block.call(a, d[a])
-                        end
-                    }
+                    return d
+                }
+            end
+        end
+        return nil
+    end
 
-                    d.each_pair { | k, v |
-                        block.call(k, nil) if !attrs.include?(k)
-                    }
+    def list_expired_attrs(&block)
+        # check attributes state expiration
+
+        if self.class.has_log_attrs()
+            # collect tracked attributes
+            attrs = []
+            self.class.each_log_attrs { | a |
+                attrs << a
+            }
+
+            d = load_attrs_log()
+
+            if not d.nil?
+                attrs.each { | a |
+                    if !d.key?(a)
+                        block.call(a, nil)
+                    elsif self.send(a) != d[a]
+                        block.call(a, d[a])
+                    end
+                }
+
+                d.each_pair { | k, v |
+                    block.call(k, nil) if !attrs.include?(k)
                 }
             elsif attrs.length > 0
-                attrs.each { |a|
+                attrs.each { | a |
                     block.call(a, nil)
                 }
             end
@@ -354,3 +495,5 @@ module LogArtifactState
         items_log_path() + ".liser"
     end
 end
+
+

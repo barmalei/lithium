@@ -23,16 +23,17 @@ require 'lithium/java-artifact/ant'
 
 require 'lithium/file-artifact/acquired'
 
-require 'lithium/js-artifact'
-require 'lithium/py-artifact'
-require 'lithium/rb-artifact'
-require 'lithium/php-artifact'
+require 'lithium/js'
+require 'lithium/py'
+require 'lithium/uv'
+require 'lithium/ruby'
+require 'lithium/php'
 require 'lithium/tt-artifact'
-require 'lithium/dart-artifact'
+require 'lithium/dart'
 require 'lithium/gcp/gcloud-artifact'
 require 'lithium/gcp/bq'
-require 'lithium/web-artifact'
-require 'lithium/c-artifact'
+require 'lithium/web'
+require 'lithium/c'
 require 'lithium/tf-artifact'
 
 require 'lithium/xml-artifact'
@@ -100,7 +101,7 @@ PATTERNS ({
         GroovyCompileErrorPattern.new()
     ],
 
-    RunPythonScript => [
+    [ RunPythonScript, UvRun ] => [
         StdPattern.new {
             any('^\s*File\s+'); group(:location) { dquotes { file('py') }; any(',\s*line\s+'); line; }
         }

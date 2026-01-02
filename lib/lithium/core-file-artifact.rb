@@ -236,6 +236,14 @@ class FileArtifact < Artifact
     end
 end
 
+class LoggedFileArtifact < FileArtifact
+   include LogArtifactState
+
+    def expired?
+        false
+    end
+end
+
 # Permanent file shortcut
 class ExistentFile < FileArtifact
     def exists?
@@ -331,6 +339,15 @@ class FileMask < FileArtifact
     end
 end
 
+class LoggedFileMask < FileMask
+   include LogArtifactState
+
+    def expired?
+        false
+    end
+end
+
+
 
 #   <WITH>  <OPTS>  <TARGETS>  <ARGS>
 #     |       |        |          |
@@ -344,8 +361,8 @@ end
 #     +--- e.g java
 #
 class RunTool < FileMask
-    include LogArtifactState
     include ToolExecuter
+    include LogArtifactState
 
     log_attr :_options, :arguments
 

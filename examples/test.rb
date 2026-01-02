@@ -11,5 +11,5 @@ class A
         m1, m2 = a()
     end
 
-
 end
+

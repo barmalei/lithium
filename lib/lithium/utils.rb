@@ -761,3 +761,4 @@ class Properties
         self.fromMask(mask, find_first)[name]
     end
 end
+
