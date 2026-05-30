@@ -34,6 +34,7 @@ require 'lithium/gcp/gcloud-artifact'
 require 'lithium/gcp/bq'
 require 'lithium/web'
 require 'lithium/c'
+require 'lithium/rust'
 require 'lithium/tf-artifact'
 
 require 'lithium/xml-artifact'
@@ -221,6 +222,14 @@ PATTERNS ({
         },
 
         JavaExceptionLocPattern.new()
+    ],
+
+    #--> src/main.rs:2:5
+    [ RunCargo, CompileRust ] => [
+        StdPattern.new {
+            any('\s*-->\s*'); group(:location) { file; colon; line; colon; column; }
+            COMPLETE_PATH()
+        }
     ],
 
     #e: /Users/brigadir/projects/newtask/src/main/kotlin/com/signicat/interview/security/TokenFactory.kt: (30, 31): Expecting an element

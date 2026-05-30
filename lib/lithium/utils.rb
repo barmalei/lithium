@@ -619,12 +619,14 @@ end
 #     |         |        |        |   +--- [ file_list ]
 #     |         |        |        +---|
 #     |         |        |            +--- path_to_tmp_file (contains files to be processed)
+#     |         |        |            |
+#     |         |        |            +--- (class.@targets)
 #     |         |        |
 #     |         |        s+--- e.g -cp classes:lib
 #     |         |
-#     |         +--- install
+#     |         +--- install (class.@commands)
 #     |
-#     +--- e.g java
+#     +--- e.g java (class.@with)
 #
 module ToolExecuter
     include OptionsSupport
@@ -641,11 +643,21 @@ module ToolExecuter
     end
 
     def WITH_COMMANDS
-        []
+        attr_value = _get_class_attr(:@commands, [].class)
+        if attr_value.nil?
+            return []
+        else
+            return attr_value
+        end
     end
 
     def WITH
-        raise "Tool name is not defined in '#{self.class.name}' class"
+        attr_value = _get_class_attr(:@with, String)
+        if !attr_value.nil?
+            return attr_value
+        else
+            raise "Tool name is not defined in '#{self.class.name}' class"
+        end
     end
 
     # @return Array
@@ -664,7 +676,12 @@ module ToolExecuter
     end
 
     def WITH_TARGETS
-        []
+        attr_value = _get_class_attr(:@targets, [].class)
+        if attr_value.nil?
+            return []
+        else
+           return attr_value
+        end
     end
 
     def CMD(run_with, cmds, opts, targets, args)
@@ -690,6 +707,16 @@ module ToolExecuter
             FAILED(*args, err_code:ec.exitstatus)
         else
             puts "'#{self.class}' was successfully executed"
+        end
+    end
+
+    def _get_class_attr(attr_name, attr_type = nil)
+        if self.class.instance_variable_defined?(attr_name)
+            v = self.class.instance_variable_get(attr_name)
+            raise "The returned value has '#{v.class}' wrong type, '#{attr_type}' type is expected" unless attr_type.nil? || v.is_a?(attr_type)
+            return v
+        else
+            return nil
         end
     end
 end

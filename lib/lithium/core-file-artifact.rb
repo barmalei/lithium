@@ -379,9 +379,18 @@ class RunTool < FileMask
 
     def build(&block)
         super
-        go_to_homedir()
+        prepare
         EXEC(&block)
     end
+
+    def prepare
+        go_to_homedir()
+    end
+end
+
+class CustomizedRunTool < RunTool
+
+
 end
 
 class RunShell < RunTool

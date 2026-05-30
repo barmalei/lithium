@@ -72,6 +72,7 @@
         DeployGoogleApp  ('**/app*.yaml')
         RunBqSql         ('**/*.sql')
         RunTf            ('**/*.tf')
+        RunRust          ('**/*.rs')
 
         # TODO: BUG that prevents recognizing "**/*.py" mask if un-comment the line below
         #RunPySetup       ('**/setup.py')
@@ -114,6 +115,7 @@
         ValidateDartCode    ('**/*.dart')
         ValidateBqSql       ('**/*.sql')
         ValidateTf          ('**/*.tf')
+        CompileRust         ('**/*.rs')
 
         # OTHERWISE
         # OTHERWISE {
