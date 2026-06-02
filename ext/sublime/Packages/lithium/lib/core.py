@@ -249,6 +249,7 @@ class Lithium:
         assert command is not None and len(command) > 0, 'Command has not been defined'
 
         script_path = SETTINGS["lithium.command", "lithium"]
+        script_path = os.path.expanduser(script_path)
         if options is None:
             options = SETTINGS["lithium.opts", {}]
 

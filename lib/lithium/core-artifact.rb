@@ -83,7 +83,7 @@ class ArtifactPath < String
     end
 
     def self.prefix(path)
-        path[/^\w+\:/]
+        path[/^[a-zA-Z]{2,}\:/]
     end
 
     def self.suffix(path)
