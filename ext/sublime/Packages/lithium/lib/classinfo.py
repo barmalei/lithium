@@ -64,7 +64,7 @@ class LiClassInfo:
             clazz = self.content,
             #methods = sorted(self.content.get('methods'), key = functools.cmp_to_key(cmp)),
             methods = sorted(self.content.get('methods'), key = functools.cmp_to_key(cmp), reverse = True),
-            fields = sorted(self.content.get('fields'), key = functools.cmp_to_key(cmp), reverse = True),
+            fields  = sorted(self.content.get('fields'), key = functools.cmp_to_key(cmp), reverse = True),
             name = self.content.get('name'),
             filters = self.filters.get('methods'),
             ui = self.filters.get('tabs')

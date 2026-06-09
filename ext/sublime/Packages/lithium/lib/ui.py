@@ -1,18 +1,20 @@
+import sublime, copy
 
-import sublime, copy, core
+from .core   import LiLog, LiConfig
+from .config import JsonConfig
 
 #
 # Output Lithium panel class.
 #
 class LiOutPanel:
-    def __init__(self, win, settings):
-        assert settings is not None, 'Settings have not been defined'
-        assert isinstance(settings, dict) or isinstance(settings, core.LiConfig), 'Settings type is unexpected'
+    def __init__(self, win, settings:dict):
+        if settings is None:
+            raise ValueError('Setting is None')
 
-        if isinstance(settings, core.LiConfig) is not True:
-            settings = core.LiConfig(settings)
+        if not isinstance(settings, dict):
+            raise ValueError('Setting is expected to have dict type')
 
-        self.settings = settings
+        self.settings = JsonConfig.from_dict(settings)
         self.selected_location = -1
         self.locations = None
         self.name = self.settings['name']
@@ -21,14 +23,14 @@ class LiOutPanel:
 
     def _re_create_view(self):
         view = self.win.create_output_panel(self.name)
-        view.settings().set("gutter", self.settings['gutter', False])
-        view.settings().set("font_size", self.settings['font_size'])
-        view.settings().set("line_numbers", self.settings['line_numbers', False])
+        view.settings().set("gutter", self.settings.as_bool('gutter', False))
+        view.settings().set("font_size", self.settings.as_str('font_size'))
+        view.settings().set("line_numbers", self.settings.as_bool('line_numbers', False))
         view.settings().set("scroll_past_end", False)
         view.set_name(self.name)
         view.set_scratch(True)
         view.set_read_only(False)
-        view.set_syntax_file(self.settings['syntax'])
+        view.set_syntax_file(self.settings.as_str('syntax'))
         view.settings().set("color_scheme", "lithium.sublime-color-scheme")
         return view
 
@@ -41,14 +43,14 @@ class LiOutPanel:
 
         return self
 
-    def append_err(self, msg):
-        return self.append("(E) [SUB]  %s" % msg, False)
+    def append_err(self, msg:str):
+        return self.append(f"(E) [SUB]  {msg}", False)
 
-    def append_warn(self, msg):
-        return self.append("(W) [SUB]  %s" % msg, False)
+    def append_warn(self, msg:str):
+        return self.append(f"(W) [SUB]  {msg}", False)
 
-    def append_info(self, msg):
-        return self.append("(I) [SUB]  %s" % msg, False)
+    def append_info(self, msg:str):
+        return self.append(f"(I) [SUB]  {msg}", False)
 
     # go to the given location
     def goto_location(self, index):
@@ -56,7 +58,7 @@ class LiOutPanel:
 
         loc = self.get_location_at(index)
         if loc is not None:
-            self.win.open_file("%s:%s" % (loc[0],loc[1]), sublime.ENCODED_POSITION)
+            self.win.open_file(f"{loc[0]}:{loc[1]}", sublime.ENCODED_POSITION)
             self.get_view().show(loc[3])
             return True
         else:
@@ -73,7 +75,7 @@ class LiOutPanel:
         if self.locations is None:
             self.locations = []
             delim = "<!<*>!>"
-            for r in core.SETTINGS["location.patterns"]:
+            for r in LiConfig.of()["location.patterns"]:
                 res     = []
                 regions = self.get_view().find_all(r, sublime.IGNORECASE, "\\1" + delim + "\\2" + delim + "\\3", res)
                 reg_idx = 0
@@ -82,11 +84,11 @@ class LiOutPanel:
                     fn = e[0].strip() # file name
                     ln = e[1].strip() # line
                     ms = e[2].strip() # message
-                    core.LiLog.debug("LiOutPanel.get_locations(): Detected location fn = '%s', line = %s" % (fn, ln))
+                    LiLog.debug("LiOutPanel.get_locations(): Detected location fn = '{fn}', line = {ln}")
                     self.locations.append([ fn, ln, ms, regions[reg_idx] ])
                     reg_idx = reg_idx + 1
 
-            core.LiLog.debug("LiOutPanel.get_locations() detected locations = %s" % self.locations)
+            LiLog.debug(f"LiOutPanel.get_locations() detected locations = {self.locations}")
             return copy.deepcopy(self.locations)
         else:
             return copy.deepcopy(self.locations)
@@ -122,7 +124,7 @@ class LiOutPanel:
         self.locations = None
         return self
 
-    def select_location(self, index, select = True):
+    def select_location(self, index, select:bool = True):
         assert index is not None
 
         if self.has_locations() is True:
@@ -163,7 +165,7 @@ class LiOutPanel:
         return self.win
 
     def show(self):
-        self.win.run_command("show_panel", { "panel": "output.%s" % self.name })
+        self.win.run_command("show_panel", { "panel": f"output.{self.name}" })
         return self
 
     def destroy(self):
@@ -177,7 +179,7 @@ class LiOutPanel:
 
 class LiView:
     @classmethod
-    def view_to_s(clazz, view):
+    def view_to_s(cls, view):
         if view == None:
             return "view is [ NONE ]"
         name = view.file_name()
@@ -188,5 +190,5 @@ class LiView:
             wid = "NONE"
         else:
             wid = win.id()
-        return "view [ id = " + str(view.id()) + ", name = '" + view.name() + "', winid = " + str(wid) + ", path = " + name + "]"
+        return f"view [ id = '{view.id()}', name = '{view.name()}', winid = {wid}, path = '{name}' ]"
 

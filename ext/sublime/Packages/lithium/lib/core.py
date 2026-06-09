@@ -1,111 +1,76 @@
+import os, json, sublime_plugin, sublime, io, threading, re, traceback, subprocess, datetime
 
-import os, json, sublime_plugin, sublime, io, threading, re, traceback, subprocess, copy, datetime
 
-# path to the lithium settings
-LI_SETTINGS_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)),
-    'lithium.sublime-settings'
-)
+from .config import JsonConfig, Config
 
-class LiConfig:
-    """
-        Utility configuration class. Helps to load and access JSON formatted file properties.
-    """
-    def __init__(self, path):
-        assert path is not None, 'Empty configuration content'
+class LiConfig(JsonConfig):
+    li_config: Config | None = None
 
-        if isinstance(path, str) is True:
-            assert path is not None and len(path.strip()) > 0
-            path = path.strip()
-
-            if not os.path.exists(path) or os.path.isdir(path):
-                raise IOError("Invalid '{}' configuration path".format(path))
-
-            self.content = None
-            with open(path) as file:
-                self.content = json.load(file)
-        else:
-            self.content = copy.deepcopy(path)
-
-    def __getitem__(self, key):
-        assert key is not None
-
-        defValue         = None
-        isDefValuePassed = isinstance(key, tuple)
-        if isDefValuePassed:
-            defValue = key[1]
-            key      = key[0]
-
-        value = self.content
-        for sub_key in key.split('.'):
-            value = value.get(sub_key)
-            if value is None and not isDefValuePassed:
-                raise AttributeError("Configuration '{}' attribute cannot be found".format(key))
-            elif value is None:
-                return defValue
-
-        if isinstance(value, dict) or isinstance(value, list):
-            return copy.deepcopy(value)
-        else:
-            return value
-
-# lithium package settings
-SETTINGS = LiConfig(LI_SETTINGS_FILE)
+    @classmethod
+    def of(cls) -> Config:
+        if cls.li_config is None:
+            path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                'lithium.sublime-settings'
+            )
+            # don't use log to avoid recursion
+            print(f"Loading lithium plugin configuration from '{path}' file")
+            cls.li_config = cls.by_path(path)
+        return cls.li_config
 
 # Log API
 class LiLog:
     format_str = "[%s] %s"
 
     @classmethod
-    def is_debug(clz):
-        return SETTINGS['log.debug', False]
+    def is_debug(cls) -> bool:
+        return LiConfig.of().as_bool('log.debug', False)
 
     @classmethod
-    def is_warn(clz):
-        return SETTINGS['log.warning', True]
+    def is_warn(cls) -> bool:
+        return LiConfig.of().as_bool('log.warning', True)
 
     @classmethod
-    def is_info(clz):
-        return SETTINGS['log.info', True]
+    def is_info(cls) -> bool:
+        return LiConfig.of().as_bool('log.info', True)
 
     @classmethod
-    def debug(clz, msg):
-        if clz.is_debug():
-            print(clz.format('DEBUG', msg))
-            #print(LiLog.format_str % ('DEBUG', msg))
+    def debug(cls, msg:str):
+        if cls.is_debug():
+            print(cls.format('DEBUG', msg))
 
     @classmethod
-    def warn(clz, msg):
-        if clz.is_warn():
-            print(clz.format('WARN', msg))
+    def warn(cls, msg:str):
+        if cls.is_warn():
+            print(cls.format('WARN', msg))
 
     @classmethod
-    def info(clz, msg):
-        if clz.is_info():
+    def info(cls, msg:str):
+        if cls.is_info():
             print(LiLog.format('INFO', msg))
 
     @classmethod
-    def format(clz, level, msg):
-        return datetime.datetime.now().strftime("%H:%M:%S.%f") + " " + LiLog.format_str % ('INFO', msg)
+    def format(cls, level:str, msg:str):
+        return datetime.datetime.now().strftime("%H:%M:%S.%f") + " " + LiLog.format_str % (level, msg)
 
 # various helper methods
 class LiHelper:
     # convert scope string to array of scope members
     @classmethod
-    def scope_to_array(clz, scope):
+    def scope_to_array(cls, scope):
         assert scope is not None, 'Passed scope is not defined'
         scopes = scope.split(' ')
         return [item for item in scopes if item != '']
 
     # test if the scope member is in the given array for the given location
     @classmethod
-    def has_in_scope(clz, view, point, scopes):
+    def has_in_scope(cls, view, point, scopes):
         assert scopes is not None, 'Passed scopes are not defined'
 
         if not isinstance(scopes, list):
             scopes = [ scopes ]
 
-        scopes_array = clz.scope_to_array(view.scope_name(point))
+        scopes_array = cls.scope_to_array(view.scope_name(point))
         for scope in scopes:
             if scope in scopes_array:
                 return True
@@ -116,16 +81,16 @@ class LiHelper:
     # Input: text
     # Output:  [ (filename, line, description), ... ]
     @classmethod
-    def detect_locations(clz, text):
+    def detect_locations(cls, text):
         paths = []
-        for r in SETTINGS["location.patterns"]:
+        for r in LiConfig.of()["location.patterns"]:
             res = re.findall(r, text) # array of (file, line, desc) tuples are expected
             for path in res:
                 paths.append(path)
         return paths
 
     @classmethod
-    def current_view(clz):
+    def current_view(cls):
         if sublime.active_window() is None:
             return None
         else:
@@ -133,9 +98,9 @@ class LiHelper:
 
     #  return selected region -> (region, <region substr>)
     @classmethod
-    def sel_region(clz, view = None):
+    def sel_region(cls, view = None):
         if view is None:
-            view = clz.current_view()
+            view = cls.current_view()
 
         if view is not None:
             regions = view.sel()
@@ -147,21 +112,21 @@ class LiHelper:
 
     # return current symbol as (symbol, region, scope)
     @classmethod
-    def view_symbol(clz, view, region = None):
+    def view_symbol(cls, view, region = None):
         if view is not None:
             symb = None
             if region is None:
-                region, symb = clz.sel_region(view)
+                region, symb = cls.sel_region(view)
                 if region is None:
-                    LiLog.debug("%s.view_symbol(): Region is NONE, symbol cannot be detected" % clz.__name__)
+                    LiLog.debug(f"{cls.__name__}.view_symbol(): Region is NONE, symbol cannot be detected")
                     return None
             else:
                 symb = view.substr(region)
-                LiLog.debug("%s.view_symbol(): (%s, %s)" % (clz.__name__, symb, view.scope_name(region.begin())))
+                LiLog.debug(f"{cls.__name__}.view_symbol(): ({symb}, {view.scope_name(region.begin())})")
 
             return symb, region, view.scope_name(region.begin())
 
-        LiLog.debug("%s.view_symbol(): View is NONE, symbol cannot be detected" % clz.__name__)
+        LiLog.debug(f"{cls.__name__}.view_symbol(): View is NONE, symbol cannot be detected")
         return None
 
     # Detect lithium project home folder by looking lithium folder up
@@ -169,8 +134,8 @@ class LiHelper:
     # Input: folder_name a folder name to be detected
     # Output: folder that contains folder_name
     @classmethod
-    def detect_host_folder(clz, pt, folder_name = ".lithium"):
-        LiLog.debug("%s.li_detect_host_folder(): initial path = '%s'" % (clz.__name__, pt))
+    def detect_host_folder(cls, pt, folder_name = ".lithium"):
+        LiLog.debug(f"{cls.__name__}.li_detect_host_folder(): initial path = '{pt}'")
 
         if pt != None and os.path.abspath(pt) and os.path.exists(pt):
             if os.path.isfile(pt):
@@ -183,13 +148,13 @@ class LiHelper:
                     pt = os.path.dirname(pt)
                 cnt = cnt + 1
         else:
-            LiLog.warn("%s.detect_host_folder() invalid initial folder '%s'" % (clz.__name__, pt))
+            LiLog.warn(f"{cls.__name__}.detect_host_folder() invalid initial folder '{pt}'")
 
         return None
 
     # load detected problem
     @classmethod
-    def load_problems(clz, path):
+    def load_problems(cls, path):
         data = []
         with open(path) as file:
             data = json.load(file)
@@ -202,7 +167,7 @@ class LiHelper:
                         if entity['level'] == 'error':
                             status = 'E'
                         elif entity['level'] == 'warning':
-                            status = 'E'
+                            status = 'W'
 
                     msg = ''
                     if 'message' in entity:
@@ -222,13 +187,10 @@ class LiHelper:
 class Lithium:
     # Detect a project home directory
     @classmethod
-    def detect_project_home(clz):
+    def detect_project_home(cls) -> str | None:
         active_view = LiHelper.current_view()
 
-        home = None
-        if active_view.file_name() != None:
-            home = LiHelper.detect_host_folder(active_view.file_name())
-
+        home = LiHelper.detect_host_folder(active_view.file_name()) if active_view.file_name() != None else None
         if home is None:
             folders = active_view.window().folders()
             if len(folders) > 0:
@@ -240,21 +202,21 @@ class Lithium:
         if home is not None:
             home = os.path.realpath(home) # resolve sym link to real path
 
-        LiLog.debug("%s.detect_project_home(): home = '%s'" % (clz.__name__, home))
+        LiLog.debug(f"{cls.__name__}.detect_project_home(): home = '{home}'")
         return home
 
     # Run lithium command
     @classmethod
-    def exec(clz, command, output_handler = None, error_handler = None, run_async = True, options = None):
+    def exec(cls, command, output_handler = None, error_handler = None, run_async = True, options:dict = None):
         assert command is not None and len(command) > 0, 'Command has not been defined'
 
-        script_path = SETTINGS["lithium.command", "lithium"]
+        script_path = LiConfig.of().as_str("lithium.command", "lithium")
         script_path = os.path.expanduser(script_path)
         if options is None:
-            options = SETTINGS["lithium.opts", {}]
+            options = LiConfig.of().get("lithium.opts", {})
 
         if 'basedir' not in options:
-            bd = clz.detect_project_home()
+            bd = cls.detect_project_home()
             if bd is None:
                 sublime.error_message("Project home cannot be detected. Check if '.lithium' folder exits in project root folder")
                 return
@@ -262,43 +224,56 @@ class Lithium:
 
         options_str = ' '.join("-{!s}={!r}".format(key, val) for (key, val) in options.items())
 
-        LiLog.debug("%s.exec(): script_path = '%s', opts = '%s', command = '%s'" % (clz.__name__, script_path , options_str, command))
+        LiLog.debug(f"{cls.__name__}.exec(): script_path = '{script_path}', opts = '{options_str}', command = '{command}' , run_async = {run_async}")
 
-        # Python 3.3
-        process = subprocess.Popen(
-            script_path + " " + options_str  + " " + command,
+        process = subprocess.Popen( #
+            #[script_path , options_str, command],
+            f"{script_path} {options_str} {command}",
             shell  = True,
             stdin  = subprocess.PIPE,
             stdout = subprocess.PIPE,
             stderr = subprocess.STDOUT,
             universal_newlines = False,
-            bufsize = 0
+            bufsize = 1
         )
 
-        # TODO: re-work to python 3.8
-        # process = subprocess.run( [script_path , options_str, command],
-        #                            shell  = True,
-        #                            capture_output = False,
-        #                            stdin  = subprocess.PIPE,
-        #                            stdout = subprocess.PIPE,
-        #                            stderr = subprocess.STDOUT,
-        #                            encoding ='utf-8'.
-        #                            universal_newlines = False,
-        #                            bufsize = 0)
+        # process = subprocess.run( #
+        #     #[script_path , options_str, command],
+        #     f"{script_path} {options_str} {command}",
+        #     shell  = True,
+        #     stdin  = subprocess.PIPE,
+        #     stdout = subprocess.PIPE,
+        #     stderr = subprocess.STDOUT,
+        #     universal_newlines = False,
+        #     bufsize = 0
+        # )
+
 
         if run_async:
+            LiLog.debug("Run process as async one")
+
             def WRITES(process, output_handler, error_handler):
                 try:
-                    for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
+                    for line in io.TextIOWrapper(process.stdout, encoding = 'utf-8', errors='strict'):
                         if output_handler is not None:
                             output_handler(process, line)
+
+                    # outs, errs = process.communicate()
+                    # for line in outs.split("\n"):
+                    #     if output_handler is not None:
+                    #         output_handler(process, line + "\n")
+
+                    # if errs is not None:
+                    #     for line in errs.split("\n"):
+                    #         if output_handler is not None:
+                    #             output_handler(process, line + "\n")
 
                     # tell the last line has been handled
                     process.stdout.close()
                     if output_handler is not None:
                         output_handler(process, None)
                 except Exception as ex:
-                    print(ex)
+                    traceback.print_exception(ex)
                     if error_handler is not None:
                         error_handler(command, ex)
 
@@ -307,6 +282,8 @@ class Lithium:
                 args   = (process, output_handler, error_handler)
             ).start()
         else:
+            LiLog.debug("Run process as blocking one")
+
             while True:
                 data = process.stdout.read().decode('utf-8')
                 try:
@@ -325,35 +302,35 @@ class Lithium:
                         if error_handler is not None:
                             error_handler(command, ex)
                     except Exception as ex2:
-                        print(ex2)
+                        traceback.print_exception(ex2)
                     break
 
         return process
 
 
 class LiCommandBase:
-    def debug(self, msg):
+    def debug(self, msg:str):
         LiLog.debug(msg)
         return self
 
-    def warn(self, msg):
+    def warn(self, msg:str):
         LiLog.warn(msg)
         return self
 
-    def info(self, msg):
+    def info(self, msg:str):
         LiLog.info(msg)
         return self
 
     def exec(self, *args):
         return Lithium.exec(*args)
 
-    def settings(self):
-        return SETTINGS
+    def settings(self) -> Config:
+        return LiConfig.of()
 
     def symbol(self):
         return LiHelper.view_symbol(self.view)[0]
 
-    def home(self):
+    def home(self) -> str | None:
         return Lithium.detect_project_home()
 
 
@@ -371,6 +348,7 @@ class LiTextCommand(sublime_plugin.TextCommand, LiCommandBase):
 
     def enabled_syntaxes(self):
         return None
+
 
 class LiWindowCommand(sublime_plugin.WindowCommand, LiCommandBase):
     pass

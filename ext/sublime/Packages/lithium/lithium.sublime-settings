@@ -1,9 +1,9 @@
 {
     "lithium" : {
-        "command" : "ruby /Users/brigadir/projects/.lithium/lib/lithium.rb",
+        "command" : "~/.rbenv/shims/ruby /Users/brigadir/projects/.lithium/lib/lithium.rb",
         "opts"    : {
             "verbosity": "2",
-            "std"      : "SublimeStd",
+            "std"      : "none",
             "header"   : "1"
         }
     },

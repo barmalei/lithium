@@ -1,26 +1,26 @@
-import sublime, sublime_plugin, subprocess, os, platform, json, re, sys, webbrowser
+import traceback
+
+import sublime, sublime_plugin, subprocess, os, platform, json, re, webbrowser, importlib
 
 from itertools      import groupby
 from urllib.request import urlopen
 from urllib.parse   import quote
 
-LI_MODULES = {
-    'core': [ 'LiHelper', 'LiTextCommand', 'LiWindowCommand'] , 'java': [ 'LiJava' ], 'ui': [], 'classinfo': [ 'LiClassInfo']
-}
+print(f"Lithium plugin Python version is '{platform.python_version()}'")
 
-# reload lib modules
-import importlib, imp
-sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
-for mod_name in LI_MODULES.keys():
-    try:
-        importlib.import_module(mod_name)
-        importlib.reload(module)
-    except AttributeError:
-        fp, pathname, description = imp.find_module(mod_name)
-        imp.load_module(mod_name, fp, pathname, description)
-    globals()[mod_name] = __import__(mod_name, globals(), locals(), LI_MODULES[mod_name])
-    for value_name in LI_MODULES[mod_name]:
-        globals()[value_name] = getattr(globals()[mod_name], value_name)
+from .lib.core       import LiHelper, LiTextCommand, LiWindowCommand, LiLog, LiConfig
+from .lib.java       import LiJava, parse_java_classname
+from .lib.ui         import LiOutPanel
+from .lib.classinfo  import LiClassInfo
+
+# Force to reload module
+from .lib import core, java, ui, classinfo, config, utils
+importlib.reload(core)
+importlib.reload(java)
+importlib.reload(ui)
+importlib.reload(classinfo)
+importlib.reload(utils)
+importlib.reload(config)
 
 OUTPUT_PAN_SET = {}
 
@@ -39,7 +39,7 @@ def OUTPUT(target):
 
     output = OUTPUT_PAN_SET.get(win.id())
     if output is None:
-        output = ui.LiOutPanel(win, core.SETTINGS["output_panel"])
+        output = LiOutPanel(win, LiConfig.of()["output_panel"])
         OUTPUT_PAN_SET[win.id()] = output
 
     return output
@@ -58,9 +58,9 @@ class LiEventListener(sublime_plugin.EventListener):
             OUTPUT_PAN_SET.pop(window.id())
 
         if output is not None:
-            core.LiLog.info("Project window '%s' has been closed, destroy lithium output panel" % window.id())
+            LiLog.info(f"Project window '{window.id()}' has been closed, destroy lithium output panel")
         else:
-            core.LiLog.info("Project window '%s' has been closed, no lithium output panel was created for this window" % window.id())
+            LiLog.info(f"Project window '{window.id()}' has been closed, no lithium output panel was created for this window")
 
 # open POM if it is available for the current project
 class LiOpenPomCommand(LiWindowCommand):
@@ -68,14 +68,14 @@ class LiOpenPomCommand(LiWindowCommand):
         return True
 
     def run(self, **args):
-        home, fn = self.home(), None
+        home = self.home()
         if home is not None:
             fn = os.path.join(home, 'pom.xml')
+            if os.path.exists(fn):
+                sublime.active_window().open_file(fn)
+                return
 
-        if home is not None and os.path.exists(fn):
-            sublime.active_window().open_file(fn)
-        else:
-            sublime.error_message("POM file cannot be identified in '%s' home" % home)
+        sublime.error_message(f"POM file cannot be identified in '{home}' home")
 
 
 class LiOpenLithiumRbCommand(LiWindowCommand):
@@ -86,11 +86,11 @@ class LiOpenLithiumRbCommand(LiWindowCommand):
         home, fn = self.home(), None
         if home is not None:
             fn = os.path.join(home, '.lithium', 'project.rb')
+            if os.path.exists(fn):
+                sublime.active_window().open_file(fn)
+                return
 
-        if home is not None and os.path.exists(fn):
-            sublime.active_window().open_file(fn)
-        else:
-            sublime.error_message("'.lithium/project.rb' file cannot be identified in '%s' home" % home)
+        sublime.error_message(f"'.lithium/project.rb' file cannot be identified in '{home}' home")
 
 
 class LiCommand(LiWindowCommand):
@@ -109,7 +109,7 @@ class LiCommand(LiWindowCommand):
 
             if sublime.ok_cancel_dialog("There is an active process still running. Are you sure you want to terminate it?", "Terminate") is True:
                 if self.has_active_process_run():
-                    self.process.terminate()
+                    self.process.kill()
                     terminated_process_msg = "Previous process has been terminated"
                 else:
                     sublime.message_dialog("Previous process has been already completed")
@@ -126,11 +126,9 @@ class LiCommand(LiWindowCommand):
             active_view.window().run_command('save')
 
         # fetch command from args list
-        command = ""
-        if "command" in args:
-            command = args["command"]
+        command = args["command"] if "command" in args else ""
 
-        self.debug("LiCommand.run(): command = '%s'" % command)
+        self.debug(f"LiCommand.run(): command = '{command}'")
 
         # detect home folder
         li_home = self.home()
@@ -143,18 +141,15 @@ class LiCommand(LiWindowCommand):
             hm = li_home
             # wrap with quotas path that contains spaces
             if hm != "\"" and hm.find(" ") > 0:
-                hm = "\"" + hm + "\""
+                hm = f"\"{hm}\""
 
             placeholders['home'] = hm
-            self.debug("LiCommand.run(): Detected home folder '%s'" % li_home)
+            self.debug(f"LiCommand.run(): Detected home folder '{li_home}'")
 
         if active_view.file_name() != None:
             fn = active_view.file_name()
             # wrap with quotas path that contains spaces
-            if fn[0] != "\"" and fn.find(" ") > 0:
-                placeholders['file'] = "\"" + fn + "\""
-            else:
-                placeholders['file'] = fn
+            placeholders['file'] = f"\"{fn}\"" if fn[0] != "\"" and fn.find(" ") > 0 else fn
 
             filename, ext = os.path.splitext(fn)
             if ext is not None and ext != '':
@@ -166,10 +161,7 @@ class LiCommand(LiWindowCommand):
                 if src_folder is None:
                     if os.path.isfile(fn):
                         src_home = os.path.join(os.path.dirname(fn), 'src')
-                        if os.path.exists(src_home):
-                            placeholders['src_home'] = src_home
-                        else:
-                            placeholders['src_home'] = os.path.dirname(fn)
+                        placeholders['src_home'] = src_home if os.path.exists(src_home) else os.path.dirname(fn)
                     else:
                         placeholders['src_home'] = os.path.join(fn, 'src')
                 else:
@@ -183,7 +175,7 @@ class LiCommand(LiWindowCommand):
         try:
             command = command.format(**placeholders)
         except KeyError:
-            sublime.error_message("Lithium command '%s' cannot be interpolated with %s" % (command, str(placeholders)))
+            sublime.error_message(f"Lithium command '{command}' cannot be interpolated with {placeholders}")
 
         try:
             OUTPUT(self).clear()
@@ -191,16 +183,19 @@ class LiCommand(LiWindowCommand):
                 OUTPUT(self).append_err(terminated_process_msg)
             OUTPUT(self).show()
 
+            print(f"Command {command}")
+
             self.process = self.exec(command, self.match_output, self.error_output)
         except Exception as ex:
             self.process = None
-            sublime.error_message("Lithium '%s' command execution has failed('%s')" % (command, str(ex)))
+            raise ex
+            sublime.error_message(f"Lithium '{command}' command execution has failed('{ex}')")
 
     def has_active_process_run(self):
         return self.process is not None and self.process.returncode is None
 
     def error_output(self, command, err):
-        sublime.error_message("Lithium '%s' command execution failed: ('%s')" % (command, str(err)))
+        sublime.error_message(f"Lithium '{command}' command execution failed: ('{err}')")
 
     def match_output(self, process, line):
         if line is None:
@@ -226,7 +221,7 @@ class LiSortImportsCommand(LiJavaTextCommand):
                 if index > 0:
                     imports_str = imports_str + "\n\n"
 
-                import_items = [ "import static %s" % x[1] if x[2] else "import %s" % x[1] for x in group ]
+                import_items = [ f"import static {x[1]}" if x[2] else f"import {x[1]}" for x in group ]
                 # for group_item in group
                 imports_str = imports_str + ";\n".join(import_items) + ";"
 
@@ -247,34 +242,34 @@ class LiSortImportsCommand(LiJavaTextCommand):
         return groups
 
 class LiRemoveUnusedImportsCommand(LiJavaTextCommand):
-    re_unused_import = r"\s+([^;:,?!!%^&()|+=></-]+)\.\s+\[UnusedImports\]$"
+    re_unused_import = r"\s+([^;:,?!!%^&()|+=></-]+)\\.\s+\[UnusedImports\]$"
 
     def run(self, edit, **args):
-        OUTPUT(self).append_info("%s: Remove un-used imports\n" % self.__class__.__name__)
+        OUTPUT(self).append_info(f"{self.__class__.__name__}: Remove un-used imports\n")
 
         self.exec(
-            "UnusedJavaCheckStyle:\"%s\" " % self.view.file_name(),
+            f"UnusedJavaCheckStyle:\"{self.view.file_name()}\" ",
             self.match_output,
             self.error_output,
             False
         )
 
         if self.unused_imports is None or len(self.unused_imports) == 0:
-            OUTPUT(self).append_warn("(%s: Unused imports have not been detected\n" % self.__class__.__name__)
+            OUTPUT(self).append_warn(f"({self.__class__.__name__}: Unused imports have not been detected\n")
         else:
             for imp in reversed(self.unused_imports):
                 line = imp[1]
                 region = self.view.full_line((self.view.text_point(line - 1, 0)));
                 self.view.show(region)
                 self.view.erase(edit, region)
-                OUTPUT(self).append_warn("%s: Remove unused import '%s' at line %i\n" % ( self.__class__.__name__, imp[0],line))
+                OUTPUT(self).append_warn(f"{self.__class__.__name__}: Remove unused import '{imp[0]}' at line {line}\n")
 
     def exec(self, *args):
         self.unused_imports = []
         return super().exec(*args)
 
     def error_output(self, command, err):
-        sublime.error_message("Lithium '%s' command execution failed: ('%s')" % (command, str(err)))
+        sublime.error_message(f"Lithium '{command}' command execution failed: ('{err}')")
 
     def match_output(self, process, line):
         if line is not None:
@@ -282,7 +277,7 @@ class LiRemoveUnusedImportsCommand(LiJavaTextCommand):
             for loc in locations:
                 match = re.search(LiRemoveUnusedImportsCommand.re_unused_import, loc[2])
                 if match is not None:
-                    self.debug("LiRemoveUnusedImportsCommand.match_output(): matched line = %s, import = '%s'" % (loc[1], match.group(1)))
+                    self.debug(f"LiRemoveUnusedImportsCommand.match_output(): matched line = {loc[1]}, import = '{match.group(1)}'")
                     self.unused_imports.append([ match.group(1), int(loc[1]) ])
 
 class LiValidateImportsCommand(LiJavaTextCommand):
@@ -292,12 +287,12 @@ class LiValidateImportsCommand(LiJavaTextCommand):
 
 class LiCompleteImportCommand(LiJavaTextCommand):
     def run(self, edit, **args):
-        OUTPUT(self).append_info("%s: Completing JAVA import\n" % self.__class__.__name__)
+        OUTPUT(self).append_info(f"{self.__class__.__name__}: Completing JAVA import\n")
 
         self.region, self.word = LiHelper.sel_region(self.view)
 
         if self.region is not None:
-            OUTPUT(self).append_info("%s: completing '%s' word\n" % (self.__class__.__name__, self.word))
+            OUTPUT(self).append_info(f"{self.__class__.__name__}: completing '{self.word}' word\n")
 
             if self.word is not None and len(self.word.strip()) > 1:
                 # detect home folder
@@ -314,14 +309,15 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     self.found_items = []
                     self.edit        = edit
                     self.process     = self.exec(
-                        "FindInClasspath:\"%s%s\" %s.class" % ('@', self.syntax().upper(), self.word),
+                        f"FindInClasspath:\"@{self.syntax().upper()}\" {self.word}.class",
                         self.match_output,
                         self.error_output,
                         False
                     )
                 except Exception as ex:
                     self.process = None
-                    sublime.error_message("Lithium command execution has failed('%s')" % ((ex),))
+                    traceback.print_exception(ex)
+                    sublime.error_message(f"Lithium command execution has failed('{ex}')")
 
     def match_output(self, process, line):
         # None means end of LI process
@@ -331,7 +327,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
             if m is not None:
                 class_name = m.group(2)
                 class_name = class_name.replace('/', '.')
-                class_name = re.sub('\.class$', '', class_name)
+                class_name = re.sub('\\.class$', '', class_name)
                 self.found_items.append(class_name)
         else:
             l = len(self.found_items)
@@ -350,8 +346,8 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                         found_items,
                         self.class_name_selected)
             else:
-                OUTPUT(self).append_warn("No class has been found for '%s' word\n" % self.word)
-                #sublime.message_dialog("Import '%s' is already declared" % item)
+                OUTPUT(self).append_warn(f"No class has been found for '{self.word}' word\n")
+                #sublime.message_dialog(f"Import '{item}' is already declared")
 
     def class_name_selected(self, index):
         if index >= 0:
@@ -359,13 +355,13 @@ class LiCompleteImportCommand(LiJavaTextCommand):
             syntax  = self.syntax()
             imports = LiJava.java_imports(self.view, syntax)
             if imports is not None and next((x[1] for x in imports if x[1].endswith(item)), None) is not None:
-                OUTPUT(self).append_warn("%s: Import '%s' is already declared\n" % (self.__class__.__name__,item))
+                OUTPUT(self).append_warn(f"{self.__class__.__name__}: Import '{item}' is already declared\n")
             else:
                 scopes = self.view.scope_name(self.region.begin()).strip().split(" ")
                 index_to_insert  = 0
-                import_to_insert = "import %s" % item
+                import_to_insert = f"import {item}"
 
-                self.debug("LiCompleteImportCommand.class_name_selected(): detected syntax '%s' " % syntax)
+                self.debug(f"LiCompleteImportCommand.class_name_selected(): detected syntax '{syntax}'")
 
                 if self.inline:
                     self.view.replace(self.edit, self.region, item)
@@ -373,7 +369,7 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     # detect a place to insert the import
                     if imports is not None and len(imports) > 0:
                         for imp in imports:
-                            cmp_imp = "import %s" % imp[1] if imp[2] is False else "import static %s" % imp[1]
+                            cmp_imp = f"import {imp[1]}" if imp[2] is False else f"import static {imp[1]}"
                             if import_to_insert > cmp_imp:
                                 index_to_insert = index_to_insert + 1
                             else:
@@ -382,38 +378,38 @@ class LiCompleteImportCommand(LiJavaTextCommand):
                     if syntax == 'java':
                         if imports is not None and len(imports) > 0:
                             if index_to_insert >= len(imports):
-                                self.view.insert(self.edit, imports[len(imports) - 1][0].b, "\n%s;" % import_to_insert)
+                                self.view.insert(self.edit, imports[len(imports) - 1][0].b, f"\n{import_to_insert};")
                             else:
-                                self.view.insert(self.edit, imports[index_to_insert][0].a, "%s;\n" % import_to_insert)
+                                self.view.insert(self.edit, imports[index_to_insert][0].a, f"{import_to_insert};\n")
                         elif len(scopes) == 2 and scopes.index('source.java') >= 0 and scopes.index('support.class.java') >= 0:
-                            self.view.replace(self.edit, self.region, '%s;' % import_to_insert)
+                            self.view.replace(self.edit, self.region, f"{import_to_insert};")
                         else:
                             pkg_reg, pkg_name = LiJava.java_package(self.view, syntax)
-                            self.view.insert(self.edit, pkg_reg.b + 1, "\n\n%s;" % import_to_insert)
+                            self.view.insert(self.edit, pkg_reg.b + 1, f"\n\n{import_to_insert};")
                     elif syntax == 'kotlin':
                         if imports is not None:
-                            self.view.insert(self.edit, imports[0][0].a, "%s\n" % import_to_insert)
+                            self.view.insert(self.edit, imports[0][0].a, f"{import_to_insert}\n")
                         elif len(scopes) == 1 and scopes.index('source.Kotlin') >= 0:
-                            self.view.replace(self.edit, self.region, '%s' % import_to_insert)
+                            self.view.replace(self.edit, self.region, import_to_insert)
                         else:
                             self.view.replace(self.edit, self.region, item)
                     elif syntax == 'scala':
                         if imports is not None:
-                            self.view.insert(self.edit, imports[0][0].a, "%s\n" % import_to_insert)
+                            self.view.insert(self.edit, imports[0][0].a, f"{import_to_insert}\n")
                         elif len(scopes) == 2 and scopes.index('source.scala') >= 0 and scopes.index('support.constant.scala') >= 0:
-                            self.view.replace(self.edit, self.region, '%s' % import_to_insert)
+                            self.view.replace(self.edit, self.region, import_to_insert)
                         else:
                             self.view.replace(self.edit, self.region, item)
                     elif syntax == 'groovy':
                         if len(scopes) == 1 and scopes.index('source.groovy') >= 0:
-                            self.view.replace(self.edit, self.region, '%s' % import_to_insert)
+                            self.view.replace(self.edit, self.region, import_to_insert)
                         elif imports is not None:
-                            self.view.insert(self.edit, imports[0][0].a, "%s\n" % import_to_insert)
+                            self.view.insert(self.edit, imports[0][0].a, f"{import_to_insert}\n")
                         else:
                             self.view.replace(self.edit, self.region, item)
 
     def error_output(self, command, err):
-        sublime.error_message("Lithium class detection has failed: ('%s')" % (str(err), ))
+        sublime.error_message(f"Lithium class detection has failed: ('{err}')")
 
 class LiShowClassMethodsCommand(LiJavaTextCommand):
     filters     = [ True, True, True ]
@@ -445,14 +441,14 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
                 mt  = re.search(r"([a-zA-Z_][a-zA-Z0-9_]*\s*\([^()]*\))", self.selected_method)
                 self.view.insert(edit, region.a, mt.group(1))
             else:
-                sublime.error_message("No region has been detected to place ")
+                sublime.error_message("No region has been detected to place")
         else:
             self.package_name, self.package_type, self.class_name = LiJava.java_view_symbol(self.view)
 
             if self.package_name is not None:
-                self.full_class_name = self.package_name + "." + self.class_name
+                self.full_class_name = f"{self.package_name}.{self.class_name}"
                 self.exec(
-                    "LiJavaToolRunner:methods:%s" % self.full_class_name,
+                    f"LiJavaToolRunner:methods:{self.full_class_name}",
                     self.match_output,
                     self.error_output,
                     False, { "std": "none" }
@@ -461,7 +457,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
                 if len(self.detected_methods) > 0:
                     self.show()
                 else:
-                    sublime.error_message("No method has been discovered for %s" % self.full_class_name)
+                    sublime.error_message(f"No method has been discovered for '{self.full_class_name}'")
             else:
                 sublime.error_message("Nothing has been selected")
 
@@ -478,7 +474,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
             LiShowClassMethodsCommand.filters[index] = not value
             self.show()
 
-    def method_name_selected(self, index):
+    def method_name_selected(self, index:int):
         if index >= 0:
             self.selected_method = self.detected_methods[index]
         else:
@@ -512,7 +508,7 @@ class LiShowClassMethodsCommand(LiJavaTextCommand):
                 if bb:
                     new_item = self.detected_methods[i].replace('<', "&lt;")
                     new_item = new_item.replace('>', "&gt;")
-                    links.append("<li><a href='%s'>%s</a></li>" % ('none', new_item))
+                    links.append(f"<li><a href='none'>{new_item}</a></li>")
 
             marks = [ 'x' if f is True else '-' for f in filters ]
             self.view.show_popup(
@@ -536,7 +532,7 @@ class LiGotoClassCommand(LiJavaTextCommand):
         if class_name is None:
             self.warn("Class name cannot be detected")
         else:
-            full_class_name = package + "." + class_name if package is not None else class_name
+            full_class_name = f"{package}.{class_name}" if package is not None else class_name
             sublime.active_window().run_command(
                 "show_overlay",
                 { "overlay": "goto", "show_files" : "true", "text": full_class_name.replace('.', '/') }
@@ -556,21 +552,22 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
     """
 
     def run(self, edit, **args):
+        package = None
         if args.get('clazz') is not None:
-            word = args.get('clazz')
+            package, class_name = parse_java_classname(args.get('clazz'))
         else:
             package, pkg_type, class_name = LiJava.java_view_symbol(self.view)
 
         if package is not None:
-            self.full_class_name = package + "." + class_name
+            self.full_class_name = f"{package}.{class_name}"
             self.exec(
-                "LiJavaToolRunner:module:%s" % self.full_class_name, self.match_output, self.error_output, False, { "std": "none" }
+                f"LiJavaToolRunner:module:{self.full_class_name}", self.match_output, self.error_output, False, { "std": "none" }
             )
 
             if len(self.detected_modules) > 0:
                 self.show()
             else:
-                sublime.error_message("No module has been discovered for %s" % self.full_class_name)
+                sublime.error_message(f"No module has been discovered for {self.full_class_name}")
         else:
             self.full_class_name = None
             sublime.error_message("Nothing has been selected")
@@ -592,7 +589,7 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
         OUTPUT(self).append_err(err)
 
     def show(self):
-        items = [ '<li>%s</li>' % module for module in self.detected_modules ]
+        items = [ f"<li>{module}</li>" for module in self.detected_modules ]
         self.view.show_popup(
             LiShowClassModuleCommand.content % (self.full_class_name, "\n".join(items)),
             max_width = 1200,
@@ -604,18 +601,18 @@ class LiShowClassModuleCommand(LiJavaTextCommand):
 class LiShowClassInfoCommand(LiJavaTextCommand):
     def run(self, edit, **args):
         if args.get('clazz') is not None:
-            word = args.get('clazz')
+            pkg, class_name = parse_java_classname(args.get('clazz'))
         else:
             pkg, pkg_type, class_name = LiJava.java_view_symbol(self.view)
 
         if pkg is not None:
-            full_class_name = pkg + "." + class_name
+            full_class_name = f"{pkg}.{class_name}"
 
-            self.exec("LiJavaToolRunner:classInfo:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" })
+            self.exec(f"LiJavaToolRunner:classInfo:{full_class_name}", self.match_output, self.error_output, False, { "std": "none" })
             if len(self.matched_results) > 0:
                 LiClassInfo(json.loads(''.join(self.matched_results))).show(self.view)
             else:
-                sublime.error_message("No module has been discovered for %s" % full_class_name)
+                sublime.error_message(f"No module has been discovered for {full_class_name}")
         else:
             sublime.error_message("Class name and package cannot be fetched")
 
@@ -657,9 +654,9 @@ class LiShowClassFieldCommand(LiJavaTextCommand):
     def run(self, edit, **args):
         pkg, pkg_type, class_name = LiJava.java_view_symbol(self.view)
         if pkg is not None:
-            full_class_name = pkgf + "." + class_name
+            full_class_name = f"{pkg}.{class_name}"
             self.exec(
-                "LiJavaToolRunner:field:%s" % full_class_name, self.match_output, self.error_output, False, { "std": "none" }
+                f"LiJavaToolRunner:field:{full_class_name}", self.match_output, self.error_output, False, { "std": "none" }
             )
 
             if self.outputText is not None and len(self.outputText) > 0:
@@ -672,7 +669,7 @@ class LiShowClassFieldCommand(LiJavaTextCommand):
                     self.detected_field = self.detected_field.replace("\n", "<br/>")
                     self.show()
             else:
-                sublime.error_message("No field value has been discovered for %s" % full_class_name)
+                sublime.error_message(f"No field value has been discovered for {full_class_name}")
         else:
             sublime.error_message("Nothing has been selected")
 
@@ -725,9 +722,10 @@ class LiShowDocCommand(LiTextCommand):
         webbrowser.open(link)
 
     def open_dash_doc(self, syntax, word):
+        conf  = self.settings()
         prx   = 'doc_servers.dash'
-        keys  = self.settings()[prx + '.keys_map.' + syntax, None]
-        query = self.settings()[prx + '.' + syntax + '.url', self.settings()[prx + '.*.url']]
+        keys  = conf.get(f"{prx}.keys_map.{syntax}", None)
+        query = conf.get(f"{prx}.{syntax}.url", conf[f"{prx}.*.url"])
         query = query % (','.join(keys), quote(word))
 
         if platform.system() == 'Windows':
@@ -735,7 +733,7 @@ class LiShowDocCommand(LiTextCommand):
         elif platform.system() == 'Linux':
             subprocess.call([ '/usr/bin/xdg-open', query ])
         else:
-            self.debug("LiShowDocCommand().open_dash_doc(): Open dash '%s'" % query)
+            self.debug(f"LiShowDocCommand().open_dash_doc(): Open dash '{query}'")
             subprocess.call([ '/usr/bin/open', '-g', query ])
 
     # fetch list of available links to an api doc for the given word  InputStream
@@ -745,13 +743,14 @@ class LiShowDocCommand(LiTextCommand):
         if syntax is not None:
             result = []
             data   = None
-            query  = self.settings()['doc_servers.solr.' + syntax + '.url'].format(core = syntax, word = word)
+            query  = self.settings()[f"doc_servers.solr.{syntax}.url"].format(core = syntax, word = word)
 
             try:
                 with urlopen(query) as response:
                     data = json.loads(response.read().decode('utf-8'))
             except Exception as ex:
-                sublime.error_message("Cannot find %s:'%s'(%s)" % (syntax, word, str(ex)))
+                traceback.print_exception(ex)
+                sublime.error_message(f"Cannot find {syntax}:'{word}'({ex})")
                 return
 
             for doc in data['response']['docs']:
@@ -759,10 +758,10 @@ class LiShowDocCommand(LiTextCommand):
                 basename = os.path.basename(path)
                 dirname  = os.path.dirname(path)
                 title    = os.path.basename(dirname) + "/" + basename
-                result.append("<a style='display:block;' href='file://{path}'>{title}</a>".format(path = path, title = title))
+                result.append(f"<a style='display:block;' href='file://{path}'>{title}</a>")
 
             if len(result) > 0:
-                self.view.set_status('apidoc', "'%s' search for '%s'" % (syntax, quote(word)))
+                self.view.set_status('apidoc', f"'{syntax}' search for '{quote(word)}'")
 
                 if show_immediate == True:
                     self.open_link("file://" + os.path.realpath(data['response']['docs'][0]['resourcename'][0]))
@@ -777,7 +776,7 @@ class LiShowDocCommand(LiTextCommand):
                         on_navigate = self.open_link)
 
         else:
-            self.view.set_status('apidoc', '%s search criteria is empty' % syntax)
+            self.view.set_status('apidoc', f"{syntax} search criteria is empty")
 
 
 class LiShowLocationsCommand(LiTextCommand):
@@ -799,7 +798,7 @@ class LiShowLocationsCommand(LiTextCommand):
                 else:
                     sublime.error_message("liGoToLocationCommand.run(): There is no an active view to go")
             else:
-                locs = [ ["%s:%s" % (location[0], location[1]), location[2]] for location in self.panel.get_locations() ]
+                locs = [ [f"{location[0]}:{location[1]}", location[2]] for location in self.panel.get_locations() ]
                 sublime.active_window().show_quick_panel(
                     locs,
                     self.done,
