@@ -134,18 +134,13 @@ module Files
         args[0] = "\"#{args[0]}\"" if !args[0].index(' ').nil? && args[0][0] != "\""
         # merged stderr and stdout
         Open3.popen2e(args.join(' ')) { | stdin, stdout, thread |
+            # close stdin
+            stdin.close
             stdout.set_encoding(Encoding::UTF_8)
             if  block.nil?
-                # close stdin
-                stdin.close
-
                 stdout.each { | line |
                     $stdout.puts line
                 }
-
-                # while line = stdout.gets do
-                #     $stdout.puts line
-                # end
             else
                 block.call(stdin, stdout, thread)
             end

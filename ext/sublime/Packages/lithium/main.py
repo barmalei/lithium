@@ -14,7 +14,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'lib'))
 for mod_name in LI_MODULES.keys():
     try:
         importlib.import_module(mod_name)
-        importlib.reload(module)
+        #importlib.reload(module)
     except AttributeError:
         fp, pathname, description = imp.find_module(mod_name)
         imp.load_module(mod_name, fp, pathname, description)
