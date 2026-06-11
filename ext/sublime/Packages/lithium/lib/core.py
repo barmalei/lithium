@@ -267,7 +267,7 @@ class Lithium:
         # Python 3.3
         process = subprocess.Popen(
             script_path + " " + options_str  + " " + command,
-            shell  = True,
+            shell  = False,
             stdin  = subprocess.PIPE,
             stdout = subprocess.PIPE,
             stderr = subprocess.STDOUT,
@@ -289,6 +289,7 @@ class Lithium:
         if run_async:
             def WRITES(process, output_handler, error_handler):
                 try:
+                    process.stdin.close()
                     for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
                         if output_handler is not None:
                             output_handler(process, line)
