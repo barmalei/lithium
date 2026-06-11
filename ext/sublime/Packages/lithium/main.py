@@ -4,6 +4,9 @@ from itertools      import groupby
 from urllib.request import urlopen
 from urllib.parse   import quote
 
+import platform
+print("Python '%s'" % platform.python_version())
+
 LI_MODULES = {
     'core': [ 'LiHelper', 'LiTextCommand', 'LiWindowCommand'] , 'java': [ 'LiJava' ], 'ui': [], 'classinfo': [ 'LiClassInfo']
 }
