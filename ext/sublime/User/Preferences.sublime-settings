@@ -1,4 +1,6 @@
 {
+	"disable_plugin_host_3.3": true,
+
 	"caret_style": "phase",
 	"color_scheme2": "Packages/User/Color Highlighter/themes/iPlastic.tmTheme",
 	"draw_minimap_border": true,

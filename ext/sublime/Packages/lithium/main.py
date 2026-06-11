@@ -1,6 +1,4 @@
-import traceback
-
-import sublime, sublime_plugin, subprocess, os, platform, json, re, webbrowser, importlib
+import sublime, sublime_plugin, subprocess, os, platform, json, re, webbrowser, importlib, traceback
 
 from itertools      import groupby
 from urllib.request import urlopen

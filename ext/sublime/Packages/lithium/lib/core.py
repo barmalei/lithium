@@ -237,36 +237,15 @@ class Lithium:
             bufsize = 1
         )
 
-        # process = subprocess.run( #
-        #     #[script_path , options_str, command],
-        #     f"{script_path} {options_str} {command}",
-        #     shell  = True,
-        #     stdin  = subprocess.PIPE,
-        #     stdout = subprocess.PIPE,
-        #     stderr = subprocess.STDOUT,
-        #     universal_newlines = False,
-        #     bufsize = 0
-        # )
-
-
         if run_async:
             LiLog.debug("Run process as async one")
 
             def WRITES(process, output_handler, error_handler):
                 try:
-                    for line in io.TextIOWrapper(process.stdout, encoding = 'utf-8', errors='strict'):
+                    process.stdin.close()
+                    for line in io.TextIOWrapper(process.stdout, encoding='utf-8', errors='strict'):
                         if output_handler is not None:
                             output_handler(process, line)
-
-                    # outs, errs = process.communicate()
-                    # for line in outs.split("\n"):
-                    #     if output_handler is not None:
-                    #         output_handler(process, line + "\n")
-
-                    # if errs is not None:
-                    #     for line in errs.split("\n"):
-                    #         if output_handler is not None:
-                    #             output_handler(process, line + "\n")
 
                     # tell the last line has been handled
                     process.stdout.close()

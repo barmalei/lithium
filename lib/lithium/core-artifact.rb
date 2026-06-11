@@ -859,9 +859,12 @@ class SdkEnvironmen < EnvArtifact
         super
 
         if @sdk_home.nil? && !tool_name.nil?
-            @sdk_home = Files.which(tool_name, true)
-            @sdk_home = File.dirname(File.dirname(@sdk_home)) unless @sdk_home.nil?
+            detected = Files.which(tool_name, true)
+            unless detected.nil? || detected.start_with?('/usr/bin/') || /^\/[^\/]+\/[^\/]+$/.match?(detected)
+                @sdk_home = File.dirname(File.dirname(detected))
+            end
         end
+
 
         if @sdk_home.nil? || !File.exist?(@sdk_home)
             @sdk_home = force_sdkhome_detection()
