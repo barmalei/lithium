@@ -4,7 +4,7 @@
       "*": [
          "python-jinja2",
          "markupsafe",
-         "yaml"
+         "PyYAML"
       ]
    }
 }
